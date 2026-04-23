@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-MpComputerStatus | Select-Object SmartAppControlState, SmartAppControlExpiration 2>&1; \\(Get-CimInstance -Namespace root/Microsoft/Windows/CI -ClassName CITestedPolicy -ErrorAction SilentlyContinue\\) 2>&1 | Out-Null; Get-ItemProperty -Path \"HKLM:\\\\SYSTEM\\\\CurrentControlSet\\\\Control\\\\CI\\\\Policy\" -ErrorAction SilentlyContinue | Select-Object VerifiedAndReputablePolicyState)",
+      "Bash(timeout 25 npx --no-install next build --webpack)",
+      "Bash(timeout 60 npx --no-install next build --webpack)",
+      "Bash(rm -rf .next)",
+      "Bash(npm install *)",
+      "Bash(timeout 90 npx --no-install next build --webpack)"
+    ]
+  }
+}
