@@ -58,8 +58,100 @@ function Divider() {
   return <span className="w-px h-6 bg-slate-200 mx-1" />;
 }
 
+function HtmlPasteModal({
+  open,
+  onClose,
+  onConfirm,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onConfirm: (html: string) => void;
+}) {
+  const [html, setHtml] = useState("");
+
+  useEffect(() => {
+    if (!open) setHtml("");
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      onClick={onClose}
+    >
+      <div
+        className="w-[min(800px,92vw)] max-h-[90vh] bg-white rounded-xl shadow-xl border border-slate-200 flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200">
+          <h3 className="font-semibold text-slate-800">HTML 붙여넣기</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-7 h-7 rounded hover:bg-slate-100 text-slate-500"
+            title="닫기"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-auto p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="flex flex-col">
+            <label className="text-xs text-slate-500 mb-1">HTML 소스</label>
+            <textarea
+              value={html}
+              onChange={(e) => setHtml(e.target.value)}
+              placeholder="<p>여기에 HTML을 붙여넣으세요</p>"
+              className="flex-1 min-h-[280px] font-mono text-sm p-3 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 resize-none"
+            />
+          </div>
+          <div className="flex flex-col">
+            <label className="text-xs text-slate-500 mb-1">미리보기</label>
+            <div
+              className="prose-editor flex-1 min-h-[280px] p-3 border border-slate-200 rounded-lg overflow-auto bg-slate-50"
+              dangerouslySetInnerHTML={{ __html: html }}
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-slate-200 bg-slate-50">
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-9 px-4 rounded-lg border border-slate-200 bg-white text-sm hover:bg-slate-100"
+          >
+            취소
+          </button>
+          <button
+            type="button"
+            disabled={!html.trim()}
+            onClick={() => {
+              onConfirm(html);
+              onClose();
+            }}
+            className="h-9 px-4 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            확인
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Toolbar({ editor }: { editor: Editor }) {
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const [htmlModalOpen, setHtmlModalOpen] = useState(false);
   const [, forceUpdate] = useState(0);
 
   useEffect(() => {
@@ -113,6 +205,12 @@ function Toolbar({ editor }: { editor: Editor }) {
       .focus()
       .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
       .run();
+
+  const insertHtml = (html: string) => {
+    editor.chain().focus().insertContent(html, {
+      parseOptions: { preserveWhitespace: "full" },
+    }).run();
+  };
 
   return (
     <div className="sticky top-0 z-10 flex flex-wrap items-center gap-1 p-2 bg-slate-50 border-b border-slate-200">
@@ -319,6 +417,16 @@ function Toolbar({ editor }: { editor: Editor }) {
 
       <Divider />
 
+      <ToolbarButton title="HTML 붙여넣기" onClick={() => setHtmlModalOpen(true)}>
+        <span className="text-[10px] font-bold tracking-tight">HTML</span>
+      </ToolbarButton>
+
+      <HtmlPasteModal
+        open={htmlModalOpen}
+        onClose={() => setHtmlModalOpen(false)}
+        onConfirm={insertHtml}
+      />
+
       <ToolbarButton title="표 삽입 (3x3)" onClick={insertTable}>
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -479,7 +587,7 @@ function TableContextMenu({ editor }: { editor: Editor }) {
   );
 }
 
-export default function RichEditor() {
+export default function TibTapEditor() {
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
