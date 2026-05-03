@@ -1,228 +1,142 @@
 "use client";
 
-import { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-
-type Role = "buyer" | "seller";
-
-const ROLE_META: Record<Role, { label: string; sub: string; accent: string; ring: string }> = {
-  buyer: {
-    label: "구매자",
-    sub: "분양 정보 탐색 · 찜 · 문의",
-    accent: "from-sky-500 to-blue-600",
-    ring: "focus:ring-blue-200",
-  },
-  seller: {
-    label: "판매자",
-    sub: "매물 등록 · 상담 관리 · 통계",
-    accent: "from-amber-500 to-orange-600",
-    ring: "focus:ring-amber-200",
-  },
-};
 
 export default function LoginPage() {
-  const router = useRouter();
-  const [role, setRole] = useState<Role>("buyer");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [remember, setRemember] = useState(true);
-  const [showPw, setShowPw] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const meta = ROLE_META[role];
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    if (!email || !password) {
-      setError("이메일과 비밀번호를 모두 입력해주세요.");
-      return;
-    }
-    setLoading(true);
-    try {
-      await new Promise((r) => setTimeout(r, 600));
-      router.push(role === "seller" ? "/seller" : "/");
-    } catch {
-      setError("로그인에 실패했어요. 잠시 후 다시 시도해주세요.");
-    } finally {
-      setLoading(false);
-    }
+  const handleKakaoLogin = () => {
+    // TODO: 카카오 OAuth 연동
+    // window.location.href = `${KAKAO_AUTH_URL}`;
   };
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center px-4 py-10"
-      style={{
-        fontFamily: "var(--font-suite)",
-        background:
-          "radial-gradient(1200px 600px at 10% -10%, #dbeafe 0%, transparent 60%), radial-gradient(900px 500px at 110% 10%, #fef3c7 0%, transparent 55%), #f8fafc",
-      }}
-    >
-      <div className="w-full max-w-md">
-        <div className="flex flex-col items-center mb-6">
-          <div className="flex items-center gap-2 text-2xl font-extrabold text-slate-800">
-            <span className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-gradient-to-br from-sky-500 to-amber-500 text-white shadow-md">
-              ⚡
-            </span>
-            번개분양
+    <div className="min-h-screen bg-[#0f1115] text-white font-sans relative overflow-hidden flex flex-col">
+      {/* 배경 글로우 */}
+      <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-blue-600/20 blur-[140px] rounded-full pointer-events-none" />
+      <div className="absolute bottom-[-15%] right-[-10%] w-[500px] h-[400px] bg-cyan-500/10 blur-[140px] rounded-full pointer-events-none" />
+
+      {/* 상단 로고/뒤로가기 */}
+      <header className="relative z-10 max-w-5xl w-full mx-auto px-6 h-16 flex items-center justify-between">
+        <Link href="/" className="flex items-center gap-2 group">
+          <span className="text-2xl font-black bg-clip-text text-transparent bg-linear-to-r from-blue-400 to-cyan-400 tracking-tighter group-hover:scale-105 transition-transform">
+            찍고
+          </span>
+        </Link>
+        <Link
+          href="/"
+          className="text-xs text-slate-400 hover:text-white transition-colors"
+        >
+          닫기
+        </Link>
+      </header>
+
+      {/* 메인 영역 */}
+      <main className="relative z-10 flex-1 flex items-center justify-center px-6 py-10">
+        <div className="w-full max-w-md">
+          {/* 헤드라인 */}
+          <div className="text-center mb-5">
+            <div className="inline-flex items-center gap-1.5 bg-blue-500/10 border border-blue-400/20 text-blue-300 text-xs font-bold px-3 py-1.5 rounded-full">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+              번거로운 가입절차 NO
+            </div>
+
+            <h1 className="text-3xl md:text-4xl font-black tracking-tight leading-snug">
+              <span className="bg-clip-text text-transparent bg-linear-to-r from-blue-400 to-cyan-400">
+                간편하게
+              </span>
+              <br />
+              <span className="text-white">찍고 서비스를 이용하세요</span>
+            </h1>
+            <p className="text-sm text-slate-400 mt-4 leading-relaxed">
+              복잡한 가입절차 없이
+              <br />
+              지금 바로 시작할 수 있어요.
+            </p>
           </div>
-          <p className="mt-2 text-sm text-slate-500">빠르고 정확한 분양 정보</p>
-        </div>
 
-        <div className="bg-white/90 backdrop-blur rounded-2xl shadow-xl border border-slate-100 p-6 sm:p-8">
-          <div className="grid grid-cols-2 gap-1 p-1 bg-slate-100 rounded-xl mb-6">
-            {(Object.keys(ROLE_META) as Role[]).map((r) => {
-              const active = role === r;
-              return (
-                <button
-                  key={r}
-                  type="button"
-                  onClick={() => setRole(r)}
-                  className={`relative h-11 rounded-lg text-sm font-bold transition-all ${
-                    active
-                      ? `bg-gradient-to-r ${ROLE_META[r].accent} text-white shadow`
-                      : "text-slate-500 hover:text-slate-700"
-                  }`}
-                >
-                  {ROLE_META[r].label}
-                </button>
-              );
-            })}
-          </div>
-
-          <p className="text-xs text-slate-500 -mt-3 mb-5 text-center">{meta.sub}</p>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                이메일
-              </label>
-              <input
-                type="email"
-                autoComplete="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className={`base-input ${meta.ring}`}
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                비밀번호
-              </label>
-              <div className="relative">
-                <input
-                  type={showPw ? "text" : "password"}
-                  autoComplete="current-password"
-                  placeholder="비밀번호를 입력하세요"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className={`base-input pr-12 ${meta.ring}`}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPw((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 hover:text-slate-700"
-                >
-                  {showPw ? "숨기기" : "보이기"}
-                </button>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between text-sm">
-              <label className="flex items-center gap-2 cursor-pointer select-none text-slate-600">
-                <input
-                  type="checkbox"
-                  checked={remember}
-                  onChange={(e) => setRemember(e.target.checked)}
-                  className="w-4 h-4 accent-blue-600"
-                />
-                로그인 유지
-              </label>
-              <Link
-                href="/auth/find-password"
-                className="text-slate-500 hover:text-slate-800"
-              >
-                비밀번호 찾기
-              </Link>
-            </div>
-
-            {error && (
-              <div className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
-                {error}
-              </div>
-            )}
-
+          {/* 로그인 카드 */}
+          <div className="bg-[#1a1d23] border border-white/10 rounded-3xl p-7 shadow-2xl shadow-black/40">
+            {/* 카카오 로그인 버튼 */}
             <button
-              type="submit"
-              disabled={loading}
-              className={`btn-base w-full h-12 bg-gradient-to-r ${meta.accent}`}
+              onClick={handleKakaoLogin}
+              className="w-full h-14 bg-[#FEE500] hover:bg-[#FDD800] active:scale-[0.98] text-[#191919] rounded-2xl font-bold text-base flex items-center justify-center gap-3 transition-all shadow-lg shadow-yellow-500/10"
             >
-              {loading ? "로그인 중..." : `${meta.label}로 로그인`}
+              <Image
+                src="/kakao_logo.png"
+                width={20}
+                height={20}
+                alt="카카오"
+                className="object-contain"
+              />
+              카카오로 간편하게 시작하기
             </button>
-          </form>
 
-          <div className="flex items-center gap-3 my-6">
-            <div className="flex-1 h-px bg-slate-200" />
-            <span className="text-xs text-slate-400">또는 간편 로그인</span>
-            <div className="flex-1 h-px bg-slate-200" />
+            {/* 네이버 자리 (준비중) */}
+            {/* <button
+              disabled
+              className="mt-3 w-full h-14 bg-white/5 border border-white/5 text-slate-500 rounded-2xl font-bold text-base flex items-center justify-center gap-3 cursor-not-allowed"
+            >
+              <span className="w-5 h-5 rounded-md bg-[#03C75A]/40 text-white text-[11px] font-black flex items-center justify-center">
+                N
+              </span>
+              네이버 로그인 (준비중)
+            </button> */}
+
+            {/* 안내문 */}
+            <p className="text-[11px] text-slate-500 text-center leading-relaxed mt-6">
+              로그인 시{" "}
+              <Link href="/terms" className="text-slate-300 underline underline-offset-2 hover:text-white">
+                이용약관
+              </Link>
+              {" 및 "}
+              <Link href="/privacy" className="text-slate-300 underline underline-offset-2 hover:text-white">
+                개인정보 처리방침
+              </Link>
+              에<br />
+              동의하는 것으로 간주됩니다.
+            </p>
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
-            <SocialButton label="카카오" bg="#FEE500" color="#000">
-              K
-            </SocialButton>
-            <SocialButton label="네이버" bg="#03C75A" color="#fff">
-              N
-            </SocialButton>
-            <SocialButton label="구글" bg="#fff" color="#1f2937" border>
-              G
-            </SocialButton>
-          </div>
+          {/* 하단 셀링 포인트 */}
+          <ul className="mt-8 space-y-2.5 text-sm text-slate-400">
+            <li className="flex items-center gap-2.5">
+              <CheckIcon />
+              가입 별도 절차 없이 즉시 이용
+            </li>
+            <li className="flex items-center gap-2.5">
+              <CheckIcon />
+              내 주변 성지·시세 알림 받기
+            </li>
+            <li className="flex items-center gap-2.5">
+              <CheckIcon />
+              찜한 매장·후기 한 곳에서 관리
+            </li>
+          </ul>
         </div>
+      </main>
 
-        <p className="text-center text-sm text-slate-500 mt-6">
-          아직 회원이 아니신가요?{" "}
-          <Link
-            href={`/auth/register?role=${role}`}
-            className="font-bold text-slate-800 hover:underline"
-          >
-            회원가입
-          </Link>
-        </p>
-      </div>
+      <footer className="relative z-10 text-center text-[11px] text-slate-600 pb-6">
+        © {new Date().getFullYear()} 찍고. 성지를 찍고, 가격을 찍고.
+      </footer>
     </div>
   );
 }
 
-function SocialButton({
-  children,
-  label,
-  bg,
-  color,
-  border,
-}: {
-  children: React.ReactNode;
-  label: string;
-  bg: string;
-  color: string;
-  border?: boolean;
-}) {
+function CheckIcon() {
   return (
-    <button
-      type="button"
-      className={`h-11 rounded-xl text-sm font-bold flex items-center justify-center gap-1.5 transition-all hover:-translate-y-0.5 active:translate-y-0 ${
-        border ? "border border-slate-200" : ""
-      }`}
-      style={{ background: bg, color }}
-    >
-      <span className="w-5 h-5 rounded-full bg-white/50 flex items-center justify-center text-[11px] font-black">
-        {children}
-      </span>
-      {label}
-    </button>
+    <span className="w-5 h-5 rounded-full bg-blue-500/15 text-blue-400 flex items-center justify-center shrink-0">
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        className="w-3 h-3"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <polyline points="20 6 9 17 4 12" />
+      </svg>
+    </span>
   );
 }

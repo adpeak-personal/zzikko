@@ -1,0 +1,17 @@
+<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="favPinGrad" cx="50%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#5DADE2"/>
+      <stop offset="100%" stop-color="#1E5F9E"/>
+    </radialGradient>
+  </defs>
+
+  <rect x="0" y="0" width="64" height="64" rx="12" fill="#E8F1FA"/>
+
+  <g transform="translate(32, 34)">
+    <ellipse cx="0" cy="22" rx="10" ry="2.5" fill="#000000" opacity="0.18"/>
+    <path d="M 0 -24 C -14 -24 -20 -14 -20 -6 C -20 6 -10 12 0 24 C 10 12 20 6 20 -6 C 20 -14 14 -24 0 -24 Z" fill="url(#favPinGrad)" stroke="#143E66" stroke-width="2" stroke-linejoin="round"/>
+    <circle cx="0" cy="-7" r="8" fill="#FFFFFF"/>
+    <path d="M 0 -14 L 2 -9 L 7 -9 L 3 -6 L 4.5 -1 L 0 -4 L -4.5 -1 L -3 -6 L -7 -9 L -2 -9 Z" fill="#FFB703" stroke="#FB8500" stroke-width="0.5" stroke-linejoin="round"/>
+  </g>
+</svg>

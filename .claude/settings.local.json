@@ -6,7 +6,9 @@
       "Bash(timeout 60 npx --no-install next build --webpack)",
       "Bash(rm -rf .next)",
       "Bash(npm install *)",
-      "Bash(timeout 90 npx --no-install next build --webpack)"
+      "Bash(timeout 90 npx --no-install next build --webpack)",
+      "Bash(git -C c:/project/zzikko mv zzikko-front/src/app/\\\\\\(app\\\\\\)/c zzikko-front/src/app/\\\\\\(app\\\\\\)/category)",
+      "PowerShell(Copy-Item -Path \"c:\\\\project\\\\zzikko\\\\zzikko-front\\\\src\\\\app\\\\\\(app\\)\\\\c\" -Destination \"c:\\\\project\\\\zzikko\\\\zzikko-front\\\\src\\\\app\\\\\\(app\\)\\\\category\" -Recurse -Force)"
     ]
   }
 }

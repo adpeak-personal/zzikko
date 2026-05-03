@@ -1,84 +1,26 @@
 'use client';
 
-import Image from "next/image";
 import Link from "next/link";
+import Logo from "@/components/common/Logo";
+import { CATEGORIES } from "@/config/navigation";
 
 
 export default function Home({ serverUser }: { serverUser: any }) {
 
 
-  // ⭐ 핵심: Zustand 스토어에 데이터가 아직 없다면(하이드레이션 전), 
+  // ⭐ 핵심: Zustand 스토어에 데이터가 아직 없다면(하이드레이션 전),
   // 서버에서 넘겨받은 데이터를 우선적으로 보여준다!
   // const currentUser = user || serverUser;
 
-  const menus = [
-    {
-      title: "휴대폰 성지",
-      icon: "📍",
-      color: "bg-red-50",
-      text: "text-red-600",
-      desc: "내 주변 최저가 좌표",
-    },
-    {
-      title: "온라인 성지",
-      icon: "🌐",
-      color: "bg-blue-50",
-      text: "text-blue-600",
-      desc: "전국 비대면 당일개통",
-    },
-    {
-      title: "인터넷+TV",
-      icon: "📺",
-      color: "bg-purple-50",
-      text: "text-purple-600",
-      desc: "최대 현금 사은품",
-    },
-    {
-      title: "구매후기",
-      icon: "⭐️",
-      color: "bg-yellow-50",
-      text: "text-yellow-600",
-      desc: "실제 이용자 리얼 리뷰",
-    },
-    // {
-    //   title: "꿀팁게시판",
-    //   icon: "💡",
-    //   color: "bg-green-50",
-    //   text: "text-green-600",
-    //   desc: "호갱 탈출 필수 지식",
-    // },
-    // {
-    //   title: "질문·답변",
-    //   icon: "❓",
-    //   color: "bg-gray-50",
-    //   text: "text-gray-600",
-    //   desc: "궁금하신 부분 물어보세요",
-    // },
-    // {
-    //   title: "휴대폰 정보",
-    //   icon: "📱",
-    //   color: "bg-orange-50",
-    //   text: "text-orange-600",
-    //   desc: "신규 기종 스펙 비교",
-    // },
-  ];
+  const menus = CATEGORIES;
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">
       {/* GNB */}
       <nav className="bg-[#0f1115] border-b border-white/5">
         <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 cursor-pointer group">
-            <div className="relative h-8 transition-transform group-hover:scale-110">
-              {/* 로고 파일이 없다면 텍스트로 대체 가능합니다 */}
-              <div className="h-full w-full flex items-center">
-                <Image src="/logo.png" width={50} height={50} priority className="object-contain mr-2" alt="로고 이미지" />
-                <span className="text-2xl font-black bg-clip-text text-transparent bg-linear-to-r from-blue-400 to-cyan-400 tracking-tighter">
-                  찍고
-                </span>
-              </div>
-            </div>
-          </Link>
+          <Logo width={140} priority />
+
 
           <Link href="/auth/login" className="text-xs font-bold text-white bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition-all">
             로그인
@@ -133,10 +75,10 @@ export default function Home({ serverUser }: { serverUser: any }) {
       {/* Main Content */}
       <main className="max-w-5xl mx-auto px-6 -mt-10 mb-20 relative z-20">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {menus.map((menu, idx) => (
+          {menus.map((menu) => (
             <Link
-              key={idx}
-              href="/"
+              key={menu.slug}
+              href={`/category/${menu.slug}`}
               className="group bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl hover:border-blue-100 transition-all hover:-translate-y-1"
             >
               <div
