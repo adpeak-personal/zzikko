@@ -4,7 +4,7 @@ const nextConfig: NextConfig = {
   async rewrites() {
     const backendUrl = process.env.NODE_ENV === "production"
       ? "http://backend:4000"
-      : process.env.NEXT_PUBLIC_BACK_API;
+      : process.env.NEXT_PUBLIC_BACK_API ?? "http://localhost:4000";
     return [
       {
         source: "/api/:path*",

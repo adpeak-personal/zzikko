@@ -8,7 +8,24 @@
       "Bash(npm install *)",
       "Bash(timeout 90 npx --no-install next build --webpack)",
       "Bash(git -C c:/project/zzikko mv zzikko-front/src/app/\\\\\\(app\\\\\\)/c zzikko-front/src/app/\\\\\\(app\\\\\\)/category)",
-      "PowerShell(Copy-Item -Path \"c:\\\\project\\\\zzikko\\\\zzikko-front\\\\src\\\\app\\\\\\(app\\)\\\\c\" -Destination \"c:\\\\project\\\\zzikko\\\\zzikko-front\\\\src\\\\app\\\\\\(app\\)\\\\category\" -Recurse -Force)"
+      "PowerShell(Copy-Item -Path \"c:\\\\project\\\\zzikko\\\\zzikko-front\\\\src\\\\app\\\\\\(app\\)\\\\c\" -Destination \"c:\\\\project\\\\zzikko\\\\zzikko-front\\\\src\\\\app\\\\\\(app\\)\\\\category\" -Recurse -Force)",
+      "Bash(npm -v)",
+      "Bash(echo \"npm: $\\(npm -v\\)\")",
+      "Bash(pnpm -v)",
+      "Bash(echo \"pnpm: $\\(pnpm -v || echo none\\)\")",
+      "Bash(cd zzikko-back *)",
+      "Bash(npm run *)",
+      "Bash(timeout 8 node dist/main.js)",
+      "Bash(node -e \"console.log\\('@fastify/jwt', require\\('@fastify/jwt/package.json'\\).version\\)\")",
+      "Bash(cd /c/project/zzikko && grep -A6 '\"paths\"' zzikko-front/tsconfig.json)",
+      "Read(//c/c/project/zzikko/zzikko-front/**)",
+      "Bash(curl -s http://127.0.0.1:4000/health)",
+      "Bash(curl -s http://127.0.0.1:4000/api/auth/kakao/url)",
+      "Bash(curl -s -o - -w \" [%{http_code}]\" http://127.0.0.1:4000/api/auth/me)",
+      "Bash(curl -s -o - -w \" [%{http_code}]\" -X POST http://127.0.0.1:4000/api/auth/refresh -H \"Content-Type: application/json\" -d '{\"refreshToken\":\"bad\"}')",
+      "Bash(curl -s -o - -w \" [%{http_code}]\" -X POST http://127.0.0.1:4000/api/auth/kakao -H \"Content-Type: application/json\" -d '{}')",
+      "Bash(node -e \"const m=require\\('mysql2/promise'\\);\\(async\\(\\)=>{const c=await m.createConnection\\({host:'127.0.0.1',user:'root',password:'rkwkrh13!#',database:'zzikko'}\\);const[r]=await c.query\\('SHOW COLUMNS FROM users'\\);console.log\\(r.map\\(x=>x.Field\\).join\\(', '\\)\\);console.log\\('---profiles---'\\);try{const[p]=await c.query\\('SHOW COLUMNS FROM user_profiles'\\);console.log\\(p.map\\(x=>x.Field\\).join\\(', '\\)\\)}catch\\(e\\){console.log\\('no user_profiles:',e.code\\)}await c.end\\(\\)}\\)\\(\\)\")",
+      "Bash(node -e \"const m=require\\('mysql2/promise'\\);\\(async\\(\\)=>{const c=await m.createConnection\\({host:'127.0.0.1',user:'root',password:'rkwkrh13!#',database:'zzikko'}\\);const[r]=await c.query\\('SHOW COLUMNS FROM users'\\);for\\(const x of r\\){console.log\\(x.Field.padEnd\\(20\\),x.Type.padEnd\\(40\\),x.Null,x.Default??''\\)}await c.end\\(\\)}\\)\\(\\)\")"
     ]
   }
 }

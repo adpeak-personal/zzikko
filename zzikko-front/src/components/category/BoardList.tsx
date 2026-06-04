@@ -24,11 +24,10 @@ export default function BoardList({ slug, posts, showRating = false }: Props) {
   return (
     <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
       {/* PC 헤더 */}
-      <div className="hidden md:grid grid-cols-[72px_1fr_120px_80px_80px_120px] gap-4 px-5 py-3 bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500">
+      <div className="hidden md:grid grid-cols-[72px_1fr_120px_80px_120px] gap-4 px-5 py-3 bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500">
         <div className="text-center">썸네일</div>
         <div>제목</div>
         <div className="text-center">작성자</div>
-        <div className="text-center">댓글</div>
         <div className="text-center">조회</div>
         <div className="text-center">작성일</div>
       </div>
@@ -41,7 +40,7 @@ export default function BoardList({ slug, posts, showRating = false }: Props) {
               className="block hover:bg-slate-50 transition-colors"
             >
               {/* PC 행 */}
-              <div className="hidden md:grid grid-cols-[72px_1fr_120px_80px_80px_120px] gap-4 items-center px-5 py-3 text-sm">
+              <div className="hidden md:grid grid-cols-[72px_1fr_120px_80px_120px] gap-4 items-center px-5 py-3 text-sm">
                 <div className="flex justify-center">
                   {post.thumb ? (
                     <div className="relative w-14 h-14 rounded-lg overflow-hidden bg-slate-100 border border-slate-200">
@@ -75,7 +74,6 @@ export default function BoardList({ slug, posts, showRating = false }: Props) {
                   )}
                 </div>
                 <div className="text-center text-slate-600 text-xs truncate">{post.author}</div>
-                <div className="text-center text-slate-500 text-xs">{post.comments}</div>
                 <div className="text-center text-slate-500 text-xs">
                   {post.views.toLocaleString()}
                 </div>
@@ -85,7 +83,7 @@ export default function BoardList({ slug, posts, showRating = false }: Props) {
               </div>
 
               {/* Mobile 행 */}
-              <div className="md:hidden px-4 py-3 flex items-start gap-3">
+              <div className="md:hidden px-4 py-3 flex items-center gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start gap-2">
                     {post.isHot && (

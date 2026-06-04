@@ -2,11 +2,20 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useState } from "react";
+import { startKakaoLogin } from "@/lib/auth";
 
 export default function LoginPage() {
-  const handleKakaoLogin = () => {
-    // TODO: 카카오 OAuth 연동
-    // window.location.href = `${KAKAO_AUTH_URL}`;
+  const [loading, setLoading] = useState(false);
+
+  const handleKakaoLogin = async () => {
+    try {
+      setLoading(true);
+      await startKakaoLogin(); // 카카오 인가 페이지로 이동
+    } catch (e) {
+      setLoading(false);
+      alert(e instanceof Error ? e.message : "로그인 중 오류가 발생했습니다.");
+    }
   };
 
   return (
@@ -59,7 +68,8 @@ export default function LoginPage() {
             {/* 카카오 로그인 버튼 */}
             <button
               onClick={handleKakaoLogin}
-              className="w-full h-14 bg-[#FEE500] hover:bg-[#FDD800] active:scale-[0.98] text-[#191919] rounded-2xl font-bold text-base flex items-center justify-center gap-3 transition-all shadow-lg shadow-yellow-500/10"
+              disabled={loading}
+              className="w-full h-14 bg-[#FEE500] hover:bg-[#FDD800] active:scale-[0.98] text-[#191919] rounded-2xl font-bold text-base flex items-center justify-center gap-3 transition-all shadow-lg shadow-yellow-500/10 disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100"
             >
               <Image
                 src="/kakao_logo.png"
@@ -68,7 +78,7 @@ export default function LoginPage() {
                 alt="카카오"
                 className="object-contain"
               />
-              카카오로 간편하게 시작하기
+              {loading ? "카카오로 이동 중..." : "카카오로 간편하게 시작하기"}
             </button>
 
             {/* 네이버 자리 (준비중) */}
