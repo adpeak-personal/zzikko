@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Recurse -Path \"c:\\\\project\\\\personal-work\\\\zzikko\\\\zzikko-back\" -Force)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(Sort-Object)",
+      "Bash(Remove-Item -Recurse -Force \"c:\\\\project\\\\personal-work\\\\zzikko\\\\zzikko-back\\\\src\")",
+      "Bash(npm uninstall *)",
+      "Bash(npx tsc *)"
+    ]
+  }
+}

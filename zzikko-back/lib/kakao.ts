@@ -1,8 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 
-// 카카오에서 받아와 우리 서비스용으로 정규화한 프로필
 export interface KakaoProfile {
-  snsId: string; // 카카오 회원번호 (고유)
+  snsId: string;
   email: string | null;
   nickname: string | null;
   profileImage: string | null;
@@ -30,16 +29,15 @@ interface KakaoMeResponse {
   };
 }
 
-// 1) 인가 코드(code)를 카카오 access_token 으로 교환
 async function exchangeCodeForToken(app: FastifyInstance, code: string): Promise<string> {
   const body = new URLSearchParams({
     grant_type: 'authorization_code',
-    client_id: app.config.KAKAO_REST_API_KEY,
-    redirect_uri: app.config.KAKAO_REDIRECT_URI,
+    client_id: process.env.KAKAO_REST_API_KEY || '',
+    redirect_uri: process.env.KAKAO_REDIRECT_URI || 'http://localhost:3000/auth/kakao',
     code,
   });
-  if (app.config.KAKAO_CLIENT_SECRET) {
-    body.set('client_secret', app.config.KAKAO_CLIENT_SECRET);
+  if (process.env.KAKAO_CLIENT_SECRET) {
+    body.set('client_secret', process.env.KAKAO_CLIENT_SECRET);
   }
 
   const res = await fetch('https://kauth.kakao.com/oauth/token', {
@@ -57,7 +55,6 @@ async function exchangeCodeForToken(app: FastifyInstance, code: string): Promise
   return data.access_token;
 }
 
-// 2) access_token 으로 카카오 사용자 정보 조회
 async function fetchKakaoMe(app: FastifyInstance, kakaoAccessToken: string): Promise<KakaoProfile> {
   const res = await fetch('https://kapi.kakao.com/v2/user/me', {
     headers: { Authorization: `Bearer ${kakaoAccessToken}` },
@@ -77,7 +74,6 @@ async function fetchKakaoMe(app: FastifyInstance, kakaoAccessToken: string): Pro
   };
 }
 
-// 인가 코드 → 카카오 프로필 (전체 플로우)
 export async function getKakaoProfileByCode(
   app: FastifyInstance,
   code: string,

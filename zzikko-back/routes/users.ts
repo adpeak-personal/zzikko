@@ -8,9 +8,7 @@ interface UserRow extends RowDataPacket {
   created_at: string;
 }
 
-// users 테이블을 다루는 예시 라우트 — /api/users 하위로 등록된다.
 export default async function userRoutes(app: FastifyInstance) {
-  // 유저 목록 (탈퇴하지 않은 유저)
   app.get('/', async () => {
     const [rows] = await app.db.query<UserRow[]>(
       `SELECT id, email, nickname, created_at
@@ -22,7 +20,6 @@ export default async function userRoutes(app: FastifyInstance) {
     return rows;
   });
 
-  // 단일 유저 조회
   app.get<{ Params: { id: string } }>('/:id', async (req, reply) => {
     const [rows] = await app.db.query<UserRow[]>(
       `SELECT id, email, nickname, created_at

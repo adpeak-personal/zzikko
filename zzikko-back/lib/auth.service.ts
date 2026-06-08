@@ -1,14 +1,14 @@
 import type { FastifyInstance } from 'fastify';
 import type { ResultSetHeader, RowDataPacket } from 'mysql2';
-import { refreshKey } from '../lib/token-store.js';
-import { toSeconds } from '../lib/duration.js';
-import type { KakaoProfile } from './kakao.js';
+import { refreshKey } from './token-store';
+import { toSeconds } from './duration';
+import type { KakaoProfile } from './kakao';
 
 export interface AuthUser extends RowDataPacket {
   id: number;
   email: string;
   nickname: string;
-  user_type: 'BUYER' | 'SELLER' | 'ADMIN';
+  role: 'BUYER' | 'SELLER' | 'ADMIN' | 'SUB_ADMIN';
   sns: string;
 }
 
@@ -17,7 +17,6 @@ export interface IssuedTokens {
   refreshToken: string;
 }
 
-// nickname 은 NOT NULL 이라 가입 시 비어있지 않은 값을 만들어준다(중복도 회피).
 async function generateUniqueNickname(app: FastifyInstance, base: string | null): Promise<string> {
   const clean = (base ?? '찍고러').trim().slice(0, 40) || '찍고러';
   for (let i = 0; i < 10; i++) {
@@ -31,13 +30,12 @@ async function generateUniqueNickname(app: FastifyInstance, base: string | null)
   return `${clean}${Date.now()}`.slice(0, 50);
 }
 
-// 카카오 프로필로 유저를 찾거나(가입) 가져온다.
 export async function findOrCreateKakaoUser(
   app: FastifyInstance,
   profile: KakaoProfile,
 ): Promise<AuthUser> {
   const [existing] = await app.db.query<AuthUser[]>(
-    `SELECT id, email, nickname, user_type, sns
+    `SELECT id, email, nickname, role, sns
        FROM users
       WHERE sns = 'kakao' AND sns_id = ? AND deleted_at IS NULL
       LIMIT 1`,
@@ -45,50 +43,53 @@ export async function findOrCreateKakaoUser(
   );
 
   if (existing[0]) {
-    await app.db.query('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?', [
-      existing[0].id,
-    ]);
+    await app.db.query(
+      `INSERT INTO user_profile (user_id, last_login_at) VALUES (?, CURRENT_TIMESTAMP)
+       ON DUPLICATE KEY UPDATE last_login_at = CURRENT_TIMESTAMP`,
+      [existing[0].id],
+    );
     return existing[0];
   }
 
-  // 신규 가입 — email 은 NOT NULL 이라 미제공 시 대체값 사용
   const email = profile.email ?? `kakao_${profile.snsId}@zzikko.local`;
   const nickname = await generateUniqueNickname(app, profile.nickname);
 
   const [result] = await app.db.query<ResultSetHeader>(
-    `INSERT INTO users (email, nickname, sns, sns_id, profile_image, is_verified, last_login_at)
-     VALUES (?, ?, 'kakao', ?, ?, 1, CURRENT_TIMESTAMP)`,
+    `INSERT INTO users (email, nickname, sns, sns_id, profile_image) VALUES (?, ?, 'kakao', ?, ?)`,
     [email, nickname, profile.snsId, profile.profileImage],
   );
 
+  await app.db.query(
+    `INSERT INTO user_profile (user_id, is_verified, last_login_at) VALUES (?, 1, CURRENT_TIMESTAMP)`,
+    [result.insertId],
+  );
+
   const [created] = await app.db.query<AuthUser[]>(
-    'SELECT id, email, nickname, user_type, sns FROM users WHERE id = ?',
+    'SELECT id, email, nickname, role, sns FROM users WHERE id = ?',
     [result.insertId],
   );
   return created[0];
 }
 
-// access + refresh 토큰 발급 후 refresh 를 저장소에 보관
 export async function issueTokens(app: FastifyInstance, user: AuthUser): Promise<IssuedTokens> {
   const accessToken = app.jwt.sign(
-    { sub: user.id, role: user.user_type, type: 'access' },
-    { expiresIn: app.config.JWT_ACCESS_EXPIRES },
+    { sub: user.id, role: user.role, type: 'access' },
+    { expiresIn: process.env.JWT_ACCESS_EXPIRES || '1h' },
   );
   const refreshToken = app.jwt.sign(
-    { sub: user.id, role: user.user_type, type: 'refresh' },
-    { expiresIn: app.config.JWT_REFRESH_EXPIRES },
+    { sub: user.id, role: user.role, type: 'refresh' },
+    { expiresIn: process.env.JWT_REFRESH_EXPIRES || '14d' },
   );
 
   await app.tokens.set(
     refreshKey(user.id),
     refreshToken,
-    toSeconds(app.config.JWT_REFRESH_EXPIRES),
+    toSeconds(process.env.JWT_REFRESH_EXPIRES || '14d'),
   );
 
   return { accessToken, refreshToken };
 }
 
-// refresh 토큰 검증 → 저장소 값과 대조 → 새 토큰 재발급(회전)
 export async function rotateTokens(
   app: FastifyInstance,
   refreshToken: string,
@@ -109,7 +110,7 @@ export async function rotateTokens(
   }
 
   const [rows] = await app.db.query<AuthUser[]>(
-    `SELECT id, email, nickname, user_type, sns
+    `SELECT id, email, nickname, role, sns
        FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1`,
     [payload.sub],
   );
@@ -118,7 +119,6 @@ export async function rotateTokens(
   return issueTokens(app, rows[0]);
 }
 
-// 로그아웃: 저장된 refresh 토큰 폐기
 export async function revokeTokens(app: FastifyInstance, userId: number): Promise<void> {
   await app.tokens.del(refreshKey(userId));
 }

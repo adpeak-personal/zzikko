@@ -1,4 +1,3 @@
-// '14d' | '1h' | '30m' | '60s' 같은 문자열을 초(seconds)로 변환한다.
 const UNIT: Record<string, number> = { s: 1, m: 60, h: 3600, d: 86400 };
 
 export function toSeconds(duration: string): number {
