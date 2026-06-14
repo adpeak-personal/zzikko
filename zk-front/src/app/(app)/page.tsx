@@ -45,7 +45,7 @@ export default function Home({ serverUser }: { serverUser: any }) {
             <div className="relative flex bg-[#1a1d23] p-1.5 rounded-2xl border border-white/10 shadow-2xl">
               <input
                 type="text"
-                placeholder="동네 이름이나 휴대폰 모델을 검색해보세요"
+                placeholder="원하는 서비스를 입력해 보세요"
                 className="bg-transparent flex-1 px-5 py-3 text-sm outline-none text-white placeholder:text-slate-500"
               />
               <button className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-xl font-bold text-sm transition-all flex items-center gap-2">

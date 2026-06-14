@@ -2,27 +2,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CATEGORIES } from "@/config/navigation";
+import { getBoardRows } from "@/data/posts";
 
 type Params = { slug: string };
-
-const SAMPLE_THUMBS = [
-  "/job_default_image.jpg",
-  "/alt_image.jpg",
-  "/profile-base.png",
-  "/logo.png",
-];
-
-const SAMPLE_POSTS = Array.from({ length: 15 }).map((_, i) => ({
-  id: i + 1,
-  title: `샘플 게시글 제목입니다 #${i + 1} — 실제 데이터 연결 전 placeholder`,
-  author: ["김철수", "이영희", "박민준", "최서연", "정도윤"][i % 5],
-  comments: (i * 7) % 53,
-  views: 100 + ((i * 137) % 5000),
-  isHot: i % 5 === 0,
-  isNew: i < 3,
-  daysAgo: i,
-  thumb: i % 3 !== 2 ? SAMPLE_THUMBS[i % SAMPLE_THUMBS.length] : null,
-}));
 
 export default async function CategoryPage({
   params,
@@ -32,6 +14,8 @@ export default async function CategoryPage({
   const { slug } = await params;
   const category = CATEGORIES.find((c : any) => c.slug === slug);
   if (!category) notFound();
+
+  const SAMPLE_POSTS = getBoardRows(slug);
 
   return (
     <div className="space-y-6">
@@ -117,7 +101,7 @@ export default async function CategoryPage({
           {SAMPLE_POSTS.map((post) => (
             <li key={post.id}>
               <Link
-                href={`/category/${slug}/${post.id}`}
+                href={`/posts/${post.id}`}
                 className="block hover:bg-slate-50 transition-colors"
               >
                 {/* PC 행 */}
