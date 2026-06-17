@@ -8,6 +8,14 @@ export type CategoryNav = {
 };
 
 export const CATEGORIES: CategoryNav[] = [
+   {
+    slug: "hotdeal",
+    title: "핫딜 정보",
+    icon: "🔥",
+    desc: "실시간 특가·핫딜 공유",
+    color: "bg-pink-50",
+    text: "text-pink-600",
+  },
   {
     slug: "offline",
     title: "휴대폰 성지",
@@ -40,14 +48,7 @@ export const CATEGORIES: CategoryNav[] = [
     color: "bg-yellow-50",
     text: "text-yellow-600",
   },
-  {
-    slug: "hotdeal",
-    title: "핫딜 정보",
-    icon: "🔥",
-    desc: "실시간 특가·핫딜 공유",
-    color: "bg-pink-50",
-    text: "text-pink-600",
-  },
+ 
   {
     slug: "tips",
     title: "꿀팁게시판",
