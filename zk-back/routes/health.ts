@@ -9,4 +9,9 @@ export default async function healthRoutes(app: FastifyInstance) {
     const [rows] = await app.db.query('SELECT 1 AS ok');
     return { status: 'ok', db: rows };
   });
+
+  app.get('/health/db_user_chk', async () => {
+    const [rows] = await app.db.query('SELECT * FROM users');
+    return { status: 'ok', users: rows };
+  });
 }

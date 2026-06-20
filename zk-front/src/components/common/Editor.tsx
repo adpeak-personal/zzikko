@@ -11,6 +11,7 @@ import { Underline } from "@tiptap/extension-underline";
 import { Placeholder } from "@tiptap/extension-placeholder";
 import { TextStyle, Color } from "@tiptap/extension-text-style";
 import { Highlight } from "@tiptap/extension-highlight";
+import { LinkPreviewExtension } from "./LinkPreview";
 
 async function uploadImage(file: File): Promise<string> {
   // TODO: GCS 업로드로 교체
@@ -587,7 +588,7 @@ function TableContextMenu({ editor }: { editor: Editor }) {
   );
 }
 
-export default function TibTapEditor() {
+export default function TibTapEditor({ onChange }: { onChange?: (html: string) => void } = {}) {
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -607,12 +608,24 @@ export default function TibTapEditor() {
       TextStyle,
       Color,
       Highlight.configure({ multicolor: true }),
+      LinkPreviewExtension,
     ],
     content: "",
+    onUpdate: ({ editor }) => onChange?.(editor.getHTML()),
     editorProps: {
       attributes: {
         class:
           "prose-editor min-h-[500px] px-5 py-4 focus:outline-none leading-relaxed",
+      },
+      handlePaste: (view, event) => {
+        const text = event.clipboardData?.getData("text/plain")?.trim();
+        if (!text || text.includes(" ") || text.includes("\n")) return false;
+        try { new URL(text); } catch { return false; }
+
+        const node = view.state.schema.nodes.linkPreview?.create({ url: text });
+        if (!node) return false;
+        view.dispatch(view.state.tr.replaceSelectionWith(node));
+        return true;
       },
     },
   });

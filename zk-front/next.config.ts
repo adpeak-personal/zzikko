@@ -1,6 +1,15 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  async redirects() {
+    return [
+      {
+        source: "/posts/:slug((?!.*\\d+$)[^/]+)",
+        destination: "/category/:slug",
+        permanent: false,
+      },
+    ];
+  },
   async rewrites() {
     const backendUrl = process.env.NODE_ENV === "production"
       ? "http://backend:4000"

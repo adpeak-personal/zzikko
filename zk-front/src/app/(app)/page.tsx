@@ -1,18 +1,24 @@
 'use client';
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Logo from "@/components/common/Logo";
 import { CATEGORIES } from "@/config/navigation";
+import { useAuthStore } from "@/store/auth";
+import { apiFetch, clearTokens } from "@/lib/auth";
 
 
-export default function Home({ serverUser }: { serverUser: any }) {
-
-
-  // ⭐ 핵심: Zustand 스토어에 데이터가 아직 없다면(하이드레이션 전),
-  // 서버에서 넘겨받은 데이터를 우선적으로 보여준다!
-  // const currentUser = user || serverUser;
-
+export default function Home() {
+  const router = useRouter();
+  const { user, isLoading, setUser } = useAuthStore();
   const menus = CATEGORIES;
+
+  async function handleLogout() {
+    await apiFetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+    clearTokens();
+    setUser(null);
+    router.push("/");
+  }
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">
@@ -22,9 +28,20 @@ export default function Home({ serverUser }: { serverUser: any }) {
           <Logo width={140} priority />
 
 
-          <Link href="/auth/login" className="text-xs font-bold text-white bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition-all">
-            로그인
-          </Link>
+          {isLoading ? (
+            <div className="w-16 h-8 rounded-lg bg-white/10 animate-pulse" />
+          ) : user ? (
+            <button
+              onClick={handleLogout}
+              className="text-xs font-bold text-white bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition-all"
+            >
+              로그아웃
+            </button>
+          ) : (
+            <Link href="/auth/login" className="text-xs font-bold text-white bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition-all">
+              로그인
+            </Link>
+          )}
 
 
         </div>

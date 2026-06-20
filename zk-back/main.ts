@@ -6,10 +6,13 @@ import sensible from '@fastify/sensible';
 import fastifyJwt from '@fastify/jwt';
 import type mysql from 'mysql2/promise';
 import { db } from './lib/db';
-import { InMemoryTokenStore, type TokenStore } from './lib/token-store';
+import { type TokenStore } from './lib/token-store';
+import { DbTokenStore } from './lib/db-token-store';
 import healthRoutes from './routes/health';
 import authRoutes from './routes/auth';
 import userRoutes from './routes/users';
+import postRoutes from './routes/posts';
+import ogRoutes from './routes/og';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -43,7 +46,7 @@ app.register(sensible);
 app.register(fastifyJwt, { secret: process.env.JWT_SECRET || 'dev-secret-change-me' });
 
 app.decorate('db', db);
-app.decorate('tokens', new InMemoryTokenStore());
+app.decorate('tokens', new DbTokenStore(db));
 app.decorate('authenticate', async (req: FastifyRequest, reply: FastifyReply) => {
   try {
     await req.jwtVerify();
@@ -58,6 +61,8 @@ app.decorate('authenticate', async (req: FastifyRequest, reply: FastifyReply) =>
 app.register(healthRoutes);
 app.register(authRoutes, { prefix: '/api/auth' });
 app.register(userRoutes, { prefix: '/api/users' });
+app.register(postRoutes, { prefix: '/api/posts' });
+app.register(ogRoutes, { prefix: '/api' });
 
 const PORT = Number(process.env.PORT || 4000);
 const HOST = process.env.HOST || '0.0.0.0';

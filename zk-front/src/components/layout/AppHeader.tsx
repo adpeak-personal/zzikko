@@ -2,8 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Logo from "@/components/common/Logo";
 import MegaMenu from "./MegaMenu";
+import { useAuthStore } from "@/store/auth";
+import { apiFetch, clearTokens } from "@/lib/auth";
 
 type Props = {
   onMobileMenuClick: () => void;
@@ -11,6 +14,15 @@ type Props = {
 
 export default function AppHeader({ onMobileMenuClick }: Props) {
   const [pcMenuOpen, setPcMenuOpen] = useState(false);
+  const router = useRouter();
+  const { user, isLoading, setUser } = useAuthStore();
+
+  async function handleLogout() {
+    await apiFetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+    clearTokens();
+    setUser(null);
+    router.push("/");
+  }
 
   useEffect(() => {
     if (!pcMenuOpen) return;
@@ -52,12 +64,23 @@ export default function AppHeader({ onMobileMenuClick }: Props) {
               </svg>
             </button>
 
-            <Link
-              href="/auth/login"
-              className="text-xs lg:text-sm font-bold text-white bg-white/10 hover:bg-white/20 px-3 lg:px-4 py-2 rounded-lg transition-all"
-            >
-              로그인
-            </Link>
+            {isLoading ? (
+              <div className="w-16 h-8 rounded-lg bg-white/10 animate-pulse" />
+            ) : user ? (
+              <button
+                onClick={handleLogout}
+                className="text-xs lg:text-sm font-bold text-white bg-white/10 hover:bg-white/20 px-3 lg:px-4 py-2 rounded-lg transition-all"
+              >
+                로그아웃
+              </button>
+            ) : (
+              <Link
+                href="/auth/login"
+                className="text-xs lg:text-sm font-bold text-white bg-white/10 hover:bg-white/20 px-3 lg:px-4 py-2 rounded-lg transition-all"
+              >
+                로그인
+              </Link>
+            )}
 
             {/* PC 전용 메가메뉴 트리거 */}
             <button

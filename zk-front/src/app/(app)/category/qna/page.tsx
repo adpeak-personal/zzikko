@@ -28,7 +28,7 @@ export default function QnaPage() {
         {QUESTIONS.map((q) => (
           <li key={q.id}>
             <Link
-              href={`/category/qna/${q.id}`}
+              href={`/posts/qna/${q.id}`}
               className="block bg-white border border-slate-200 rounded-2xl p-5 hover:shadow-md hover:border-blue-200 transition-all"
             >
               <div className="flex items-start gap-4">

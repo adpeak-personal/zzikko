@@ -1,34 +1,27 @@
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CATEGORIES } from "@/config/navigation";
-import { getPost, getAdjacent } from "@/data/posts";
+import { fetchPostDetail } from "@/service/posts/api";
+import { nestComments, formatDate, daysAgo } from "@/lib/utils";
+import type { HotdealExtra, NestedComment } from "@/service/posts/types";
 
-type Params = { id: string };
-
-/* ------------------------------------------------------------------ *
- * 상세 페이지
- * 목록과 동일한 단일 소스(@/data/posts)에서 id 로 글을 조회한다.
- *  - boardSlug 로 어떤 게시판인지 구분
- *  - deal(=extra_data) 이 있으면 핫딜 게시판 → 딜 정보 박스 노출
- * 실제로는 getPost 를 GET /posts/:id 호출로 교체하면 된다.
- * ------------------------------------------------------------------ */
+type Params = { slug: string; id: string };
 
 export default async function PostDetailPage({
   params,
 }: {
   params: Promise<Params>;
 }) {
-  const { id } = await params;
-  const post = getPost(Number(id));
+  const { slug, id } = await params;
+  const post = await fetchPostDetail(Number(id));
   if (!post) notFound();
 
-  const board = CATEGORIES.find((c) => c.slug === post.boardSlug);
-  const { prevId, nextId } = getAdjacent(post.id);
-  const totalComments =
-    post.commentCount ||
-    post.comments.length +
-      post.comments.reduce((acc, c) => acc + c.replies.length, 0);
+  const board = CATEGORIES.find((c) => c.slug === slug);
+  const comments = nestComments(post.comments);
+  const deal = post.board_slug === "hotdeal" ? (post.extra_data as HotdealExtra | null) : null;
+  const tags: string[] = (post.extra_data as any)?.tags ?? [];
+  const isHot = post.like_count >= 10;
+  const avatar = post.author_profile_image ?? `https://api.dicebear.com/7.x/thumbs/svg?seed=${encodeURIComponent(post.author)}`;
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -60,7 +53,7 @@ export default async function PostDetailPage({
                 {board.icon} {board.title}
               </Link>
             )}
-            {post.isHot && (
+            {isHot && (
               <span className="bg-red-100 text-red-600 text-[10px] font-black px-2 py-0.5 rounded-full">
                 HOT
               </span>
@@ -74,64 +67,64 @@ export default async function PostDetailPage({
           {/* 작성자 / 메타 */}
           <div className="flex items-center justify-between mt-4">
             <div className="flex items-center gap-2.5">
-              <div className="relative w-9 h-9 rounded-full overflow-hidden bg-slate-100 border border-slate-200">
-                <Image src={post.author.profileImage} alt="" fill sizes="36px" className="object-cover" />
-              </div>
+              <div
+                className="w-9 h-9 rounded-full overflow-hidden bg-slate-100 border border-slate-200 shrink-0"
+                style={{ backgroundImage: `url(${avatar})`, backgroundSize: "cover" }}
+              />
               <div>
                 <div className="flex items-center gap-1.5">
-                  <span className="text-sm font-bold text-slate-800">{post.author.nickname}</span>
+                  <span className="text-sm font-bold text-slate-800">{post.author}</span>
                   <span className="text-[10px] font-black text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
-                    {post.author.level}
+                    {post.level ?? "BRONZE"}
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-400 mt-0.5">{post.createdAt}</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">{formatDate(post.created_at)}</p>
               </div>
             </div>
             <div className="flex items-center gap-3 text-[11px] text-slate-400">
-              <span>조회 {post.views.toLocaleString()}</span>
+              <span>조회 {post.view_count.toLocaleString()}</span>
               <span>·</span>
-              <span>댓글 {totalComments}</span>
+              <span>댓글 {post.comment_count}</span>
             </div>
           </div>
         </header>
 
-        {/* 딜 정보 박스 (핫딜 게시판 = extra_data 존재 시에만) */}
-        {post.deal && (
+        {/* 딜 정보 박스 (핫딜 전용) */}
+        {deal && (
           <div className="mx-6 mt-5 rounded-2xl border border-pink-100 bg-pink-50/50 p-5">
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div>
                 <div className="flex items-center gap-2 mb-1.5">
                   <span className="text-xs font-bold text-slate-700 bg-white border border-slate-200 px-2 py-0.5 rounded">
-                    {post.deal.mall}
+                    {deal.mall}
                   </span>
-                  {post.deal.freeShipping && (
+                  {deal.free_shipping && (
                     <span className="text-[11px] font-bold text-emerald-600">무료배송</span>
                   )}
-                  {post.deal.isEnded ? (
+                  {deal.is_ended ? (
                     <span className="text-[11px] font-bold text-slate-500">종료된 딜</span>
                   ) : (
-                    <span className="text-[11px] font-bold text-pink-600">진행중 · ~{post.deal.endsAt}</span>
+                    <span className="text-[11px] font-bold text-pink-600">진행중 · ~{deal.ends_at}</span>
                   )}
                 </div>
                 <div className="flex items-end gap-2">
                   <span className="text-2xl font-black text-pink-600">
-                    {post.deal.price.toLocaleString()}원
+                    {deal.price.toLocaleString()}원
                   </span>
                   <span className="text-sm text-slate-400 line-through mb-1">
-                    {post.deal.originalPrice.toLocaleString()}원
+                    {deal.original_price.toLocaleString()}원
                   </span>
                   <span className="text-sm font-black text-red-500 mb-1">
-                    {post.deal.discountRate}%↓
+                    {deal.discount_rate}%↓
                   </span>
                 </div>
               </div>
-
               <a
-                href={post.deal.dealUrl}
+                href={deal.deal_url}
                 target="_blank"
                 rel="noopener noreferrer"
                 className={`shrink-0 text-sm font-bold px-5 py-3 rounded-xl transition-colors flex items-center gap-1.5 ${
-                  post.deal.isEnded
+                  deal.is_ended
                     ? "bg-slate-200 text-slate-500 pointer-events-none"
                     : "bg-pink-600 hover:bg-pink-500 text-white"
                 }`}
@@ -146,46 +139,27 @@ export default async function PostDetailPage({
         )}
 
         {/* 본문 */}
-        <div className="px-6 py-6 space-y-4">
-          {post.images.length > 0 && (
-            <div className="space-y-3">
-              {post.images.map((src, i) => (
-                <div key={i} className="relative w-full aspect-video rounded-xl overflow-hidden bg-slate-100 border border-slate-200">
-                  <Image
-                    src={src}
-                    alt=""
-                    fill
-                    sizes="(min-width:768px) 768px, 100vw"
-                    className="object-cover"
-                  />
-                </div>
-              ))}
-            </div>
-          )}
+        <div
+          className="px-6 py-6 prose prose-slate max-w-none text-[15px] leading-relaxed"
+          dangerouslySetInnerHTML={{ __html: post.content }}
+        />
 
-          {post.content.map((para, i) => (
-            <p key={i} className="text-[15px] leading-relaxed text-slate-700">
-              {para}
-            </p>
-          ))}
-
-          {/* 태그 */}
-          {post.tags.length > 0 && (
-            <div className="flex flex-wrap gap-2 pt-2">
-              {post.tags.map((t) => (
-                <span key={t} className="text-xs font-medium text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full">
-                  #{t}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
+        {/* 태그 */}
+        {tags.length > 0 && (
+          <div className="px-6 pb-4 flex flex-wrap gap-2">
+            {tags.map((t) => (
+              <span key={t} className="text-xs font-medium text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full">
+                #{t}
+              </span>
+            ))}
+          </div>
+        )}
 
         {/* 좋아요 / 공유 액션 바 */}
         <div className="px-6 py-5 border-t border-slate-100 flex items-center justify-center gap-3">
           <button className="flex items-center gap-2 bg-pink-50 hover:bg-pink-100 text-pink-600 font-bold px-6 py-2.5 rounded-xl transition-colors">
             <span>❤️</span>
-            <span className="text-sm">좋아요 {post.likeCount}</span>
+            <span className="text-sm">좋아요 {post.like_count}</span>
           </button>
           <button className="flex items-center gap-2 bg-slate-50 hover:bg-slate-100 text-slate-600 font-bold px-5 py-2.5 rounded-xl transition-colors text-sm">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
@@ -202,7 +176,7 @@ export default async function PostDetailPage({
       {/* 댓글 섹션 */}
       <section className="bg-white border border-slate-200 rounded-2xl p-6">
         <h2 className="text-base font-extrabold text-slate-900 mb-4">
-          댓글 <span className="text-pink-600">{totalComments}</span>
+          댓글 <span className="text-pink-600">{post.comment_count}</span>
         </h2>
 
         {/* 댓글 입력 */}
@@ -220,54 +194,10 @@ export default async function PostDetailPage({
         </div>
 
         {/* 댓글 리스트 */}
-        {post.comments.length > 0 ? (
+        {comments.length > 0 ? (
           <ul className="space-y-5">
-            {post.comments.map((c) => (
-              <li key={c.id}>
-                <div className="flex gap-3">
-                  <div className="relative w-8 h-8 rounded-full overflow-hidden bg-slate-100 border border-slate-200 shrink-0">
-                    <Image src={c.profileImage} alt="" fill sizes="32px" className="object-cover" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold text-slate-800">{c.author}</span>
-                      <span className="text-[11px] text-slate-400">
-                        {c.daysAgo === 0 ? "오늘" : `${c.daysAgo}일 전`}
-                      </span>
-                    </div>
-                    <p className="text-sm text-slate-700 mt-1 leading-relaxed">{c.content}</p>
-                    <div className="flex items-center gap-3 mt-1.5 text-[11px] text-slate-400">
-                      <button className="hover:text-pink-600 font-medium">❤️ {c.likeCount}</button>
-                      <button className="hover:text-pink-600 font-medium">답글</button>
-                    </div>
-
-                    {/* 대댓글 */}
-                    {c.replies.length > 0 && (
-                      <ul className="mt-4 space-y-4 pl-4 border-l-2 border-slate-100">
-                        {c.replies.map((r) => (
-                          <li key={r.id} className="flex gap-3">
-                            <div className="relative w-7 h-7 rounded-full overflow-hidden bg-slate-100 border border-slate-200 shrink-0">
-                              <Image src={r.profileImage} alt="" fill sizes="28px" className="object-cover" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm font-bold text-slate-800">{r.author}</span>
-                                <span className="text-[11px] text-slate-400">
-                                  {r.daysAgo === 0 ? "오늘" : `${r.daysAgo}일 전`}
-                                </span>
-                              </div>
-                              <p className="text-sm text-slate-700 mt-1 leading-relaxed">{r.content}</p>
-                              <div className="flex items-center gap-3 mt-1.5 text-[11px] text-slate-400">
-                                <button className="hover:text-pink-600 font-medium">❤️ {r.likeCount}</button>
-                              </div>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                </div>
-              </li>
+            {comments.map((c) => (
+              <CommentItem key={c.id} comment={c} />
             ))}
           </ul>
         ) : (
@@ -290,9 +220,9 @@ export default async function PostDetailPage({
         </Link>
 
         <div className="flex items-center gap-2">
-          {prevId !== null ? (
+          {post.prev_id !== null ? (
             <Link
-              href={`/posts/${prevId}`}
+              href={`/posts/${post.board_slug}/${post.prev_id}`}
               className="text-sm font-medium text-slate-500 bg-white border border-slate-200 hover:border-slate-300 px-4 py-2.5 rounded-xl transition-colors"
             >
               ‹ 이전글
@@ -302,9 +232,9 @@ export default async function PostDetailPage({
               ‹ 이전글
             </span>
           )}
-          {nextId !== null ? (
+          {post.next_id !== null ? (
             <Link
-              href={`/posts/${nextId}`}
+              href={`/posts/${post.board_slug}/${post.next_id}`}
               className="text-sm font-medium text-slate-500 bg-white border border-slate-200 hover:border-slate-300 px-4 py-2.5 rounded-xl transition-colors"
             >
               다음글 ›
@@ -317,5 +247,71 @@ export default async function PostDetailPage({
         </div>
       </div>
     </div>
+  );
+}
+
+function CommentItem({ comment }: { comment: NestedComment }) {
+  const avatar = comment.author_profile_image
+    ?? `https://api.dicebear.com/7.x/thumbs/svg?seed=${encodeURIComponent(comment.author)}`;
+  const ago = daysAgo(comment.created_at);
+
+  return (
+    <li>
+      <div className="flex gap-3">
+        <div
+          className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 shrink-0"
+          style={{ backgroundImage: `url(${avatar})`, backgroundSize: "cover" }}
+        />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-bold text-slate-800">{comment.author}</span>
+            <span className="text-[11px] text-slate-400">
+              {ago === 0 ? "오늘" : `${ago}일 전`}
+            </span>
+          </div>
+          <p className="text-sm text-slate-700 mt-1 leading-relaxed">{comment.content}</p>
+          <div className="flex items-center gap-3 mt-1.5 text-[11px] text-slate-400">
+            <button className="hover:text-pink-600 font-medium">❤️ {comment.like_count}</button>
+            <button className="hover:text-pink-600 font-medium">답글</button>
+          </div>
+
+          {/* 대댓글 */}
+          {comment.replies.length > 0 && (
+            <ul className="mt-4 space-y-4 pl-4 border-l-2 border-slate-100">
+              {comment.replies.map((r) => (
+                <ReplyItem key={r.id} reply={r} />
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </li>
+  );
+}
+
+function ReplyItem({ reply }: { reply: NestedComment }) {
+  const avatar = reply.author_profile_image
+    ?? `https://api.dicebear.com/7.x/thumbs/svg?seed=${encodeURIComponent(reply.author)}`;
+  const ago = daysAgo(reply.created_at);
+
+  return (
+    <li className="flex gap-3">
+      <div
+        className="w-7 h-7 rounded-full bg-slate-100 border border-slate-200 shrink-0"
+        style={{ backgroundImage: `url(${avatar})`, backgroundSize: "cover" }}
+      />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-bold text-slate-800">{reply.author}</span>
+          <span className="text-[11px] text-slate-400">
+            {ago === 0 ? "오늘" : `${ago}일 전`}
+          </span>
+        </div>
+        <p className="text-sm text-slate-700 mt-1 leading-relaxed">{reply.content}</p>
+        <div className="flex items-center gap-3 mt-1.5 text-[11px] text-slate-400">
+          <button className="hover:text-pink-600 font-medium">❤️ {reply.like_count}</button>
+        </div>
+      </div>
+    </li>
   );
 }

@@ -3,12 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --webpack",
+    "dev": "next dev --webpack -p 3030",
     "build": "next build --webpack",
-    "start": "next start",
+    "start": "next start -p 3030",
     "lint": "eslint"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.101.0",
     "@tiptap/extension-color": "^3.22.4",
     "@tiptap/extension-highlight": "^3.22.4",
     "@tiptap/extension-image": "^3.22.4",
@@ -26,7 +27,8 @@
     "@tiptap/starter-kit": "^3.22.4",
     "next": "16.2.4",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@types/node": "^20",

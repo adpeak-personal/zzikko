@@ -15,13 +15,12 @@ export type BoardPost = {
 };
 
 type Props = {
-  /** @deprecated 상세는 /posts/[id] 로 통합되어 더 이상 링크에 사용하지 않음 (호환용으로 유지) */
-  slug?: string;
+  slug: string;
   posts: BoardPost[];
   showRating?: boolean;
 };
 
-export default function BoardList({ posts, showRating = false }: Props) {
+export default function BoardList({ slug, posts, showRating = false }: Props) {
   return (
     <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
       {/* PC 헤더 */}
@@ -37,7 +36,7 @@ export default function BoardList({ posts, showRating = false }: Props) {
         {posts.map((post) => (
           <li key={post.id}>
             <Link
-              href={`/posts/${post.id}`}
+              href={`/posts/${slug}/${post.id}`}
               className="block hover:bg-slate-50 transition-colors"
             >
               {/* PC 행 */}

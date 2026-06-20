@@ -1,10 +1,7 @@
 import CategoryHeader, { WriteButton } from "@/components/category/CategoryHeader";
 import CategoryToolbar from "@/components/category/CategoryToolbar";
-import BoardList from "@/components/category/BoardList";
+import BoardListClient from "@/components/category/BoardListClient";
 import Pagination from "@/components/category/Pagination";
-import { getBoardRows } from "@/data/posts";
-
-const POSTS = getBoardRows("internet-tv");
 
 export default function InternetTvPage() {
   return (
@@ -14,7 +11,7 @@ export default function InternetTvPage() {
         filters={["전체", "KT", "SKB", "LG U+", "알뜰", "결합"]}
         searchPlaceholder="통신사·요금제 검색"
       />
-      <BoardList posts={POSTS} />
+      <BoardListClient slug="internet-tv" />
       <Pagination />
     </div>
   );

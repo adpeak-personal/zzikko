@@ -6,7 +6,13 @@
       "Bash(Sort-Object)",
       "Bash(Remove-Item -Recurse -Force \"c:\\\\project\\\\personal-work\\\\zzikko\\\\zzikko-back\\\\src\")",
       "Bash(npm uninstall *)",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(rm -rf \"c:/project/personal-work/zzikko/zk-front/src/app/\\(app\\)/posts/[id]\")",
+      "Bash(Remove-Item \"c:\\\\project\\\\personal-work\\\\zzikko\\\\zk-front\\\\src\\\\service\\\\posts.ts\")",
+      "Bash(npm list *)"
+    ],
+    "additionalDirectories": [
+      "c:\\project\\personal-work\\zzikko\\zk-front\\src\\app\\(app)\\posts\\[id]"
     ]
   }
 }

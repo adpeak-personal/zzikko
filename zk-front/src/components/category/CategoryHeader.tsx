@@ -38,13 +38,25 @@ export default function CategoryHeader({ slug, cta }: Props) {
   );
 }
 
-export function WriteButton({ label = "글쓰기" }: { label?: string }) {
-  return (
-    <button className="bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold px-4 py-2.5 rounded-xl transition-colors flex items-center gap-1.5">
+export function WriteButton({ label = "글쓰기", href }: { label?: string; href?: string }) {
+  const inner = (
+    <>
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
       </svg>
       {label}
+    </>
+  );
+  if (href) {
+    return (
+      <Link href={href} className="bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold px-4 py-2.5 rounded-xl transition-colors flex items-center gap-1.5">
+        {inner}
+      </Link>
+    );
+  }
+  return (
+    <button className="bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold px-4 py-2.5 rounded-xl transition-colors flex items-center gap-1.5">
+      {inner}
     </button>
   );
 }
