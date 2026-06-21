@@ -1,12 +1,12 @@
 export type HotdealExtra = {
   mall: string;
-  price: number;
-  original_price: number;
-  discount_rate: number;
-  free_shipping: boolean;
-  is_ended: boolean;
-  ends_at: string;
-  deal_url: string;
+  price?: number;
+  original_price?: number;
+  discount_rate?: number;
+  free_shipping?: boolean;
+  is_ended?: boolean;
+  ends_at?: string;
+  deal_url?: string;
 };
 
 export type PostRow = {
@@ -51,6 +51,7 @@ export type NestedComment = CommentRow & { replies: NestedComment[] };
 export type PostDetail = {
   id: number;
   board_slug: string;
+  user_id: number | null;
   title: string;
   content: string;
   thumbnail_url: string | null;

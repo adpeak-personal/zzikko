@@ -8,7 +8,7 @@ export default async function authRoutes(app: FastifyInstance) {
   app.get('/kakao/url', async () => {
     const params = new URLSearchParams({
       client_id: process.env.KAKAO_REST_API_KEY || '',
-      redirect_uri: process.env.KAKAO_REDIRECT_URI || 'http://localhost:3000/auth/kakao',
+      redirect_uri: process.env.KAKAO_REDIRECT_URI || 'http://localhost:3040/auth/kakao',
       response_type: 'code',
     });
     return { url: `https://kauth.kakao.com/oauth/authorize?${params.toString()}` };

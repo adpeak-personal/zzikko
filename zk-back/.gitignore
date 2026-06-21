@@ -7,6 +7,9 @@ dist/
 .env.local
 .env.*.local
 
+# GCS service account key (절대 커밋 금지)
+*-gcs-key.json
+
 # editor / os
 .DS_Store
 .idea/

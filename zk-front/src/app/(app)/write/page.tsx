@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import TibTapEditor from "@/components/common/Editor";
 import { apiFetch } from "@/lib/auth";
@@ -26,6 +27,7 @@ function parsePriceFromTitle(title: string): number | null {
 
 export default function WritePage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { user, isLoading } = useAuthStore();
 
   const [title, setTitle] = useState("");
@@ -64,6 +66,8 @@ export default function WritePage() {
         const data = await res.json().catch(() => ({}));
         throw new Error((data as { message?: string }).message ?? "등록 실패");
       }
+      // 목록 캐시 무효화 → 새 글이 바로 보이게
+      await queryClient.invalidateQueries({ queryKey: ["posts", "hotdeal"] });
       router.push("/category/hotdeal");
     } catch (err) {
       setError(err instanceof Error ? err.message : "등록에 실패했습니다.");

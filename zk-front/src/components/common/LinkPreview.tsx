@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Node, mergeAttributes } from "@tiptap/core";
 import { ReactNodeViewRenderer, NodeViewWrapper, type NodeViewProps } from "@tiptap/react";
 
@@ -11,33 +11,57 @@ interface OgData {
   domain: string | null;
 }
 
-function LinkPreviewCard({ node, selected, deleteNode, updateAttributes }: NodeViewProps) {
+function LinkPreviewCard({ editor, node, getPos, selected, deleteNode, updateAttributes }: NodeViewProps) {
   const { url, title, description, image, domain } = node.attrs as { url: string } & OgData;
-  const [loading, setLoading] = useState(!title);
+  const [loading, setLoading] = useState(!title && !image);
   const [clicked, setClicked] = useState(false);
 
   const displayDomain = domain ?? (() => { try { return new URL(url).hostname; } catch { return url; } })();
 
+  // 이미지가 없으면 카드 대신 일반(클릭 가능한) 링크로 교체한다.
+  const replaceWithPlainLink = useCallback(() => {
+    const pos = typeof getPos === "function" ? getPos() : null;
+    if (pos == null) { setLoading(false); return; }
+    editor
+      .chain()
+      .insertContentAt(
+        { from: pos, to: pos + node.nodeSize },
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: url, marks: [{ type: "link", attrs: { href: url } }] },
+          ],
+        },
+      )
+      .run();
+  }, [editor, getPos, node, url]);
+
   useEffect(() => {
-    // title이 이미 있으면 저장된 데이터 사용 — API 호출 안 함
-    if (title) return;
+    // 저장된 문서: 이미 메타데이터가 있는 경우 — 이미지 없으면 일반 링크로
+    if (title || description || domain) {
+      if (!image) replaceWithPlainLink();
+      return;
+    }
 
     let cancelled = false;
     fetch(`/api/og?url=${encodeURIComponent(url)}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((data: (OgData & { domain: string }) | null) => {
         if (cancelled) return;
-        if (data) {
+        // OG 이미지가 있으면 카드로, 없으면(또는 조회 실패) 일반 링크로
+        if (data?.image) {
           updateAttributes({
             title: data.title,
             description: data.description,
             image: data.image,
             domain: data.domain,
           });
+          setLoading(false);
+        } else {
+          replaceWithPlainLink();
         }
-        setLoading(false);
       })
-      .catch(() => { if (!cancelled) setLoading(false); });
+      .catch(() => { if (!cancelled) replaceWithPlainLink(); });
 
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps

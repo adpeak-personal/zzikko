@@ -33,7 +33,7 @@ async function exchangeCodeForToken(app: FastifyInstance, code: string): Promise
   const body = new URLSearchParams({
     grant_type: 'authorization_code',
     client_id: process.env.KAKAO_REST_API_KEY || '',
-    redirect_uri: process.env.KAKAO_REDIRECT_URI || 'http://localhost:3000/auth/kakao',
+    redirect_uri: process.env.KAKAO_REDIRECT_URI || 'http://localhost:3040/auth/kakao',
     code,
   });
   if (process.env.KAKAO_CLIENT_SECRET) {

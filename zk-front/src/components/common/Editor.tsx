@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import { Image } from "@tiptap/extension-image";
 import { Link } from "@tiptap/extension-link";
 import { TableKit } from "@tiptap/extension-table";
 import { TextAlign } from "@tiptap/extension-text-align";
@@ -12,16 +11,43 @@ import { Placeholder } from "@tiptap/extension-placeholder";
 import { TextStyle, Color } from "@tiptap/extension-text-style";
 import { Highlight } from "@tiptap/extension-highlight";
 import { LinkPreviewExtension } from "./LinkPreview";
+import { ImageNode } from "./ImageNode";
+import { apiFetch } from "@/lib/auth";
+import imageCompression from "browser-image-compression";
+
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10MB
 
 async function uploadImage(file: File): Promise<string> {
-  // TODO: GCS 업로드로 교체
-  // const formData = new FormData();
-  // formData.append("file", file);
-  // const res = await fetch("/api/upload/image", { method: "POST", body: formData });
-  // if (!res.ok) throw new Error("upload failed");
-  // const { url } = await res.json();
-  // return url;
-  return URL.createObjectURL(file);
+  // 업로드 전 브라우저에서 1차 축소 (업로드 속도·대역폭 절약).
+  // 최종 품질/포맷(webp)·검증은 백엔드(sharp)가 담당하므로 여기선 가볍게만.
+  let upload: File = file;
+  try {
+    upload = await imageCompression(file, {
+      maxWidthOrHeight: 1920, // 백엔드 1600px 보다 살짝 크게 (최종 축소는 서버가)
+      maxSizeMB: 1.5,
+      initialQuality: 0.8,
+      useWebWorker: true,
+    });
+  } catch {
+    // 압축 실패 시 원본으로 업로드 (방어선은 백엔드)
+    upload = file;
+  }
+
+  // 축소 후에도 용량이 크면 거절 (서버 한도와 동일)
+  if (upload.size > MAX_IMAGE_BYTES) {
+    throw new Error("이미지 용량이 너무 큽니다. (최대 10MB)");
+  }
+  const form = new FormData();
+  // 원본 파일명 유지 (압축 결과는 Blob 이라 name 명시)
+  form.append("file", upload, file.name);
+  // Content-Type 은 브라우저가 boundary 와 함께 자동 설정하므로 지정하지 않는다.
+  const res = await apiFetch("/api/upload/image", { method: "POST", body: form });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error((data as { message?: string }).message ?? "이미지 업로드 실패");
+  }
+  const { url } = (await res.json()) as { url: string };
+  return url;
 }
 
 type ToolbarButtonProps = {
@@ -179,7 +205,7 @@ function Toolbar({ editor }: { editor: Editor }) {
       const url = await uploadImage(file);
       editor.chain().focus().setImage({ src: url, alt: file.name }).run();
     } catch (err) {
-      alert("이미지 업로드 실패");
+      alert(err instanceof Error ? err.message : "이미지 업로드 실패");
       console.error(err);
     }
   };
@@ -192,6 +218,18 @@ function Toolbar({ editor }: { editor: Editor }) {
       editor.chain().focus().extendMarkRange("link").unsetLink().run();
       return;
     }
+
+    let valid = true;
+    try { new URL(url); } catch { valid = false; }
+
+    // 선택된 텍스트가 없으면 → 붙여넣기와 동일하게 링크 프리뷰 노드 삽입.
+    //   (OG 이미지가 있으면 카드, 없으면 일반 링크로 자동 변환)
+    if (editor.state.selection.empty && valid) {
+      editor.chain().focus().insertContent({ type: "linkPreview", attrs: { url } }).run();
+      return;
+    }
+
+    // 선택된 텍스트가 있으면 → 그 텍스트에 링크를 적용
     editor
       .chain()
       .focus()
@@ -589,6 +627,24 @@ function TableContextMenu({ editor }: { editor: Editor }) {
 }
 
 export default function TibTapEditor({ onChange }: { onChange?: (html: string) => void } = {}) {
+  // paste/drop 핸들러에서 editor 커맨드를 쓰기 위해 ref 로 잡아둔다.
+  const editorRef = useRef<Editor | null>(null);
+
+  const insertUploadedImages = (files: File[], pos?: number) => {
+    files.forEach((file) => {
+      uploadImage(file)
+        .then((url) => {
+          const ed = editorRef.current;
+          if (!ed) return;
+          const chain = ed.chain().focus();
+          if (typeof pos === "number") chain.insertContentAt(pos, { type: "image", attrs: { src: url } });
+          else chain.setImage({ src: url });
+          chain.run();
+        })
+        .catch((err) => alert(err instanceof Error ? err.message : "이미지 업로드 실패"));
+    });
+  };
+
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -601,9 +657,9 @@ export default function TibTapEditor({ onChange }: { onChange?: (html: string) =
         openOnClick: false,
         HTMLAttributes: { rel: "noopener noreferrer", target: "_blank" },
       }),
-      Image.configure({ inline: false, allowBase64: true }),
+      ImageNode.configure({ inline: false, allowBase64: false }),
       TableKit.configure({ table: { resizable: true } }),
-      TextAlign.configure({ types: ["heading", "paragraph"] }),
+      TextAlign.configure({ types: ["heading", "paragraph", "image"] }),
       Placeholder.configure({ placeholder: "내용을 입력하세요..." }),
       TextStyle,
       Color,
@@ -618,6 +674,17 @@ export default function TibTapEditor({ onChange }: { onChange?: (html: string) =
           "prose-editor min-h-[500px] px-5 py-4 focus:outline-none leading-relaxed",
       },
       handlePaste: (view, event) => {
+        // 1) 이미지 파일 붙여넣기 → 업로드
+        const imageFiles = Array.from(event.clipboardData?.files ?? []).filter((f) =>
+          f.type.startsWith("image/"),
+        );
+        if (imageFiles.length) {
+          event.preventDefault();
+          insertUploadedImages(imageFiles);
+          return true;
+        }
+
+        // 2) 단일 URL 붙여넣기 → 링크 프리뷰
         const text = event.clipboardData?.getData("text/plain")?.trim();
         if (!text || text.includes(" ") || text.includes("\n")) return false;
         try { new URL(text); } catch { return false; }
@@ -627,8 +694,21 @@ export default function TibTapEditor({ onChange }: { onChange?: (html: string) =
         view.dispatch(view.state.tr.replaceSelectionWith(node));
         return true;
       },
+      handleDrop: (view, event, _slice, moved) => {
+        if (moved) return false; // 에디터 내부 요소 이동은 기본 동작 유지
+        const imageFiles = Array.from(event.dataTransfer?.files ?? []).filter((f) =>
+          f.type.startsWith("image/"),
+        );
+        if (!imageFiles.length) return false;
+        event.preventDefault();
+        const coords = view.posAtCoords({ left: event.clientX, top: event.clientY });
+        insertUploadedImages(imageFiles, coords?.pos);
+        return true;
+      },
     },
   });
+
+  editorRef.current = editor;
 
   if (!editor) {
     return (

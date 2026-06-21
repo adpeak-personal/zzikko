@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { ResultSetHeader } from 'mysql2';
+import { finalizeTmpUrls, deleteStoredImages, generateThumbnail } from '../lib/gcs';
 
 export default async function postRoutes(app: FastifyInstance) {
   // POST /api/posts  — 게시글 작성 (인증 필요)
@@ -23,10 +24,16 @@ export default async function postRoutes(app: FastifyInstance) {
     },
     async (req) => {
       const { board_slug, title, content, thumbnail_url, extra_data } = req.body;
+      // 본문/썸네일의 tmp/ 이미지를 posts/ 로 확정 이동 + URL 치환 (고아 파일 방지)
+      const finalContent = await finalizeTmpUrls(content);
+      // 썸네일: 본문 첫 이미지로 생성 → 없으면 전달된 thumbnail_url → 그것도 없으면 null
+      const finalThumb =
+        (await generateThumbnail(finalContent)) ??
+        (thumbnail_url ? await finalizeTmpUrls(thumbnail_url) : null);
       const [result] = await app.db.query<ResultSetHeader>(
         `INSERT INTO posts (board_slug, user_id, title, content, thumbnail_url, extra_data)
          VALUES (?, ?, ?, ?, ?, ?)`,
-        [board_slug, req.user.sub, title, content, thumbnail_url ?? null, extra_data ? JSON.stringify(extra_data) : null],
+        [board_slug, req.user.sub, title, finalContent, finalThumb, extra_data ? JSON.stringify(extra_data) : null],
       );
       return { id: result.insertId };
     },
@@ -39,7 +46,7 @@ export default async function postRoutes(app: FastifyInstance) {
     if (isNaN(postId)) return reply.badRequest('잘못된 게시글 ID입니다.');
 
     const [postRows] = await app.db.query(
-      `SELECT p.id, p.board_slug, p.title, p.content, p.thumbnail_url, p.extra_data,
+      `SELECT p.id, p.board_slug, p.user_id, p.title, p.content, p.thumbnail_url, p.extra_data,
               p.view_count, p.like_count, p.comment_count, p.is_notice, p.created_at,
               u.nickname AS author, u.profile_image AS author_profile_image, up.level
        FROM posts p
@@ -135,5 +142,33 @@ export default async function postRoutes(app: FastifyInstance) {
         totalPages: Math.ceil(Number(total) / limitNum),
       },
     };
+  });
+
+  // DELETE /api/posts/:id — 게시글 삭제 (작성자 본인만, DB + GCS 이미지 전부 삭제)
+  app.delete('/:id', { preHandler: app.authenticate }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const postId = parseInt(id);
+    if (isNaN(postId)) return reply.badRequest('잘못된 게시글 ID입니다.');
+
+    const [rows] = await app.db.query(
+      'SELECT user_id, content, thumbnail_url, extra_data FROM posts WHERE id = ?',
+      [postId],
+    ) as any;
+    const post = (rows as any[])[0];
+    if (!post) return reply.notFound('게시글을 찾을 수 없습니다.');
+
+    // 작성자 본인(또는 관리자)만 삭제 가능
+    const isOwner = post.user_id === req.user.sub;
+    const isAdmin = req.user.role === 'ADMIN';
+    if (!isOwner && !isAdmin) return reply.forbidden('본인 글만 삭제할 수 있습니다.');
+
+    // 본문 + 썸네일 + extra_data 안의 GCS 이미지 전부 삭제
+    const extraText = post.extra_data ? JSON.stringify(post.extra_data) : null;
+    await deleteStoredImages(post.content, post.thumbnail_url, extraText);
+
+    // DB 삭제 (comments·post_likes 는 ON DELETE CASCADE 로 함께 삭제됨)
+    await app.db.query('DELETE FROM posts WHERE id = ?', [postId]);
+
+    return { ok: true };
   });
 }
