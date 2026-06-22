@@ -9,7 +9,11 @@
       "Bash(npx tsc *)",
       "Bash(rm -rf \"c:/project/personal-work/zzikko/zk-front/src/app/\\(app\\)/posts/[id]\")",
       "Bash(Remove-Item \"c:\\\\project\\\\personal-work\\\\zzikko\\\\zk-front\\\\src\\\\service\\\\posts.ts\")",
-      "Bash(npm list *)"
+      "Bash(npm list *)",
+      "Bash(cmd /c \"dir /b c:\\\\project\\\\personal-work\\\\zzikko\\\\zk-back\\\\.env* 2>nul & echo --- & dir /b c:\\\\project\\\\personal-work\\\\zzikko\\\\zk-front\\\\.env* 2>nul\")",
+      "Bash(cmd /c \"dir /b c:\\\\project\\\\personal-work\\\\zzikko\\\\zk-back\\\\*.json 2>nul\")",
+      "Bash(curl -s -o NUL -w \"HTTP: %{http_code}\\\\nTime: %{time_total}s\\\\n\" http://localhost:3041/api/auth/me)",
+      "Bash(curl -s -w \"\\\\nHTTP: %{http_code}\\\\n\" -H \"Origin: http://localhost:3040\" \"http://localhost:3041/api/posts/load_lists?board_slug=hotdeal&page=1&limit=20\")"
     ],
     "additionalDirectories": [
       "c:\\project\\personal-work\\zzikko\\zk-front\\src\\app\\(app)\\posts\\[id]"

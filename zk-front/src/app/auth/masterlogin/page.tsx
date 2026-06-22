@@ -3,11 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { BACK_API, saveTokens, type LoginResult } from "@/lib/auth";
+import { useAuthStore } from "@/store/auth";
 
 type Mode = "login" | "register";
 
 export default function MasterLoginPage() {
   const router = useRouter();
+  const setUser = useAuthStore((s) => s.setUser);
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -35,6 +37,7 @@ export default function MasterLoginPage() {
       }
       const data = (await res.json()) as LoginResult;
       saveTokens(data.accessToken, data.refreshToken);
+      setUser(data.user);
       router.replace("/");
     } catch (e) {
       setError(e instanceof Error ? e.message : "오류가 발생했습니다.");
