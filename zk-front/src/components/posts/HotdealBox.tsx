@@ -1,13 +1,6 @@
 import type { HotdealExtra } from "@/service/posts/types";
 
-export default function HotdealBox({
-  deal,
-  disabled,
-}: {
-  deal: HotdealExtra;
-  /** "최저가 보러가기" 비활성화 여부 (마감됐거나 본문 링크가 정확히 1개가 아닐 때) */
-  disabled: boolean;
-}) {
+export default function HotdealBox({ deal }: { deal: HotdealExtra }) {
   return (
     <div className="mx-3 mt-3 rounded-2xl border border-pink-100 bg-pink-50/50 p-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -44,27 +37,9 @@ export default function HotdealBox({
           </div>
         </div>
 
-        <div className="shrink-0 flex flex-row items-center gap-2">
-          {/* 최저가 보러가기 */}
-          <a
-            href={deal.deal_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-disabled={disabled}
-            className={`text-sm font-bold px-3 py-2 rounded-xl transition-colors flex items-center justify-center gap-1.5 ${
-              disabled
-                ? "bg-slate-200 text-slate-500 pointer-events-none"
-                : "bg-pink-600 hover:bg-pink-500 text-white shadow-sm shadow-pink-600/20"
-            }`}
-          >
-            최저가 보러가기
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-            </svg>
-          </a>
-
-          {/* 종료 신청 (회원 제보) — 이미 마감된 딜이면 숨김 */}
-          {!deal.is_ended && (
+        {/* 종료 신청 (회원 제보) — 이미 마감된 딜이면 숨김 */}
+        {!deal.is_ended && (
+          <div className="shrink-0">
             <button
               type="button"
               className="text-xs font-bold text-slate-500 bg-white border border-slate-200 hover:border-rose-300 hover:text-rose-600 hover:bg-rose-50 px-2.5 py-1.5 rounded-xl transition-colors flex items-center justify-center gap-1.5"
@@ -74,8 +49,8 @@ export default function HotdealBox({
               </svg>
               종료 신청
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

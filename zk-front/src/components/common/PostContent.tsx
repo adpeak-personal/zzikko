@@ -123,7 +123,7 @@ export default function PostContent({
     <div className={className}>
       {segments.map((seg, i) =>
         seg.type === "card" ? (
-          // OG 이미지가 있으면 카드 박스, 없으면 일반 링크
+          // OG 이미지가 있으면 카드 박스, 없으면 일반(파란색) 링크
           seg.image ? (
             <LinkPreviewCard key={i} {...seg} />
           ) : (
@@ -132,14 +132,19 @@ export default function PostContent({
                 href={seg.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-pink-600 underline break-all"
+                className="text-blue-600 underline break-all"
               >
                 {seg.title ?? seg.url}
               </a>
             </p>
           )
         ) : (
-          <div key={i} dangerouslySetInnerHTML={{ __html: seg.html }} />
+          // 본문 HTML 내부의 일반 <a> 도 일관되게 파란색 링크로 표시
+          <div
+            key={i}
+            className="[&_a]:text-blue-600 [&_a]:underline [&_a]:break-all"
+            dangerouslySetInnerHTML={{ __html: seg.html }}
+          />
         ),
       )}
     </div>

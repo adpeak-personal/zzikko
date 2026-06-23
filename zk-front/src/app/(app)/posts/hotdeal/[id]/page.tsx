@@ -26,9 +26,6 @@ export default async function HotdealPostPage({
   const board = CATEGORIES.find((c) => c.slug === SLUG);
   const comments = nestComments(post.comments);
   const deal = post.extra_data as HotdealExtra | null;
-  // 본문 <a> 링크 개수 — 정확히 1개일 때만 "최저가 보러가기" 활성화 (0개 or 2개 이상이면 비활성화)
-  const contentLinkCount = (post.content.match(/<a\s/gi) ?? []).length;
-  const dealDisabled = !!deal && (deal.is_ended || contentLinkCount !== 1);
   const tags: string[] = (post.extra_data as any)?.tags ?? [];
 
   return (
@@ -41,7 +38,7 @@ export default async function HotdealPostPage({
       <article className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
         <PostHeader post={post} board={board} />
 
-        {deal && <HotdealBox deal={deal} disabled={dealDisabled} />}
+        {deal && <HotdealBox deal={deal} />}
 
         <PostContent
           html={post.content}
