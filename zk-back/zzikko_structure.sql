@@ -164,3 +164,85 @@ CREATE TABLE `devices` (
   KEY `idx_antutu` (`antutu_score`),                        -- 성능 순위 정렬
   KEY `idx_price` (`official_price`)                        -- 가격 정렬
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- 키워드 정리 (지역 / 기종 ++)
+CREATE TABLE `keywords` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `category` enum('region','phone_model') NOT NULL,  -- 나중에 '통신사','사은품' 등 추가하기 쉬움
+  `name` varchar(80) NOT NULL,                       -- "강남", "갤럭시 S26"
+  `sort_order` int DEFAULT 0,                        -- 어드민에서 드래그 정렬
+  `is_active` tinyint(1) DEFAULT 1,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_category_name` (`category`,`name`),
+  KEY `idx_category_active` (`category`,`is_active`,`sort_order`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- =====================================================================
+-- 블로그 예약 발행 작업 (blog_jobs)
+-- 어드민 BulkComposer 가 등록하는 "제목·키워드·예약시각" 1건 = 1행.
+-- 지금은 zustand persist(localStorage) 에 보관 중이지만, 이 테이블로 옮기면:
+--   1) 최근 N일 안에 같은 제목 재사용 차단 (앱 레이어 검사)
+--   2) 최근 N일 안에 같은 키워드 재사용 차단 (앱 레이어 검사)
+--   3) 여러 브라우저/디바이스에서 같은 큐를 본다
+--
+-- ⚠️ 중복 정책 메모:
+--   - "영원히 UNIQUE" 로 막으면 글이 누적될수록 제목/키워드 고갈 문제가 생긴다.
+--   - 그래서 DB 제약(UNIQUE) 대신, 등록 라우트에서 시간 윈도우(예: 20일) 검사로
+--     "최근에 쓴 적 없으면 통과" 시킨다. 20일 지난 건 자연스럽게 재사용 가능.
+--   - MySQL 은 partial index 가 없어서 이 정책을 컬럼 UNIQUE 로 표현 불가.
+--     대신 (컬럼, created_at) 복합 인덱스로 윈도우 쿼리를 인덱스 스캔만으로 끝낸다.
+--
+-- 상태값은 프론트의 BlogJobStatus 와 1:1.
+-- =====================================================================
+CREATE TABLE `blog_jobs` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `title` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,           -- 발행 제목
+  `scheduled_at` datetime NOT NULL,                                   -- 예약 발행 시각
+  `status` enum('PENDING','PROCESSING','DONE','FAILED') COLLATE utf8mb4_unicode_ci DEFAULT 'PENDING',
+  `result_url` varchar(511) COLLATE utf8mb4_unicode_ci DEFAULT NULL,  -- 발행 완료 후 결과 URL
+  `error` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,               -- 실패 사유
+  `published_at` timestamp NULL DEFAULT NULL,                         -- 실제로 발행된 시각 (워커가 채움)
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_status_schedule` (`status`,`scheduled_at`),                -- 워커가 "PENDING 중 가장 이른 것" 픽업
+  -- "최근 N일 안에 같은 제목 썼나?" 윈도우 쿼리용 복합 인덱스
+  --   SELECT 1 FROM blog_jobs
+  --    WHERE title = ? AND created_at >= NOW() - INTERVAL 20 DAY
+  KEY `idx_title_recent` (`title`,`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- =====================================================================
+-- 블로그 작업 키워드 (blog_job_keywords)
+-- 한 블로그 작업당 키워드 N개 → 1:N 으로 분리 저장.
+--
+-- 중복 정책:
+--   - 같은 글 안에서의 키워드 중복(예: ["강남","강남"]) 만 DB 가 차단
+--     → UNIQUE(job_id, keyword)
+--   - 다른 글 간 동일 키워드 재사용은 DB 가 막지 않고, 등록 라우트에서
+--     "최근 N일 (예: 20일) 안에 같은 키워드를 쓴 글이 있는가?" 만 검사.
+--     N일 지난 키워드는 자연히 재사용 가능.
+--
+-- 검사 쿼리(권장):
+--   SELECT DISTINCT keyword
+--     FROM blog_job_keywords
+--    WHERE keyword IN (?)
+--      AND created_at >= NOW() - INTERVAL 20 DAY;
+-- =====================================================================
+CREATE TABLE `blog_job_keywords` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `job_id` int NOT NULL,
+  `keyword` varchar(80) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_job_keyword` (`job_id`,`keyword`),                   -- 같은 작업 안에서 키워드 중복 차단
+  -- "최근 N일 안에 같은 키워드 썼나?" 윈도우 쿼리용 복합 인덱스
+  KEY `idx_keyword_recent` (`keyword`,`created_at`),
+  CONSTRAINT `blog_job_keywords_ibfk_1`
+    FOREIGN KEY (`job_id`) REFERENCES `blog_jobs` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

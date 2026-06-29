@@ -10,6 +10,7 @@ import {
   type DistMode,
 } from "@/lib/blog-schedule";
 import { useBlogJobsStore } from "@/store/blogJobs";
+import { useBulkSaveBlogJobs } from "@/service/blog-jobs/mutations";
 
 // 미리보기에서 편집 중인 행 (키워드는 콤마 텍스트로 편집)
 type EditRow = { title: string; keywordsText: string };
@@ -27,12 +28,25 @@ const PLACEHOLDER = `제목 | 키워드 형식으로 한 줄에 하나씩 붙여
 홍대 휴대폰 성지 아이폰 17 프로 최저가 확인 | 홍대휴대폰성지, 아이폰17프로
 ...`;
 
-type Props = { onRegistered: () => void };
+type Props = {
+  onRegistered: () => void;
+  /** 외부(AI 제목 생성 등)에서 raw 텍스트를 주입하고 싶을 때 — 미지정 시 내부 state 로 동작 */
+  raw?: string;
+  onRawChange?: (next: string) => void;
+};
 
-export default function BulkComposer({ onRegistered }: Props) {
+export default function BulkComposer({ onRegistered, raw: rawProp, onRawChange }: Props) {
   const addJobs = useBlogJobsStore((s) => s.addJobs);
+  const saveMutation = useBulkSaveBlogJobs();
 
-  const [raw, setRaw] = useState("");
+  // controlled / uncontrolled 양립 — prop 이 오면 그걸, 아니면 내부 state 사용
+  const [innerRaw, setInnerRaw] = useState("");
+  const raw = rawProp ?? innerRaw;
+  const setRaw = (next: string) => {
+    if (onRawChange) onRawChange(next);
+    else setInnerRaw(next);
+  };
+
   const [rows, setRows] = useState<EditRow[]>([]);
   const [startAt, setStartAt] = useState("");
   const [windowHours, setWindowHours] = useState(24);
@@ -75,18 +89,46 @@ export default function BulkComposer({ onRegistered }: Props) {
     setRows((prev) => prev.filter((_, idx) => idx !== i));
   }
 
-  function handleRegister() {
+  async function handleRegister() {
     if (rows.length === 0 || times.length !== rows.length) return;
-    addJobs(
-      rows.map((r, i) => {
-        const keywords = splitKeywords(r.keywordsText);
-        return {
-          title: r.title,
-          keywords: keywords.length > 0 ? keywords : [r.title],
-          scheduledAt: times[i].toISOString(),
-        };
-      }),
-    );
+
+    // 1) 통일된 jobs 배열 — DB 저장 / zustand 양쪽에 동일하게 사용
+    const jobs = rows.map((r, i) => {
+      const keywords = splitKeywords(r.keywordsText);
+      return {
+        title: r.title.trim(),
+        keywords: keywords.length > 0 ? keywords : [r.title.trim()],
+        scheduledAt: times[i].toISOString(),
+      };
+    });
+
+    // 2) DB 저장 (최근 20일 내 같은 제목은 자동으로 건너뜀)
+    try {
+      const result = await saveMutation.mutateAsync({
+        items: jobs.map((j) => ({
+          title: j.title,
+          scheduled_at: j.scheduledAt,
+          keywords: j.keywords,
+        })),
+      });
+
+      // 3) zustand 에는 "DB 에 실제로 저장된 제목들" 만 미러링 — JobBoard 가 일단 그대로 동작
+      const skipped = new Set(result.skipped_titles);
+      const accepted = jobs.filter((j) => !skipped.has(j.title));
+      if (accepted.length > 0) addJobs(accepted);
+
+      if (result.skipped > 0) {
+        alert(
+          `${result.saved}개 저장, ${result.skipped}개 건너뜀\n` +
+          `(최근 ${result.dedupe_window_days}일 안에 이미 사용된 제목)\n\n` +
+          `건너뛴 제목:\n- ${result.skipped_titles.join('\n- ')}`,
+        );
+      }
+    } catch (err) {
+      alert((err as Error).message ?? '저장에 실패했습니다.');
+      return;
+    }
+
     setRaw("");
     setRows([]);
     onRegistered();
@@ -202,9 +244,10 @@ export default function BulkComposer({ onRegistered }: Props) {
             <h2 className="font-extrabold text-slate-900">3. 예약 미리보기</h2>
             <button
               onClick={handleRegister}
-              className="text-sm font-bold text-white bg-blue-600 hover:bg-blue-500 px-5 py-2.5 rounded-xl transition-colors"
+              disabled={saveMutation.isPending}
+              className="text-sm font-bold text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed px-5 py-2.5 rounded-xl transition-colors"
             >
-              {rows.length}개 예약 등록
+              {saveMutation.isPending ? "저장 중…" : `${rows.length}개 예약 등록`}
             </button>
           </div>
           <div className="overflow-x-auto">
