@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
@@ -26,7 +26,9 @@ function parsePriceFromTitle(title: string): number | null {
   return null;
 }
 
-export default function WritePage() {
+// useSearchParams() 를 사용하는 내부 컴포넌트.
+// Next.js 빌드 시 prerender 단계에서 useSearchParams 가 throw 하므로 페이지를 Suspense 로 감싼다.
+function WriteForm() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
@@ -202,5 +204,20 @@ export default function WritePage() {
         </form>
       </div>
     </div>
+  );
+}
+
+// 페이지 export — useSearchParams 를 쓰는 폼을 Suspense 로 감싼다.
+export default function WritePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center text-slate-400 text-sm">
+          로딩 중...
+        </div>
+      }
+    >
+      <WriteForm />
+    </Suspense>
   );
 }
