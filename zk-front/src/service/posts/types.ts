@@ -12,6 +12,7 @@ export type HotdealExtra = {
 export type PostRow = {
   id: number;
   board_slug: string;
+  sub_slug?: string | null;
   title: string;
   thumb: string | null;
   views: number;
@@ -51,6 +52,7 @@ export type NestedComment = CommentRow & { replies: NestedComment[] };
 export type PostDetail = {
   id: number;
   board_slug: string;
+  sub_slug?: string | null;
   user_id: number | null;
   title: string;
   content: string;

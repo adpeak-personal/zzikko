@@ -60,7 +60,7 @@ export default function MobileSidebar({ open, onClose }: Props) {
             카테고리
           </p>
           <ul className="px-2">
-            {CATEGORIES.map((c) => {
+            {CATEGORIES.filter((c) => !c.hiddenFromNav).map((c) => {
               const active = pathname?.startsWith(`/category/${c.slug}`);
               return (
                 <li key={c.slug}>

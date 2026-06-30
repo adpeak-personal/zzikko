@@ -1,10 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 import type { ResultSetHeader } from 'mysql2';
 import { finalizeTmpUrls, deleteStoredImages, generateThumbnail } from '../lib/gcs';
+import { pickRandomAlias } from '../lib/alias';
 
 export default async function postRoutes(app: FastifyInstance) {
   // POST /api/posts  — 게시글 작성 (인증 필요)
-  app.post<{ Body: { board_slug: string; title: string; content: string; thumbnail_url?: string; extra_data?: object } }>(
+  app.post<{ Body: { board_slug: string; sub_slug?: string; title: string; content: string; thumbnail_url?: string; extra_data?: object } }>(
     '/',
     {
       preHandler: app.authenticate,
@@ -14,6 +15,7 @@ export default async function postRoutes(app: FastifyInstance) {
           required: ['board_slug', 'title', 'content'],
           properties: {
             board_slug:    { type: 'string', minLength: 1 },
+            sub_slug:      { type: 'string', minLength: 1, maxLength: 50 },
             title:         { type: 'string', minLength: 1 },
             content:       { type: 'string', minLength: 1 },
             thumbnail_url: { type: 'string' },
@@ -23,17 +25,22 @@ export default async function postRoutes(app: FastifyInstance) {
       },
     },
     async (req) => {
-      const { board_slug, title, content, thumbnail_url, extra_data } = req.body;
-      // 본문/썸네일의 tmp/ 이미지를 posts/ 로 확정 이동 + URL 치환 (고아 파일 방지)
-      const finalContent = await finalizeTmpUrls(content);
+      const { board_slug, sub_slug, title, content, thumbnail_url, extra_data } = req.body;
+      // 본문/썸네일의 tmp/ 이미지를 게시판 slug 폴더로 확정 이동 + URL 치환 (고아 파일 방지)
+      // → 게시판 추가/제거 시 별도 설정 불필요. 폴더만 봐도 어디 글 이미지인지 명확.
+      const finalContent = await finalizeTmpUrls(content, board_slug);
       // 썸네일: 본문 첫 이미지로 생성 → 없으면 전달된 thumbnail_url → 그것도 없으면 null
       const finalThumb =
-        (await generateThumbnail(finalContent)) ??
-        (thumbnail_url ? await finalizeTmpUrls(thumbnail_url) : null);
+        (await generateThumbnail(finalContent, board_slug)) ??
+        (thumbnail_url ? await finalizeTmpUrls(thumbnail_url, board_slug) : null);
+      // 작성자에게 등록된 활성 alias 가 있으면 그 중 랜덤 하나로 display_nickname 을 stamp.
+      // 없으면 NULL → 글 표시 시 users.nickname 으로 폴백.
+      const displayNickname = await pickRandomAlias(app, req.user.sub);
+
       const [result] = await app.db.query<ResultSetHeader>(
-        `INSERT INTO posts (board_slug, user_id, title, content, thumbnail_url, extra_data)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [board_slug, req.user.sub, title, finalContent, finalThumb, extra_data ? JSON.stringify(extra_data) : null],
+        `INSERT INTO posts (board_slug, sub_slug, user_id, display_nickname, title, content, thumbnail_url, extra_data)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [board_slug, sub_slug ?? null, req.user.sub, displayNickname, title, finalContent, finalThumb, extra_data ? JSON.stringify(extra_data) : null],
       );
       return { id: result.insertId };
     },
@@ -46,9 +53,10 @@ export default async function postRoutes(app: FastifyInstance) {
     if (isNaN(postId)) return reply.badRequest('잘못된 게시글 ID입니다.');
 
     const [postRows] = await app.db.query(
-      `SELECT p.id, p.board_slug, p.user_id, p.title, p.content, p.thumbnail_url, p.extra_data,
+      `SELECT p.id, p.board_slug, p.sub_slug, p.user_id, p.title, p.content, p.thumbnail_url, p.extra_data,
               p.view_count, p.like_count, p.comment_count, p.is_notice, p.created_at,
-              u.nickname AS author, u.profile_image AS author_profile_image, up.level
+              COALESCE(p.display_nickname, u.nickname) AS author,
+              u.profile_image AS author_profile_image, up.level
        FROM posts p
        LEFT JOIN users u ON p.user_id = u.id
        LEFT JOIN user_profile up ON u.id = up.user_id
@@ -89,11 +97,12 @@ export default async function postRoutes(app: FastifyInstance) {
     };
   });
 
-  // GET /api/posts/load_lists
+  // GET /api/posts/load_lists?board_slug=...&sub_slug=...
   app.get('/load_lists', async (req, _reply) => {
 
-    const { board_slug, page = '1', limit = '20' } = req.query as {
+    const { board_slug, sub_slug, page = '1', limit = '20' } = req.query as {
       board_slug?: string;
+      sub_slug?: string;
       page?: string;
       limit?: string;
     };
@@ -102,13 +111,24 @@ export default async function postRoutes(app: FastifyInstance) {
     const limitNum = Math.min(50, Math.max(1, parseInt(limit)));
     const offset = (pageNum - 1) * limitNum;
 
-    const where = board_slug ? 'WHERE p.board_slug = ? AND p.status = "ACTIVE"' : 'WHERE p.status = "ACTIVE"';
-    const params = board_slug ? [board_slug, limitNum, offset] : [limitNum, offset];
+    // 동적 WHERE 빌드 — board_slug / sub_slug 조합 지원
+    const conds: string[] = ['p.status = "ACTIVE"'];
+    const baseParams: unknown[] = [];
+    if (board_slug) {
+      conds.push('p.board_slug = ?');
+      baseParams.push(board_slug);
+    }
+    if (sub_slug) {
+      conds.push('p.sub_slug = ?');
+      baseParams.push(sub_slug);
+    }
+    const whereSql = `WHERE ${conds.join(' AND ')}`;
 
     const [rows] = await app.db.query(
       `SELECT
         p.id,
         p.board_slug,
+        p.sub_slug,
         p.title,
         p.thumbnail_url AS thumb,
         p.view_count   AS views,
@@ -117,20 +137,20 @@ export default async function postRoutes(app: FastifyInstance) {
         p.is_notice,
         p.extra_data,
         p.created_at,
-        u.nickname     AS author,
+        COALESCE(p.display_nickname, u.nickname) AS author,
         up.level
       FROM posts p
       LEFT JOIN users u  ON p.user_id = u.id
       LEFT JOIN user_profile up ON u.id = up.user_id
-      ${where}
+      ${whereSql}
       ORDER BY p.is_notice DESC, p.created_at DESC
       LIMIT ? OFFSET ?`,
-      params,
+      [...baseParams, limitNum, offset],
     );
 
     const [[{ total }]] = await app.db.query(
-      `SELECT COUNT(*) AS total FROM posts p ${where.replace('LIMIT ? OFFSET ?', '')}`,
-      board_slug ? [board_slug] : [],
+      `SELECT COUNT(*) AS total FROM posts p ${whereSql}`,
+      baseParams,
     ) as any;
 
     return {

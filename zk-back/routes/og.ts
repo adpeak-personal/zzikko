@@ -25,7 +25,7 @@ export default async function ogRoutes(app: FastifyInstance) {
       });
 
       if (!error && result.success) {
-        const rawImage = Array.isArray(result.ogImage) ? result.ogImage[0]?.url : result.ogImage?.url;
+        const rawImage = result.ogImage?.[0]?.url;
         const image = resolveImage(rawImage, url);
 
         // 이미지까지 있으면 바로 반환

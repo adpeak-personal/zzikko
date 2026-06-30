@@ -10,6 +10,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
   { href: "/admin/blog", title: "블로그 발행", icon: "✍️" },
   { href: "/admin/posts", title: "게시글관리", icon: "📝" },
   { href: "/admin/keywords", title: "키워드관리", icon: "🏷️" },
+  { href: "/admin/aliases", title: "닉네임 alias", icon: "🎭" },
   { href: "/admin/reports", title: "신고관리", icon: "🚨" },
   { href: "/admin/settings", title: "설정", icon: "⚙️" },
 ];

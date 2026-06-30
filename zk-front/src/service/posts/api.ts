@@ -1,17 +1,18 @@
 import type { PostListResponse, PostDetail } from "./types";
-
-const BACK = process.env.NEXT_PUBLIC_BACK_API ?? "http://localhost:3041";
+import { BACK_API as BACK } from "@/lib/backend-url";
 
 export async function fetchBoardPosts(
   boardSlug: string,
   page = 1,
   limit = 20,
+  subSlug?: string,
 ): Promise<PostListResponse> {
   const params = new URLSearchParams({
     board_slug: boardSlug,
     page: String(page),
     limit: String(limit),
   });
+  if (subSlug) params.set("sub_slug", subSlug);
   const res = await fetch(`${BACK}/api/posts/load_lists?${params}`);
   if (!res.ok) throw new Error("게시글 목록을 불러오지 못했습니다.");
   return res.json();

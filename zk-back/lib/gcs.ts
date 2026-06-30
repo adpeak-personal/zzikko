@@ -55,8 +55,13 @@ function escapeRegExp(s: string): string {
  * 본문 HTML 의 첫 번째 이미지로 썸네일(webp)을 만들어 GCS 에 올리고 공개 URL 을 반환한다.
  * - 글 작성 시 호출 → 목록 썸네일로 사용 (thumbnail_url 컬럼에 저장).
  * - 본문에 이미지가 없거나 이 버킷 이미지가 아니면 null.
+ *
+ * @param destPrefix 저장될 GCS 경로 prefix. 게시판별 폴더 분리에 사용 (e.g. 'blog', 'posts', 'community')
  */
-export async function generateThumbnail(html: string): Promise<string | null> {
+export async function generateThumbnail(
+  html: string,
+  destPrefix: string = 'posts',
+): Promise<string | null> {
   if (!BUCKET_NAME || !html) return null;
 
   const m = html.match(/<img[^>]+src=["']([^"']+)["']/i);
@@ -68,14 +73,13 @@ export async function generateThumbnail(html: string): Promise<string | null> {
 
   const srcKey = decodeURIComponent(src.slice(prefix.length));
   try {
-    // GCS 에서 원본을 받아 → 최대 600px webp 로 축소 → thumb 경로로 업로드
+    // GCS 에서 원본을 받아 → 최대 600px webp 로 축소 → {destPrefix}/{date}/thumb_*.webp 로 업로드
     const [buf] = await bucket.file(srcKey).download();
     const thumb = await sharp(buf)
       .resize({ width: 600, height: 600, fit: 'inside', withoutEnlargement: true })
       .webp({ quality: 70 })
       .toBuffer();
-    // 원본과 같은 날짜 경로에 저장하되 파일명 앞에 thumb_ 접두사
-    const key = `posts/${datePath()}/thumb_${randomUUID()}.webp`;
+    const key = `${destPrefix}/${datePath()}/thumb_${randomUUID()}.webp`;
     return await uploadBuffer(key, thumb, 'image/webp');
   } catch {
     return null;
@@ -108,12 +112,14 @@ export async function deleteStoredImages(...texts: (string | null | undefined)[]
 }
 
 /**
- * 본문(또는 임의 문자열) 안의 tmp/ 이미지들을 posts/ 로 이동하고
+ * 본문(또는 임의 문자열) 안의 tmp/ 이미지들을 {destPrefix}/ 로 이동하고
  * URL 을 영구 경로로 치환한 문자열을 반환한다.
- * - 글 저장 시 호출 → posts/ 에는 실제로 글에 쓰인 이미지만 남는다(고아 0).
+ * - 글 저장 시 호출 → 영구 폴더에는 실제로 글에 쓰인 이미지만 남는다(고아 0).
  * - 저장 안 된(취소된) tmp/ 이미지는 그대로 남아 Lifecycle 규칙으로 자동 삭제.
+ *
+ * @param destPrefix 저장될 GCS 경로 prefix. 게시판별 폴더 분리에 사용 (e.g. 'blog', 'posts', 'community')
  */
-export async function finalizeTmpUrls(html: string): Promise<string> {
+export async function finalizeTmpUrls(html: string, destPrefix: string = 'posts'): Promise<string> {
   if (!html || !BUCKET_NAME) return html;
 
   const prefix = `https://storage.googleapis.com/${BUCKET_NAME}/tmp/`;
@@ -127,7 +133,7 @@ export async function finalizeTmpUrls(html: string): Promise<string> {
   let result = html;
   for (const rest of rests) {
     const srcKey = `tmp/${rest}`;
-    const destKey = `posts/${rest}`;
+    const destKey = `${destPrefix}/${rest}`;
     try {
       await bucket.file(srcKey).move(destKey);
     } catch {

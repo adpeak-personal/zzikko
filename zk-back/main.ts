@@ -18,6 +18,7 @@ import uploadRoutes from './routes/upload';
 import keywordRoutes from './routes/keywords';
 import aiTitlesRoutes from './routes/ai-titles';
 import blogJobsRoutes from './routes/blog-jobs';
+import aliasRoutes from './routes/aliases';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -73,6 +74,7 @@ app.register(uploadRoutes, { prefix: '/api/upload' });
 app.register(keywordRoutes, { prefix: '/api/keywords' });
 app.register(aiTitlesRoutes, { prefix: '/api/ai' });
 app.register(blogJobsRoutes, { prefix: '/api/blog-jobs' });
+app.register(aliasRoutes, { prefix: '/api/admin/aliases' });
 
 const PORT = Number(process.env.PORT || 4000);
 const HOST = process.env.HOST || '0.0.0.0';

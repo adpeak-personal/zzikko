@@ -5,6 +5,16 @@ export type CategoryNav = {
   desc: string;
   color: string;
   text: string;
+  /** true 면 메가메뉴/모바일 사이드바에서 숨김. URL 접근 / CategoryHeader 메타데이터는 그대로 동작. */
+  hiddenFromNav?: boolean;
+  /** 1뎁스 더 — 자유게시판 같은 게시판은 sub_slug 로 한번 더 분류 */
+  subs?: SubCategoryNav[];
+};
+
+export type SubCategoryNav = {
+  slug: string;
+  title: string;
+  icon?: string;
 };
 
 export const CATEGORIES: CategoryNav[] = [
@@ -72,5 +82,34 @@ export const CATEGORIES: CategoryNav[] = [
     desc: "신규 기종 스펙 비교",
     color: "bg-orange-50",
     text: "text-orange-600",
+  },
+  // ──────────────────────────────────────────────────────────────────
+  // 자유게시판 — sub_slug 로 1뎁스 더 분류
+  // ──────────────────────────────────────────────────────────────────
+  {
+    slug: "free",
+    title: "자유게시판",
+    icon: "💬",
+    desc: "잡담·유머·질문 등 자유 주제",
+    color: "bg-slate-50",
+    text: "text-slate-700",
+    subs: [
+      { slug: "chat", title: "잡담", icon: "🗨️" },
+      { slug: "humor", title: "유머", icon: "😆" },
+      { slug: "question", title: "질문", icon: "❓" },
+      { slug: "info", title: "정보공유", icon: "💡" },
+    ],
+  },
+  // ──────────────────────────────────────────────────────────────────
+  // AI 자동 발행 블로그 — 메인 네비에서는 숨김. 직접 URL/푸터로만 접근.
+  // ──────────────────────────────────────────────────────────────────
+  {
+    slug: "blog",
+    title: "Blog",
+    icon: "📰",
+    desc: "정보성 블로그 글",
+    color: "bg-zinc-50",
+    text: "text-zinc-700",
+    hiddenFromNav: true,
   },
 ];

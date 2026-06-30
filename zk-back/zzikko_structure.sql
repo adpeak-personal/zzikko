@@ -17,7 +17,27 @@ CREATE TABLE `users` (
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `deleted_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `email` (`email`)
+  UNIQUE KEY `email` (`email`),
+  UNIQUE KEY `uq_nickname` (`nickname`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- =====================================================================
+-- 닉네임 alias 풀 (1 user : N aliases)
+-- "찍고" 측에서 다양한 캐릭터로 글을 자동/수동 발행할 때 매번 다른 닉으로 보이게.
+-- posts.display_nickname 에 INSERT 시점에 stamp 되어 그 글은 영구적으로 그 alias 로 표시.
+-- =====================================================================
+CREATE TABLE `user_aliases` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `user_id` int NOT NULL,
+  `nickname` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `is_active` tinyint(1) DEFAULT 1,
+  `sort_order` int DEFAULT 0,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_alias_nickname` (`nickname`),
+  KEY `idx_user_active` (`user_id`,`is_active`),
+  CONSTRAINT `user_aliases_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
@@ -60,7 +80,9 @@ CREATE TABLE `user_tokens` (
 CREATE TABLE `posts` (
   `id` int NOT NULL AUTO_INCREMENT,
   `board_slug` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL, -- navigation.ts 의 카테고리 slug
+  `sub_slug` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL, -- 1뎁스 더 (자유게시판 잡담/유머/질문 등). 다른 게시판은 NULL
   `user_id` int DEFAULT NULL,
+  `display_nickname` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL, -- INSERT 시점에 user_aliases 풀에서 랜덤 stamp. NULL 이면 users.nickname 사용.
   `title` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `content` longtext COLLATE utf8mb4_unicode_ci NOT NULL,
   `thumbnail_url` text COLLATE utf8mb4_unicode_ci,
@@ -75,8 +97,17 @@ CREATE TABLE `posts` (
   PRIMARY KEY (`id`),
   KEY `user_id` (`user_id`),
   KEY `idx_board_created` (`board_slug`,`status`,`created_at`), -- 게시판별 목록 조회용
+  KEY `idx_board_sub_created` (`board_slug`,`sub_slug`,`status`,`created_at`), -- 1뎁스 필터링용
   CONSTRAINT `posts_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ──────────────────────────────────────────────────────────────────────
+-- 운영 중인 DB 에 적용할 ALTER 문 (zzikko_structure.sql 통째 재실행 X)
+-- ──────────────────────────────────────────────────────────────────────
+-- ALTER TABLE `posts`
+--   ADD COLUMN `sub_slug` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL AFTER `board_slug`,
+--   ADD KEY `idx_board_sub_created` (`board_slug`,`sub_slug`,`status`,`created_at`);
+-- ──────────────────────────────────────────────────────────────────────
 
 
 -- =====================================================================
@@ -201,6 +232,7 @@ CREATE TABLE `keywords` (
 CREATE TABLE `blog_jobs` (
   `id` int NOT NULL AUTO_INCREMENT,
   `title` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,           -- 발행 제목
+  `keywords` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,    -- 콤마구분 키워드 (디버깅·간편조회용 denormalized). 정규화 데이터는 blog_job_keywords 에도 동시 저장.
   `scheduled_at` datetime NOT NULL,                                   -- 예약 발행 시각
   `status` enum('PENDING','PROCESSING','DONE','FAILED') COLLATE utf8mb4_unicode_ci DEFAULT 'PENDING',
   `result_url` varchar(511) COLLATE utf8mb4_unicode_ci DEFAULT NULL,  -- 발행 완료 후 결과 URL

@@ -3,7 +3,8 @@
 // ⚠️ 임시: 지금은 access/refresh 토큰을 localStorage 에 저장한다.
 // (백엔드 Redis 세션이 준비되면 httpOnly 쿠키 기반으로 옮기는 게 안전함)
 
-export const BACK_API = process.env.NEXT_PUBLIC_BACK_API ?? "http://localhost:4000";
+export { BACK_API } from "./backend-url";
+import { BACK_API } from "./backend-url";
 
 const ACCESS_KEY = "zzikko_access";
 const REFRESH_KEY = "zzikko_refresh";

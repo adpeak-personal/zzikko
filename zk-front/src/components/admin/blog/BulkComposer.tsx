@@ -9,7 +9,6 @@ import {
   toLocalInputValue,
   type DistMode,
 } from "@/lib/blog-schedule";
-import { useBlogJobsStore } from "@/store/blogJobs";
 import { useBulkSaveBlogJobs } from "@/service/blog-jobs/mutations";
 
 // 미리보기에서 편집 중인 행 (키워드는 콤마 텍스트로 편집)
@@ -36,7 +35,6 @@ type Props = {
 };
 
 export default function BulkComposer({ onRegistered, raw: rawProp, onRawChange }: Props) {
-  const addJobs = useBlogJobsStore((s) => s.addJobs);
   const saveMutation = useBulkSaveBlogJobs();
 
   // controlled / uncontrolled 양립 — prop 이 오면 그걸, 아니면 내부 state 사용
@@ -92,30 +90,19 @@ export default function BulkComposer({ onRegistered, raw: rawProp, onRawChange }
   async function handleRegister() {
     if (rows.length === 0 || times.length !== rows.length) return;
 
-    // 1) 통일된 jobs 배열 — DB 저장 / zustand 양쪽에 동일하게 사용
-    const jobs = rows.map((r, i) => {
-      const keywords = splitKeywords(r.keywordsText);
+    // DB 로 보낼 페이로드
+    const items = rows.map((r, i) => {
+      const kws = splitKeywords(r.keywordsText);
       return {
         title: r.title.trim(),
-        keywords: keywords.length > 0 ? keywords : [r.title.trim()],
-        scheduledAt: times[i].toISOString(),
+        scheduled_at: times[i].toISOString(),
+        keywords: kws.length > 0 ? kws : [r.title.trim()],
       };
     });
 
-    // 2) DB 저장 (최근 20일 내 같은 제목은 자동으로 건너뜀)
+    // DB 저장 (최근 20일 내 같은 제목은 자동으로 건너뜀)
     try {
-      const result = await saveMutation.mutateAsync({
-        items: jobs.map((j) => ({
-          title: j.title,
-          scheduled_at: j.scheduledAt,
-          keywords: j.keywords,
-        })),
-      });
-
-      // 3) zustand 에는 "DB 에 실제로 저장된 제목들" 만 미러링 — JobBoard 가 일단 그대로 동작
-      const skipped = new Set(result.skipped_titles);
-      const accepted = jobs.filter((j) => !skipped.has(j.title));
-      if (accepted.length > 0) addJobs(accepted);
+      const result = await saveMutation.mutateAsync({ items });
 
       if (result.skipped > 0) {
         alert(

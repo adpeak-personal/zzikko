@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import TibTapEditor from "@/components/common/Editor";
 import { apiFetch } from "@/lib/auth";
 import { useAuthStore } from "@/store/auth";
 import { MALLS } from "@/data/constants";
+import { CATEGORIES } from "@/config/navigation";
 
 function parsePriceFromTitle(title: string): number | null {
   // "19,900원" / "19900원"
@@ -28,7 +29,14 @@ function parsePriceFromTitle(title: string): number | null {
 export default function WritePage() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const searchParams = useSearchParams();
   const { user, isLoading } = useAuthStore();
+
+  // 쿼리스트링 ?board=blog&sub=humor 같은 형태로 들어옴. 미지정 시 hotdeal (기본).
+  const boardSlug = searchParams.get("board") ?? "hotdeal";
+  const subSlug = searchParams.get("sub") ?? undefined;
+  const board = CATEGORIES.find((c) => c.slug === boardSlug);
+  const isHotdeal = boardSlug === "hotdeal";
 
   const [title, setTitle] = useState("");
   const [parsedPrice, setParsedPrice] = useState<number | null>(null);
@@ -44,7 +52,7 @@ export default function WritePage() {
 
   function handleTitleChange(val: string) {
     setTitle(val);
-    setParsedPrice(parsePriceFromTitle(val));
+    if (isHotdeal) setParsedPrice(parsePriceFromTitle(val));
   }
 
   async function handleSubmit(e: { preventDefault(): void }) {
@@ -52,23 +60,34 @@ export default function WritePage() {
     setError(null);
     if (!content.trim()) { setError("본문을 입력해주세요."); return; }
 
-    const mall = selectedMall === "직접 입력" ? customMall.trim() : selectedMall;
-    const extra_data = { mall, price: parsedPrice, is_ended: false };
+    // 게시판별 extra_data 차이 — 핫딜만 mall/price 가 필요
+    let extra_data: Record<string, unknown> | undefined;
+    if (isHotdeal) {
+      const mall = selectedMall === "직접 입력" ? customMall.trim() : selectedMall;
+      extra_data = { mall, price: parsedPrice, is_ended: false };
+    }
 
     try {
       setSubmitting(true);
       const res = await apiFetch("/api/posts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ board_slug: "hotdeal", title, content, extra_data }),
+        body: JSON.stringify({
+          board_slug: boardSlug,
+          ...(subSlug ? { sub_slug: subSlug } : {}),
+          title,
+          content,
+          ...(extra_data ? { extra_data } : {}),
+        }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error((data as { message?: string }).message ?? "등록 실패");
       }
       // 목록 캐시 무효화 → 새 글이 바로 보이게
-      await queryClient.invalidateQueries({ queryKey: ["posts", "hotdeal"] });
-      router.push("/category/hotdeal");
+      await queryClient.invalidateQueries({ queryKey: ["posts", boardSlug] });
+      // 등록 후 이동 — 서브카테고리가 있으면 그 페이지로
+      router.push(subSlug ? `/category/${boardSlug}/${subSlug}` : `/category/${boardSlug}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "등록에 실패했습니다.");
     } finally {
@@ -86,13 +105,23 @@ export default function WritePage() {
       {/* 상단 헤더 */}
       <div className="sticky top-0 z-30 bg-[#0f1115] border-b border-white/5">
         <div className="max-w-3xl mx-auto px-4 h-14 flex items-center gap-4">
-          <Link href="/category/hotdeal" className="flex items-center gap-1.5 text-slate-300 hover:text-white text-sm transition-colors">
+          <Link
+            href={subSlug ? `/category/${boardSlug}/${subSlug}` : `/category/${boardSlug}`}
+            className="flex items-center gap-1.5 text-slate-300 hover:text-white text-sm transition-colors"
+          >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
             </svg>
             뒤로
           </Link>
-          <span className="text-white font-bold text-sm flex-1">핫딜 등록</span>
+          <span className="text-white font-bold text-sm flex-1">
+            {board?.title ?? boardSlug} 등록
+            {subSlug && board?.subs?.find((s) => s.slug === subSlug) && (
+              <span className="ml-1.5 text-xs font-normal text-slate-400">
+                · {board.subs.find((s) => s.slug === subSlug)?.title}
+              </span>
+            )}
+          </span>
           <button
             form="write-form"
             type="submit"
@@ -123,37 +152,43 @@ export default function WritePage() {
               <input
                 type="text" required value={title}
                 onChange={(e) => handleTitleChange(e.target.value)}
-                placeholder="예) [쿠팡] 삼성 65W 충전기 19,900원 역대최저"
+                placeholder={
+                  isHotdeal
+                    ? "예) [쿠팡] 삼성 65W 충전기 19,900원 역대최저"
+                    : "제목을 입력하세요"
+                }
                 className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-400"
               />
-              {parsedPrice !== null && (
+              {isHotdeal && parsedPrice !== null && (
                 <p className="mt-1.5 text-xs text-blue-600 font-medium">
                   💰 파싱된 가격: {parsedPrice.toLocaleString()}원
                 </p>
               )}
             </div>
 
-            {/* 쇼핑몰 */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 mb-1.5">쇼핑몰</label>
-              <select
-                value={selectedMall}
-                onChange={(e) => setSelectedMall(e.target.value)}
-                className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-blue-400"
-              >
-                {MALLS.map((m) => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
-              </select>
-              {selectedMall === "직접 입력" && (
-                <input
-                  type="text" value={customMall}
-                  onChange={(e) => setCustomMall(e.target.value)}
-                  placeholder="쇼핑몰 이름 입력"
-                  className="mt-2 w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-400"
-                />
-              )}
-            </div>
+            {/* 쇼핑몰 — 핫딜 전용 */}
+            {isHotdeal && (
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1.5">쇼핑몰</label>
+                <select
+                  value={selectedMall}
+                  onChange={(e) => setSelectedMall(e.target.value)}
+                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-blue-400"
+                >
+                  {MALLS.map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+                {selectedMall === "직접 입력" && (
+                  <input
+                    type="text" value={customMall}
+                    onChange={(e) => setCustomMall(e.target.value)}
+                    placeholder="쇼핑몰 이름 입력"
+                    className="mt-2 w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-400"
+                  />
+                )}
+              </div>
+            )}
           </div>
 
           {/* 본문 */}

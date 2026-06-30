@@ -47,7 +47,7 @@ export default function MegaMenu({ open, onClose }: Props) {
           </p>
 
           <div className="grid grid-cols-4 gap-3">
-            {CATEGORIES.map((c) => {
+            {CATEGORIES.filter((c) => !c.hiddenFromNav).map((c) => {
               const active = pathname?.startsWith(`/category/${c.slug}`);
               return (
                 <Link

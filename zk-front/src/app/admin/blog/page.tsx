@@ -4,8 +4,7 @@ import { useState } from "react";
 import BulkComposer from "@/components/admin/blog/BulkComposer";
 import JobBoard from "@/components/admin/blog/JobBoard";
 import AITitleModal from "@/components/admin/blog/AITitleModal";
-import { useBlogJobsStore } from "@/store/blogJobs";
-import { useHydrated } from "@/lib/useHydrated";
+import { useBlogJobs } from "@/service/blog-jobs/queries";
 
 type Tab = "compose" | "board";
 
@@ -17,8 +16,9 @@ export default function AdminBlogPage() {
   const [aiOpen, setAiOpen] = useState(false);
   const [aiMin, setAiMin] = useState(27);
   const [aiMax, setAiMax] = useState(32);
-  const hydrated = useHydrated();
-  const count = useBlogJobsStore((s) => s.jobs.length);
+  // 탭 옆에 표시할 총 건수 — DB 기준 (useBlogJobs 쿼리 캐시 공유)
+  const { data: jobsData } = useBlogJobs({ limit: 100 });
+  const count = jobsData?.total ?? 0;
 
   function handleOpenAi() {
     if (!Number.isInteger(aiMin) || !Number.isInteger(aiMax) || aiMin < 1 || aiMax < 1) {
@@ -73,7 +73,7 @@ export default function AdminBlogPage() {
               tab === "board" ? "bg-white shadow-sm text-slate-900" : "text-slate-500"
             }`}
           >
-            예약 현황{hydrated && count > 0 ? ` (${count})` : ""}
+            예약 현황{count > 0 ? ` (${count})` : ""}
           </button>
         </div>
 

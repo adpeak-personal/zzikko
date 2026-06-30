@@ -21,9 +21,12 @@ async function generateUniqueNickname(app: FastifyInstance, base: string | null)
   const clean = (base ?? '찍고러').trim().slice(0, 40) || '찍고러';
   for (let i = 0; i < 10; i++) {
     const candidate = i === 0 ? clean : `${clean}${Math.floor(1000 + Math.random() * 9000)}`;
+    // users.nickname 과 user_aliases.nickname 어느 쪽이든 겹치면 안 됨.
     const [rows] = await app.db.query<RowDataPacket[]>(
-      'SELECT 1 FROM users WHERE nickname = ? LIMIT 1',
-      [candidate],
+      `SELECT 1 FROM users         WHERE nickname = ? LIMIT 1
+       UNION ALL
+       SELECT 1 FROM user_aliases  WHERE nickname = ? LIMIT 1`,
+      [candidate, candidate],
     );
     if (rows.length === 0) return candidate.slice(0, 50);
   }

@@ -5,11 +5,12 @@ import BoardList from "./BoardList";
 
 type Props = {
   slug: string;
+  subSlug?: string;
   showRating?: boolean;
 };
 
-export default function BoardListClient({ slug, showRating }: Props) {
-  const { data, isPending, isError } = useBoardPosts(slug);
+export default function BoardListClient({ slug, subSlug, showRating }: Props) {
+  const { data, isPending, isError } = useBoardPosts(slug, 1, subSlug);
 
   if (isPending) {
     return (

@@ -1,0 +1,15 @@
+node_modules
+dist
+.git
+.gitignore
+.env
+.env.*
+*.log
+README.md
+.vscode
+.idea
+
+# 시크릿 — 컨테이너에 마운트로만 들어가야 함
+community-gcs-key.json
+*.pem
+*.key
