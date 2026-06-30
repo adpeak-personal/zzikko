@@ -54,9 +54,10 @@ services:
     build:
       context: ./zk-front
       args:
-        # 클라이언트 번들에 박히는 URL — 브라우저가 접근 가능한 주소.
-        # 로컬 도커 테스트: localhost:3041 / 운영: 실제 도메인
-        NEXT_PUBLIC_BACK_API: "http://localhost:3041"
+        # 빈 문자열 → 클라이언트가 "/api/..." 상대 경로로 요청 →
+        # next.config.ts 의 rewrites 가 컨테이너 네트워크의 backend:4000 으로 포워드.
+        # 결과적으로 어떤 도메인/IP 로 접속해도(localhost, 158.247.x.x, 실제 도메인) 다 동작.
+        NEXT_PUBLIC_BACK_API: ""
     container_name: zzikko-front
     ports:
       - "3040:3040"
