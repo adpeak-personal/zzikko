@@ -14,6 +14,10 @@ interface KeywordNameRow extends RowDataPacket {
   name: string;
 }
 
+interface PostKeywordRow extends RowDataPacket {
+  keywords: string | null;
+}
+
 // 모델 이름은 .env 의 GEMINI_MODEL 로 덮어쓸 수 있음.
 // ⚠️ gemini-1.5-flash, gemini-2.0-flash 는 deprecated → 404.
 //    현재 권장: gemini-2.5-flash (최신·빠름), gemini-2.5-pro (고품질·느림)
@@ -25,6 +29,52 @@ const DEFAULT_MIN = 27;
 const DEFAULT_MAX = 32;
 const HARD_MAX = 50; // 한 번에 너무 많이 요청하지 못하도록 상한
 
+// ─── 이력 기반 pool 선정 파라미터 ─────────────────────────────
+// 최근 N일간 발행된 posts.keywords 를 보고, 덜 쓰인 것부터 Gemini 에 전달할 pool 을 뽑는다.
+const DEDUPE_WINDOW_DAYS = 20;
+const FRESH_REGIONS = 40;   // 지역 pool: 최근 20일 안 쓴순 상위 40개
+const FRESH_MODELS = 20;    // 기종 pool: 최근 20일 안 쓴순 상위 20개
+
+// Fisher-Yates 셔플 — Gemini 가 앞쪽 것부터 우선 고르는 편향 방지
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// posts.keywords 안에서 지역 사용 횟수 세기.
+// AI 프롬프트가 생성하는 형식이 "{region} 휴대폰 성지" 또는 "{region} 핸드폰 성지" 라서,
+// "{region} " 로 시작하는 CSV 엔트리를 카운트.
+function countRegionUsage(region: string, entries: string[]): number {
+  const prefix = region + ' ';
+  let n = 0;
+  for (const e of entries) if (e.startsWith(prefix)) n++;
+  return n;
+}
+
+// 기종 사용 횟수 — CSV 엔트리와 정확히 일치.
+function countModelUsage(model: string, entries: string[]): number {
+  let n = 0;
+  for (const e of entries) if (e === model) n++;
+  return n;
+}
+
+// 덜 쓴 순 (오름차순) 정렬 후 상위 limit 개 → 셔플.
+function pickFreshKeywords(
+  names: string[],
+  entries: string[],
+  countFn: (name: string, entries: string[]) => number,
+  limit: number,
+): string[] {
+  const withCount = names.map((n) => ({ name: n, count: countFn(n, entries) }));
+  withCount.sort((a, b) => a.count - b.count);
+  const top = withCount.slice(0, limit).map((x) => x.name);
+  return shuffle(top);
+}
+
 function buildPrompt(regions: string[], models: string[], min: number, max: number): string {
   const regionLines = regions.map((r) => `- ${r}`).join('\n');
   const modelLines = models.map((m) => `- ${m}`).join('\n');
@@ -35,28 +85,20 @@ function buildPrompt(regions: string[], models: string[], min: number, max: numb
 
 [제목] 형식: [지역] [성지표현] [기종] [미사여구]
 [성지표현] 은 매 줄마다 "휴대폰 성지" 또는 "핸드폰 성지" 중 하나를 골라 쓰세요. 두 표현을 골고루 섞어 사용하세요.
-주의: 한 줄 안에서 제목의 [성지표현] 과 키워드 부분의 [성지표현] 은 반드시 같아야 합니다.
+주의: 한 줄 안에서 제목의 [성지표현] 과 키워드 부분의 [성지표현] 은 같게 하세요.
+미사여구는 본 제목과 어울리게 자유롭게 작성 해주세요
 
-올바른 출력 예시:
+ex)
 강남 휴대폰 성지 갤럭시S26 최저가 확인|강남 휴대폰 성지,갤럭시S26
 서초 핸드폰 성지 아이폰 17 프로 호갱 안 되는 법|서초 핸드폰 성지,아이폰 17 프로
+
+--------
 
 [지역] 후보 (이 목록 안에서만 선택):
 ${regionLines}
 
 [기종] 후보 (이 목록 안에서만 선택):
 ${modelLines}
-
-[미사여구] 예시 (참고만 — 매번 자연스럽게 다른 표현을 만드세요):
-- 합리적인 구매 방법
-- 최저가 확인
-- 가성비 갑
-- 정직한 시세 공유
-- 후기 모음
-- 호갱 안 되는 법
-- 실시간 시세
-- 사은품 풀로 받기
-- 솔직 견적 정리
 
 규칙:
 1. 총 ${min}개 이상 ${max}개 이하로 무작위 개수만큼 작성하세요.
@@ -215,15 +257,37 @@ export default async function aiTitlesRoutes(app: FastifyInstance) {
         ORDER BY sort_order ASC, id ASC`,
     );
 
-    const regions = regionRows.map((r) => r.name);
-    const models = modelRows.map((r) => r.name);
+    const allRegions = regionRows.map((r) => r.name);
+    const allModels = modelRows.map((r) => r.name);
 
-    if (regions.length === 0) {
+    if (allRegions.length === 0) {
       return reply.badRequest('등록된 지역 키워드가 없습니다. 키워드 관리에서 먼저 추가해주세요.');
     }
-    if (models.length === 0) {
+    if (allModels.length === 0) {
       return reply.badRequest('등록된 기종 키워드가 없습니다. 키워드 관리에서 먼저 추가해주세요.');
     }
+
+    // 1-b) 이력 기반 pool 선정 — 최근 N일 posts.keywords 를 읽어 덜 쓴 키워드 우선 뽑고 셔플.
+    // Gemini 에 "쓰지 마세요" 목록을 넣는 대신, 애초에 신선한 pool 만 보여줘 프롬프트를 짧게 유지.
+    const [postKwRows] = await app.db.query<PostKeywordRow[]>(
+      `SELECT keywords FROM posts
+        WHERE board_slug = 'blog' AND status = 'ACTIVE'
+          AND keywords IS NOT NULL
+          AND created_at >= NOW() - INTERVAL ? DAY`,
+      [DEDUPE_WINDOW_DAYS],
+    );
+    // CSV 를 개별 엔트리 배열로 flat 화 — 카운트 함수가 이걸 스캔
+    const usedEntries: string[] = [];
+    for (const row of postKwRows) {
+      if (!row.keywords) continue;
+      for (const part of row.keywords.split(',')) {
+        const t = part.trim();
+        if (t) usedEntries.push(t);
+      }
+    }
+
+    const regions = pickFreshKeywords(allRegions, usedEntries, countRegionUsage, FRESH_REGIONS);
+    const models = pickFreshKeywords(allModels, usedEntries, countModelUsage, FRESH_MODELS);
 
     // 2) Gemini 호출
     const prompt = buildPrompt(regions, models, min, max);
@@ -284,8 +348,13 @@ export default async function aiTitlesRoutes(app: FastifyInstance) {
     return {
       titles: trimmed,
       meta: {
+        // Gemini 에 실제로 전달된 (fresh) pool 크기
         regions: regions.length,
         models: models.length,
+        // 전체 활성 키워드 수 (참고)
+        total_regions: allRegions.length,
+        total_models: allModels.length,
+        dedupe_window_days: DEDUPE_WINDOW_DAYS,
         requested_min: min,
         requested_max: max,
         got: trimmed.length,

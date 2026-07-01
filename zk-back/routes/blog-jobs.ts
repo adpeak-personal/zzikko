@@ -303,7 +303,9 @@ export default async function blogJobsRoutes(app: FastifyInstance) {
       );
       keywords = kwRows.map((r) => r.keyword);
     }
-    return { job: { ...job, keywords } };
+    // 워커가 이미지 GCS 업로드 시 사용할 폴더 prefix — 게시판 slug 그대로.
+    // 지금은 상수(AI_BLOG_SLUG)지만, 이후 blog_jobs 에 board_slug 컬럼 추가 시 job.board_slug 로 교체.
+    return { job: { ...job, keywords, board_slug: AI_BLOG_SLUG } };
   });
 
   // PATCH /api/blog-jobs/:id/claim
@@ -354,9 +356,9 @@ export default async function blogJobsRoutes(app: FastifyInstance) {
 
       const { content, thumbnail_url } = req.body;
 
-      // 작업 정보 (제목) 가져오기 — PROCESSING 상태인지 검증도 같이
+      // 작업 정보 (제목/키워드) 가져오기 — PROCESSING 상태인지 검증도 같이
       const [jobRows] = await app.db.query<JobRow[]>(
-        `SELECT id, title, status FROM blog_jobs WHERE id = ?`,
+        `SELECT id, title, keywords, status FROM blog_jobs WHERE id = ?`,
         [id],
       );
       const job = jobRows[0];
@@ -378,11 +380,12 @@ export default async function blogJobsRoutes(app: FastifyInstance) {
 
         // posts INSERT — 어드민 계정으로 작성하되, alias 풀에서 랜덤 닉으로 stamp.
         // alias 가 없으면 NULL → users.nickname 으로 표시.
+        // keywords 도 blog_jobs 에서 그대로 propagate → AI 제목 생성 시 이력 dedup 에 사용.
         const displayNickname = await pickRandomAlias(app, AI_BLOG_AUTHOR_ID);
         const [postResult] = await conn.query<ResultSetHeader>(
-          `INSERT INTO posts (board_slug, user_id, display_nickname, title, content, thumbnail_url)
-           VALUES (?, ?, ?, ?, ?, ?)`,
-          [AI_BLOG_SLUG, AI_BLOG_AUTHOR_ID, displayNickname, job.title, finalContent, finalThumb],
+          `INSERT INTO posts (board_slug, user_id, display_nickname, title, keywords, content, thumbnail_url)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [AI_BLOG_SLUG, AI_BLOG_AUTHOR_ID, displayNickname, job.title, job.keywords ?? null, finalContent, finalThumb],
         );
         const postId = postResult.insertId;
 
