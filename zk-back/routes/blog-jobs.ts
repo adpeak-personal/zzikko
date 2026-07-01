@@ -11,7 +11,7 @@
 
 import type { FastifyInstance } from 'fastify';
 import type { RowDataPacket, ResultSetHeader } from 'mysql2';
-import { finalizeTmpUrls, generateThumbnail } from '../lib/gcs';
+import { finalizeTmpUrls, generateThumbnail, toRelative } from '../lib/gcs';
 import { pickRandomAlias } from '../lib/alias';
 
 interface TitleRow extends RowDataPacket {
@@ -367,12 +367,13 @@ export default async function blogJobsRoutes(app: FastifyInstance) {
         return reply.conflict(`현재 상태가 PROCESSING 이 아닙니다. (status=${job.status})`);
       }
 
-      // 본문의 tmp/ 이미지를 blog/ 로 영구 이동 + URL 치환 (lifecycle 자동삭제 방지)
-      // 썸네일: 본문 첫 이미지로 생성(서버측 리사이즈). 실패하면 클라가 보낸 thumbnail_url 사용.
+      // 본문의 tmp/ 이미지를 blog/ 로 영구 이동 + 모든 우리 버킷 URL 을 상대경로("/…")로 정규화.
+      // 썸네일: 본문 첫 이미지로 생성(우리 버킷/외부 URL 모두 대응). 결과는 상대경로("/…").
+      // 실패 시 워커가 보낸 thumbnail_url 사용 — 우리 버킷이면 상대경로로 스트립, 외부 http* 는 그대로.
       const finalContent = await finalizeTmpUrls(content, AI_BLOG_SLUG);
       const finalThumb =
         (await generateThumbnail(finalContent, AI_BLOG_SLUG)) ??
-        (thumbnail_url ?? null);
+        (thumbnail_url ? toRelative(thumbnail_url) : null);
 
       const conn = await app.db.getConnection();
       try {

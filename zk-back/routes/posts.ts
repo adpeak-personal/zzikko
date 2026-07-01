@@ -1,6 +1,15 @@
 import type { FastifyInstance } from 'fastify';
 import type { ResultSetHeader } from 'mysql2';
-import { finalizeTmpUrls, deleteStoredImages, generateThumbnail } from '../lib/gcs';
+import {
+  finalizeTmpUrls,
+  deleteStoredImages,
+  generateThumbnail,
+  toRelative,
+  toDisplayUrl,
+  stripBaseInText,
+  expandBaseInHtml,
+  expandExtraData,
+} from '../lib/gcs';
 import { pickRandomAlias } from '../lib/alias';
 
 export default async function postRoutes(app: FastifyInstance) {
@@ -26,13 +35,19 @@ export default async function postRoutes(app: FastifyInstance) {
     },
     async (req) => {
       const { board_slug, sub_slug, title, content, thumbnail_url, extra_data } = req.body;
-      // 본문/썸네일의 tmp/ 이미지를 게시판 slug 폴더로 확정 이동 + URL 치환 (고아 파일 방지)
-      // → 게시판 추가/제거 시 별도 설정 불필요. 폴더만 봐도 어디 글 이미지인지 명확.
+      // 본문/썸네일의 tmp/ 이미지를 게시판 slug 폴더로 확정 이동 + URL 을 상대경로로 통일.
+      // finalizeTmpUrls 는 결과를 항상 상대경로로 정규화해서 반환 (풀 URL 제거).
       const finalContent = await finalizeTmpUrls(content, board_slug);
-      // 썸네일: 본문 첫 이미지로 생성 → 없으면 전달된 thumbnail_url → 그것도 없으면 null
+      // 썸네일: 본문 첫 이미지로 생성(GCS/외부 URL 모두 대응) → 없으면 클라이언트가 준 값
+      //   generateThumbnail 은 상대경로("/…")를 반환. 실패 시 null.
+      //   폴백은 외부 URL 그대로일 수 있고(http* 는 규칙상 통과), 우리 버킷이면 toRelative 로 스트립.
       const finalThumb =
         (await generateThumbnail(finalContent, board_slug)) ??
-        (thumbnail_url ? await finalizeTmpUrls(thumbnail_url, board_slug) : null);
+        (thumbnail_url ? toRelative(await finalizeTmpUrls(thumbnail_url, board_slug)) : null);
+      // extra_data 안에 남을 수 있는 우리 버킷 풀 URL 도 스트립하여 저장.
+      const finalExtraJson = extra_data
+        ? stripBaseInText(JSON.stringify(extra_data))
+        : null;
       // 작성자에게 등록된 활성 alias 가 있으면 그 중 랜덤 하나로 display_nickname 을 stamp.
       // 없으면 NULL → 글 표시 시 users.nickname 으로 폴백.
       const displayNickname = await pickRandomAlias(app, req.user.sub);
@@ -40,7 +55,7 @@ export default async function postRoutes(app: FastifyInstance) {
       const [result] = await app.db.query<ResultSetHeader>(
         `INSERT INTO posts (board_slug, sub_slug, user_id, display_nickname, title, content, thumbnail_url, extra_data)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [board_slug, sub_slug ?? null, req.user.sub, displayNickname, title, finalContent, finalThumb, extra_data ? JSON.stringify(extra_data) : null],
+        [board_slug, sub_slug ?? null, req.user.sub, displayNickname, title, finalContent, finalThumb, finalExtraJson],
       );
       return { id: result.insertId };
     },
@@ -89,8 +104,12 @@ export default async function postRoutes(app: FastifyInstance) {
       [post.board_slug, postId],
     ) as any;
 
+    // 응답 조립 — DB 는 상대경로("/…"), 응답은 풀 URL 로 재조립.
     return {
       ...post,
+      content: expandBaseInHtml(post.content),
+      thumbnail_url: toDisplayUrl(post.thumbnail_url),
+      extra_data: expandExtraData(post.extra_data),
       comments,
       prev_id: (prevRows as any[])[0]?.id ?? null,
       next_id: (nextRows as any[])[0]?.id ?? null,
@@ -153,8 +172,15 @@ export default async function postRoutes(app: FastifyInstance) {
       baseParams,
     ) as any;
 
+    // 목록 응답에서도 썸네일/extra_data 재조립.
+    const data = (rows as any[]).map((r) => ({
+      ...r,
+      thumb: toDisplayUrl(r.thumb),
+      extra_data: expandExtraData(r.extra_data),
+    }));
+
     return {
-      data: rows,
+      data,
       meta: {
         page: pageNum,
         limit: limitNum,
@@ -182,7 +208,7 @@ export default async function postRoutes(app: FastifyInstance) {
     const isAdmin = req.user.role === 'ADMIN';
     if (!isOwner && !isAdmin) return reply.forbidden('본인 글만 삭제할 수 있습니다.');
 
-    // 본문 + 썸네일 + extra_data 안의 GCS 이미지 전부 삭제
+    // 본문 + 썸네일 + extra_data 안의 GCS 이미지 전부 삭제 (풀 URL/상대경로 둘 다 매칭)
     const extraText = post.extra_data ? JSON.stringify(post.extra_data) : null;
     await deleteStoredImages(post.content, post.thumbnail_url, extraText);
 
