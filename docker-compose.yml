@@ -25,8 +25,7 @@ services:
       context: ./zk-back
     container_name: zzikko-back
     ports:
-      # 호스트 3041 → 컨테이너 4000 (Python 워커가 localhost:3041 그대로 사용)
-      - "3041:4000"
+      - "127.0.0.1:3041:4000"
     env_file:
       # DB 접속/카카오 키/GEMINI 키 등 모든 시크릿
       - ./zk-back/.env
@@ -44,7 +43,7 @@ services:
       - ./zk-back/community-gcs-key.json:/app/secrets/gcs-key.json:ro
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:4000/health"]
+      test: [ "CMD", "wget", "-qO-", "http://localhost:4000/health" ]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -60,7 +59,7 @@ services:
         NEXT_PUBLIC_BACK_API: ""
     container_name: zzikko-front
     ports:
-      - "3040:3040"
+      - "127.0.0.1:3040:3040"
     environment:
       NODE_ENV: production
       # SSR/RSC 가 컨테이너 안에서 사용할 백엔드 호스트 (도커 네트워크 내부 이름)
