@@ -34,6 +34,10 @@ services:
       NODE_ENV: production
       PORT: "4000"
       HOST: "0.0.0.0"
+      # 서버가 UTC 로 돌고 있어서 Node 의 Date 함수도 UTC. 컨테이너를 KST 로 고정 →
+      # Date.getHours() / getFullYear() 등이 KST 반환 → scheduled_at 저장 시 밀림 방지.
+      # MySQL 세션 timezone 은 lib/db.ts 의 connection 이벤트에서 별도로 +09:00 설정.
+      TZ: Asia/Seoul
       # GCS 서비스 계정 키를 볼륨 경로로 지정 — 이미지에는 안 박힘
       GCS_KEY_FILE: /app/secrets/gcs-key.json
       # frontend 컨테이너가 SSR 시 호출할 backend 의 내부 호스트
@@ -62,6 +66,7 @@ services:
       - "127.0.0.1:3040:3040"
     environment:
       NODE_ENV: production
+      TZ: Asia/Seoul
       # SSR/RSC 가 컨테이너 안에서 사용할 백엔드 호스트 (도커 네트워크 내부 이름)
       INTERNAL_BACK_API: "http://backend:4000"
     depends_on:

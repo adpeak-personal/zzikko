@@ -23,8 +23,15 @@ RUN npm run build
 FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+# 이미지 자체를 KST 로 고정 — docker-compose 의 TZ env 로도 override 가능
+ENV TZ=Asia/Seoul
 
-RUN apk add --no-cache libc6-compat
+# libc6-compat: sharp 등 네이티브 모듈 호환
+# tzdata: KST 를 실제 적용시키려면 필요 (alpine 기본에 없음)
+# /etc/localtime + /etc/timezone: 셸의 date 명령 및 libc 가 KST 로 인식하게 만듦
+RUN apk add --no-cache libc6-compat tzdata \
+ && cp /usr/share/zoneinfo/Asia/Seoul /etc/localtime \
+ && echo "Asia/Seoul" > /etc/timezone
 
 COPY package*.json ./
 RUN npm ci --omit=dev && npm cache clean --force

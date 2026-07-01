@@ -23,8 +23,11 @@ RUN npm run build
 FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+ENV TZ=Asia/Seoul
 
-RUN apk add --no-cache libc6-compat
+RUN apk add --no-cache libc6-compat tzdata \
+ && cp /usr/share/zoneinfo/Asia/Seoul /etc/localtime \
+ && echo "Asia/Seoul" > /etc/timezone
 
 COPY package*.json ./
 RUN npm ci --omit=dev && npm cache clean --force
