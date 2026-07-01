@@ -11,7 +11,7 @@
 
 import type { FastifyInstance } from 'fastify';
 import type { RowDataPacket, ResultSetHeader } from 'mysql2';
-import { finalizeTmpUrls, generateThumbnail, toRelative } from '../lib/gcs';
+import { finalizeTmpUrls, generateThumbnail, makeThumbFromUrl } from '../lib/gcs';
 import { pickRandomAlias } from '../lib/alias';
 
 interface TitleRow extends RowDataPacket {
@@ -368,12 +368,23 @@ export default async function blogJobsRoutes(app: FastifyInstance) {
       }
 
       // 본문의 tmp/ 이미지를 blog/ 로 영구 이동 + 모든 우리 버킷 URL 을 상대경로("/…")로 정규화.
-      // 썸네일: 본문 첫 이미지로 생성(우리 버킷/외부 URL 모두 대응). 결과는 상대경로("/…").
-      // 실패 시 워커가 보낸 thumbnail_url 사용 — 우리 버킷이면 상대경로로 스트립, 외부 http* 는 그대로.
+      // 썸네일 우선순위:
+      //   1) 워커가 보낸 thumbnail_url — it_blog 가 이미 body 첫 이미지의 raw 로 썸을 만들어 올려두었음.
+      //      우리 버킷이면 그대로 사용, 외부 URL 이면 다운로드→GCS 업로드로 재생성.
+      //   2) 없으면 본문 첫 이미지로 auto 생성.
       const finalContent = await finalizeTmpUrls(content, AI_BLOG_SLUG);
-      const finalThumb =
-        (await generateThumbnail(finalContent, AI_BLOG_SLUG)) ??
-        (thumbnail_url ? toRelative(thumbnail_url) : null);
+      let finalThumb: string | null = null;
+      if (thumbnail_url) {
+        const finalizedThumb = await finalizeTmpUrls(thumbnail_url, AI_BLOG_SLUG);
+        if (finalizedThumb.startsWith('/')) {
+          finalThumb = finalizedThumb;
+        } else {
+          finalThumb = await makeThumbFromUrl(finalizedThumb, AI_BLOG_SLUG);
+        }
+      }
+      if (!finalThumb) {
+        finalThumb = await generateThumbnail(finalContent, AI_BLOG_SLUG);
+      }
 
       const conn = await app.db.getConnection();
       try {

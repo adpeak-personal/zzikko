@@ -4,7 +4,7 @@ import {
   finalizeTmpUrls,
   deleteStoredImages,
   generateThumbnail,
-  toRelative,
+  makeThumbFromUrl,
   toDisplayUrl,
   stripBaseInText,
   expandBaseInHtml,
@@ -38,12 +38,23 @@ export default async function postRoutes(app: FastifyInstance) {
       // 본문/썸네일의 tmp/ 이미지를 게시판 slug 폴더로 확정 이동 + URL 을 상대경로로 통일.
       // finalizeTmpUrls 는 결과를 항상 상대경로로 정규화해서 반환 (풀 URL 제거).
       const finalContent = await finalizeTmpUrls(content, board_slug);
-      // 썸네일: 본문 첫 이미지로 생성(GCS/외부 URL 모두 대응) → 없으면 클라이언트가 준 값
-      //   generateThumbnail 은 상대경로("/…")를 반환. 실패 시 null.
-      //   폴백은 외부 URL 그대로일 수 있고(http* 는 규칙상 통과), 우리 버킷이면 toRelative 로 스트립.
-      const finalThumb =
-        (await generateThumbnail(finalContent, board_slug)) ??
-        (thumbnail_url ? toRelative(await finalizeTmpUrls(thumbnail_url, board_slug)) : null);
+      // 썸네일 우선순위:
+      //   1) 클라이언트가 thumbnail_url 을 명시 (파이썬 워커/스크래퍼 등이 미리 만든 경우)
+      //      - 우리 버킷 → 상대경로로 스트립 후 그대로 사용 (중복 리사이즈 생략).
+      //      - 외부 URL → 다운로드해서 GCS 썸으로 재생성. raw 외부 URL 은 절대 DB 로 안 새어감.
+      //   2) 없으면 본문 첫 이미지로 auto 생성 (에디터에서 안 넘긴 경우 등).
+      let finalThumb: string | null = null;
+      if (thumbnail_url) {
+        const finalizedThumb = await finalizeTmpUrls(thumbnail_url, board_slug);
+        if (finalizedThumb.startsWith('/')) {
+          finalThumb = finalizedThumb;
+        } else {
+          finalThumb = await makeThumbFromUrl(finalizedThumb, board_slug);
+        }
+      }
+      if (!finalThumb) {
+        finalThumb = await generateThumbnail(finalContent, board_slug);
+      }
       // extra_data 안에 남을 수 있는 우리 버킷 풀 URL 도 스트립하여 저장.
       const finalExtraJson = extra_data
         ? stripBaseInText(JSON.stringify(extra_data))

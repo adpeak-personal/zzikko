@@ -139,6 +139,83 @@ function walkExpand(v: unknown): unknown {
 }
 
 /**
+ * 임의의 이미지 소스를 다운로드해서 Buffer 로 반환.
+ * - 상대경로("/blog/…") 또는 우리 버킷 풀 URL → 버킷에서 다운로드
+ * - 외부 http(s) URL → HTTP 로 다운로드 (UA/Referer 세팅)
+ * - 실패 시 null (원인은 warn 로그로 남김)
+ */
+async function downloadImageForThumb(src: string): Promise<Buffer | null> {
+  try {
+    if (src.startsWith('/')) {
+      const srcKey = decodeURIComponent(src.replace(/^\/+/, ''));
+      const [buf] = await bucket.file(srcKey).download();
+      return buf;
+    }
+    if (src.startsWith(PUBLIC_BASE + '/')) {
+      const srcKey = decodeURIComponent(src.slice(PUBLIC_BASE.length + 1));
+      const [buf] = await bucket.file(srcKey).download();
+      return buf;
+    }
+    if (/^https?:\/\//i.test(src)) {
+      let referer: string | undefined;
+      try {
+        const u = new URL(src);
+        referer = `${u.protocol}//${u.hostname}/`;
+      } catch {
+        referer = undefined;
+      }
+      const resp = await fetch(src, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0',
+          ...(referer ? { Referer: referer } : {}),
+        },
+      });
+      if (!resp.ok) {
+        console.warn(`[thumb] fetch ${resp.status} ${src}`);
+        return null;
+      }
+      return Buffer.from(await resp.arrayBuffer());
+    }
+    return null;
+  } catch (err) {
+    console.warn(`[thumb] download failed ${src}: ${(err as Error).message}`);
+    return null;
+  }
+}
+
+async function processAndUploadThumb(
+  buf: Buffer,
+  destPrefix: string,
+): Promise<string | null> {
+  try {
+    const thumb = await sharp(buf)
+      .resize({ width: 600, height: 600, fit: 'inside', withoutEnlargement: true })
+      .webp({ quality: 70 })
+      .toBuffer();
+    const key = `${destPrefix}/${datePath()}/thumb_${randomUUID()}.webp`;
+    await uploadBuffer(key, thumb, 'image/webp');
+    return '/' + key;
+  } catch (err) {
+    console.warn(`[thumb] process/upload failed: ${(err as Error).message}`);
+    return null;
+  }
+}
+
+/**
+ * 임의의 URL/경로에서 썸네일(webp) 생성 → GCS 업로드 → 상대경로("/…") 반환.
+ * 실패하면 null. **절대 외부 URL 을 그대로 반환하지 않는다** — DB 에 외부 URL 이 새어 들어가는 일이 없도록.
+ */
+export async function makeThumbFromUrl(
+  src: string | null | undefined,
+  destPrefix: string = 'posts',
+): Promise<string | null> {
+  if (!BUCKET_NAME || !src) return null;
+  const buf = await downloadImageForThumb(src);
+  if (!buf) return null;
+  return processAndUploadThumb(buf, destPrefix);
+}
+
+/**
  * 본문 HTML 의 첫 번째 이미지로 썸네일(webp)을 만들어 GCS 에 올리고 상대경로("/…") 를 반환한다.
  * - 글 작성 시 호출 → 목록 썸네일로 사용 (thumbnail_url 컬럼에 저장).
  * - 본문 첫 이미지가:
@@ -154,55 +231,9 @@ export async function generateThumbnail(
   destPrefix: string = 'posts',
 ): Promise<string | null> {
   if (!BUCKET_NAME || !html) return null;
-
   const m = html.match(/<img[^>]+src=["']([^"']+)["']/i);
   if (!m) return null;
-  const src = m[1];
-
-  let buf: Buffer | null = null;
-  try {
-    if (src.startsWith('/')) {
-      const srcKey = decodeURIComponent(src.replace(/^\/+/, ''));
-      [buf] = await bucket.file(srcKey).download();
-    } else if (src.startsWith(PUBLIC_BASE + '/')) {
-      const srcKey = decodeURIComponent(src.slice(PUBLIC_BASE.length + 1));
-      [buf] = await bucket.file(srcKey).download();
-    } else if (/^https?:\/\//i.test(src)) {
-      // 외부 URL — naver 등 일부 사이트가 UA/Referer 없으면 차단하니 둘 다 세팅
-      let referer: string | undefined;
-      try {
-        const u = new URL(src);
-        referer = `${u.protocol}//${u.hostname}/`;
-      } catch {
-        referer = undefined;
-      }
-      const resp = await fetch(src, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0',
-          ...(referer ? { Referer: referer } : {}),
-        },
-      });
-      if (!resp.ok) return null;
-      buf = Buffer.from(await resp.arrayBuffer());
-    } else {
-      return null;
-    }
-  } catch {
-    return null;
-  }
-  if (!buf) return null;
-
-  try {
-    const thumb = await sharp(buf)
-      .resize({ width: 600, height: 600, fit: 'inside', withoutEnlargement: true })
-      .webp({ quality: 70 })
-      .toBuffer();
-    const key = `${destPrefix}/${datePath()}/thumb_${randomUUID()}.webp`;
-    await uploadBuffer(key, thumb, 'image/webp');
-    return '/' + key;
-  } catch {
-    return null;
-  }
+  return makeThumbFromUrl(m[1], destPrefix);
 }
 
 /**
