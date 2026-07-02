@@ -10,22 +10,9 @@ RUN npm ci
 
 COPY . .
 
-# 클라이언트 번들에 박힐 백엔드 URL — 브라우저가 직접 접근할 수 있는 주소.
-# 로컬 도커 테스트: http://localhost:3041 / 운영: https://api.example.com 등
-ARG NEXT_PUBLIC_BACK_API="http://localhost:3041"
-ENV NEXT_PUBLIC_BACK_API=$NEXT_PUBLIC_BACK_API
-
-# SEO — 네이버 서치어드바이저 / Google Search Console 소유확인 메타 태그 값.
-# 미설정 시 태그 자체가 삽입되지 않아 무해. 등록 후 값 채워서 재빌드하면 <head> 에 자동 삽입.
-ARG NEXT_PUBLIC_NAVER_SITE_VERIFICATION=""
-ENV NEXT_PUBLIC_NAVER_SITE_VERIFICATION=$NEXT_PUBLIC_NAVER_SITE_VERIFICATION
-ARG NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION=""
-ENV NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION=$NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION
-
-# 운영 도메인 오버라이드 (기본 https://zzikko.co.kr) — canonical / sitemap / RSS 절대 URL 기준.
-ARG NEXT_PUBLIC_SITE_URL=""
-ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL
-
+# 모든 NEXT_PUBLIC_* (BACK_API, SEO verification, SITE_URL 등) 은 zk-front/.env 에서 관리.
+# .dockerignore 가 .env 를 이미지에 포함시키고, next build 가 자동으로 읽어 클라이언트 번들에 박는다.
+# 여기서 ARG/ENV 로 미리 세팅하면 .env 값이 덮여쓰기 되니 세팅하지 않는다.
 RUN npm run build
 
 

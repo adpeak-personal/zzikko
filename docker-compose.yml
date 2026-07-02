@@ -57,19 +57,12 @@ services:
     build:
       context: ./zk-front
       args:
-        # 빈 문자열 → 클라이언트가 "/api/..." 상대 경로로 요청 →
-        # next.config.ts 의 rewrites 가 컨테이너 네트워크의 backend:4000 으로 포워드.
-        # 결과적으로 어떤 도메인/IP 로 접속해도(localhost, 158.247.x.x, 실제 도메인) 다 동작.
         NEXT_PUBLIC_BACK_API: ""
-        # SEO 소유확인 — 네이버 서치어드바이저 / Google Search Console 에서 발급받은 값.
-        # 값 채우고 `docker compose up -d --build` 로 재빌드 해야 <head> 에 삽입됨.
-        NEXT_PUBLIC_NAVER_SITE_VERIFICATION: ""
-        NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION: ""
-        # 사이트 canonical/sitemap 절대 URL 기준. 미설정 시 https://zzikko.co.kr.
-        NEXT_PUBLIC_SITE_URL: ""
     container_name: zzikko-front
     ports:
       - "127.0.0.1:3040:3040"
+    env_file:
+      - ./zk-front/.env
     environment:
       NODE_ENV: production
       TZ: Asia/Seoul
