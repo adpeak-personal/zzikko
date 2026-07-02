@@ -56,8 +56,6 @@ services:
   frontend:
     build:
       context: ./zk-front
-      args:
-        NEXT_PUBLIC_BACK_API: ""
     container_name: zzikko-front
     ports:
       - "127.0.0.1:3040:3040"
