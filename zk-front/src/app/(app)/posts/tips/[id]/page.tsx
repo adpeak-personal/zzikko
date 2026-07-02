@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { CATEGORIES } from "@/config/navigation";
-import { fetchPostDetail } from "@/service/posts/api";
+import { getPostDetailCached } from "@/service/posts/server";
 import { nestComments } from "@/lib/utils";
 import PostContent from "@/components/common/PostContent";
 import PostBreadcrumb from "@/components/posts/PostBreadcrumb";
@@ -9,8 +9,20 @@ import PostHeader from "@/components/posts/PostHeader";
 import PostActions from "@/components/posts/PostActions";
 import PostComments from "@/components/posts/PostComments";
 import PostNav from "@/components/posts/PostNav";
+import PostJsonLd from "@/components/posts/PostJsonLd";
+import { postMetadata } from "@/lib/seo";
 
 const SLUG = "tips";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const post = await getPostDetailCached(Number(id));
+  return postMetadata(post, SLUG);
+}
 
 export default async function TipsPostPage({
   params,
@@ -18,7 +30,7 @@ export default async function TipsPostPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const post = await fetchPostDetail(Number(id));
+  const post = await getPostDetailCached(Number(id));
   if (!post) notFound();
 
   const board = CATEGORIES.find((c) => c.slug === SLUG);
@@ -31,6 +43,8 @@ export default async function TipsPostPage({
         <PostBreadcrumb board={board} title={post.title} />
         <PostOwnerActions postId={post.id} authorId={post.user_id} boardSlug={post.board_slug} />
       </div>
+
+      <PostJsonLd post={post} />
 
       <article className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
         <PostHeader post={post} board={board} />

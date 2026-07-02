@@ -201,6 +201,63 @@ export default async function postRoutes(app: FastifyInstance) {
     };
   });
 
+  // GET /api/posts/sitemap
+  //   sitemap.xml 생성용 라이트 페이로드. 인증 불필요, 최근 5000개 활성 글.
+  //   프론트 sitemap.ts 가 5분 캐싱해서 호출한다.
+  app.get('/sitemap', async (_req, reply) => {
+    const [rows] = await app.db.query(
+      `SELECT id, board_slug, updated_at
+         FROM posts
+        WHERE status = 'ACTIVE'
+        ORDER BY updated_at DESC
+        LIMIT 5000`,
+    ) as any;
+    // CDN/브라우저 캐시 힌트 — 5분 fresh, 실패 시 하루까지 stale 허용
+    reply.header('Cache-Control', 'public, max-age=300, stale-while-revalidate=86400');
+    return { data: rows };
+  });
+
+  // GET /api/posts/rss?limit=50
+  //   RSS/Atom 피드 생성용. 인증 불필요, 최신 순.
+  //   본문은 HTML 태그 제거 후 앞 500자만 반환(피드 excerpt 용).
+  app.get<{ Querystring: { limit?: string } }>('/rss', async (req, reply) => {
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit ?? '50', 10) || 50));
+    const [rows] = await app.db.query(
+      `SELECT p.id, p.board_slug, p.sub_slug, p.title, p.content, p.thumbnail_url,
+              p.created_at, p.updated_at,
+              COALESCE(p.display_nickname, u.nickname) AS author
+         FROM posts p
+         LEFT JOIN users u ON p.user_id = u.id
+        WHERE p.status = 'ACTIVE'
+        ORDER BY p.created_at DESC
+        LIMIT ?`,
+      [limit],
+    ) as any;
+
+    const items = (rows as any[]).map((r) => {
+      // HTML 태그 제거 + 공백 정리 → 앞 500자
+      const excerpt = String(r.content ?? '')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 500);
+      return {
+        id: r.id,
+        board_slug: r.board_slug,
+        sub_slug: r.sub_slug,
+        title: r.title,
+        thumbnail_url: toDisplayUrl(r.thumbnail_url),
+        excerpt,
+        author: r.author,
+        created_at: r.created_at,
+        updated_at: r.updated_at,
+      };
+    });
+
+    reply.header('Cache-Control', 'public, max-age=300, stale-while-revalidate=86400');
+    return { data: items };
+  });
+
   // DELETE /api/posts/:id — 게시글 삭제 (작성자 본인만, DB + GCS 이미지 전부 삭제)
   app.delete('/:id', { preHandler: app.authenticate }, async (req, reply) => {
     const { id } = req.params as { id: string };

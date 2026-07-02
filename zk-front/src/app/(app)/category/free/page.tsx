@@ -3,6 +3,9 @@ import BoardListClient from "@/components/category/BoardListClient";
 import Pagination from "@/components/category/Pagination";
 import SubCategoryTabs from "@/components/category/SubCategoryTabs";
 import { CATEGORIES } from "@/config/navigation";
+import { categoryMetadata } from "@/lib/seo";
+
+export const metadata = categoryMetadata("free");
 
 export default function FreeBoardPage() {
   const board = CATEGORIES.find((c) => c.slug === "free");

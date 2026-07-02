@@ -2,6 +2,9 @@ import CategoryHeader, { WriteButton } from "@/components/category/CategoryHeade
 import CategoryToolbar from "@/components/category/CategoryToolbar";
 import BoardListClient from "@/components/category/BoardListClient";
 import Pagination from "@/components/category/Pagination";
+import { categoryMetadata } from "@/lib/seo";
+
+export const metadata = categoryMetadata("blog");
 
 export default function BlogPage() {
   return (

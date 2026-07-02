@@ -1,5 +1,8 @@
 import Image from "next/image";
 import CategoryHeader from "@/components/category/CategoryHeader";
+import { categoryMetadata } from "@/lib/seo";
+
+export const metadata = categoryMetadata("devices");
 
 const DEVICES = Array.from({ length: 12 }).map((_, i) => ({
   id: i + 1,

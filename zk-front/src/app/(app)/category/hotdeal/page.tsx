@@ -2,6 +2,9 @@ import CategoryHeader, { WriteButton } from "@/components/category/CategoryHeade
 import CategoryToolbar from "@/components/category/CategoryToolbar";
 import HotdealListClient from "@/components/category/HotdealListClient";
 import Pagination from "@/components/category/Pagination";
+import { categoryMetadata } from "@/lib/seo";
+
+export const metadata = categoryMetadata("hotdeal");
 
 export default function HotdealPage() {
   return (

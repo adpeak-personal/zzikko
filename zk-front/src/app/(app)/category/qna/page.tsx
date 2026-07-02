@@ -2,6 +2,9 @@ import Link from "next/link";
 import CategoryHeader, { WriteButton } from "@/components/category/CategoryHeader";
 import CategoryToolbar from "@/components/category/CategoryToolbar";
 import Pagination from "@/components/category/Pagination";
+import { categoryMetadata } from "@/lib/seo";
+
+export const metadata = categoryMetadata("qna");
 
 const QUESTIONS = Array.from({ length: 12 }).map((_, i) => ({
   id: i + 1,

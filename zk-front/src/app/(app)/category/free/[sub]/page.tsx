@@ -4,6 +4,16 @@ import BoardListClient from "@/components/category/BoardListClient";
 import Pagination from "@/components/category/Pagination";
 import SubCategoryTabs from "@/components/category/SubCategoryTabs";
 import { CATEGORIES } from "@/config/navigation";
+import { categoryMetadata } from "@/lib/seo";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ sub: string }>;
+}) {
+  const { sub } = await params;
+  return categoryMetadata("free", sub);
+}
 
 export default async function FreeBoardSubPage({
   params,
