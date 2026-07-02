@@ -3,7 +3,10 @@ import { CATEGORIES } from "@/config/navigation";
 import { siteConfig } from "@/lib/seo";
 import { BACK_API } from "@/lib/backend-url";
 
-// 새 글이 최대 5분 안에 반영되도록 캐싱 (백엔드도 동일 정책).
+// 빌드 타임 prerender 대상에서 제외 — 도커 빌드 중엔 백엔드에 접근이 안 돼 fetch 가 hang 한다.
+// 런타임 SSR + Cache-Control 헤더로 CDN/브라우저에서 5분 캐시.
+export const dynamic = "force-dynamic";
+// (참고) revalidate 를 병기해도 무해하지만 dynamic 이 우선한다.
 export const revalidate = 300;
 
 type SitemapPost = { id: number; board_slug: string; updated_at: string };
@@ -11,6 +14,8 @@ type SitemapPost = { id: number; board_slug: string; updated_at: string };
 async function fetchAllPosts(): Promise<SitemapPost[]> {
   try {
     const res = await fetch(`${BACK_API}/api/posts/sitemap`, {
+      // 백엔드가 응답 못 하면 5초 안에 포기 — sitemap 이 hang 되면 안 됨.
+      signal: AbortSignal.timeout(5000),
       next: { revalidate },
     });
     if (!res.ok) return [];
