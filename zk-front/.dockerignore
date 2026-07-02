@@ -2,8 +2,12 @@ node_modules
 .next
 .git
 .gitignore
-.env
-.env.*
+# .env 는 서버에서 직접 관리하는 운영 설정 파일 — 이미지에 포함시켜 next build 가 읽게 함.
+# .env.local / .env.*.local 은 개발자 개인 오버라이드라 이미지에서 제외.
+.env.local
+.env.development
+.env.test
+.env.*.local
 *.log
 README*.md
 .vscode
