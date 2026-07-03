@@ -17,6 +17,8 @@ export type SubCategoryNav = {
   icon?: string;
   /** true 면 서브 탭에서 어드민에게만 노출. URL 접근 자체는 public 유지 (SEO 크롤 가능). */
   hiddenFromNav?: boolean;
+  /** true 면 서브 리스트에서 별점(rating) 을 노출. reviews 서브 전용. */
+  showRating?: boolean;
 };
 
 export const CATEGORIES: CategoryNav[] = [
@@ -53,31 +55,6 @@ export const CATEGORIES: CategoryNav[] = [
     text: "text-purple-600",
   },
   {
-    slug: "reviews",
-    title: "이용후기",
-    icon: "⭐️",
-    desc: "실제 이용자 리얼 리뷰",
-    color: "bg-yellow-50",
-    text: "text-yellow-600",
-  },
- 
-  {
-    slug: "tips",
-    title: "꿀팁게시판",
-    icon: "💡",
-    desc: "호갱 탈출 필수 지식",
-    color: "bg-green-50",
-    text: "text-green-600",
-  },
-  {
-    slug: "qna",
-    title: "질문·답변",
-    icon: "❓",
-    desc: "궁금한 부분 물어보세요",
-    color: "bg-gray-50",
-    text: "text-gray-600",
-  },
-  {
     slug: "devices",
     title: "휴대폰 정보",
     icon: "📱",
@@ -86,19 +63,21 @@ export const CATEGORIES: CategoryNav[] = [
     text: "text-orange-600",
   },
   // ──────────────────────────────────────────────────────────────────
-  // 자유게시판 — sub_slug 로 1뎁스 더 분류
+  // 커뮤니티 — reviews/tips/qna 를 sub 로 통합. sub_slug 로 1뎁스 분류.
   // ──────────────────────────────────────────────────────────────────
   {
-    slug: "free",
-    title: "자유게시판",
+    slug: "community",
+    title: "커뮤니티",
     icon: "💬",
-    desc: "잡담·유머·질문 등 자유 주제",
+    desc: "후기·꿀팁·질문·잡담까지 유저 커뮤니티",
     color: "bg-slate-50",
     text: "text-slate-700",
     subs: [
+      { slug: "reviews", title: "이용후기", icon: "⭐️", showRating: true },
+      { slug: "tips", title: "꿀팁", icon: "💡" },
+      { slug: "qna", title: "질문·답변", icon: "❓" },
       { slug: "chat", title: "잡담", icon: "🗨️" },
       { slug: "humor", title: "유머", icon: "😆" },
-      { slug: "question", title: "질문", icon: "❓" },
       { slug: "info", title: "정보공유", icon: "💡" },
       // AI 자동 발행 블로그 — 어드민에게만 탭 노출. URL/SEO 는 public 유지.
       { slug: "blog", title: "블로그", icon: "📰", hiddenFromNav: true },

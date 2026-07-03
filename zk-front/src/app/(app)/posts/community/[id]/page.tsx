@@ -12,7 +12,7 @@ import PostNav from "@/components/posts/PostNav";
 import PostJsonLd from "@/components/posts/PostJsonLd";
 import { postMetadata } from "@/lib/seo";
 
-const SLUG = "free";
+const SLUG = "community";
 
 export async function generateMetadata({
   params,
@@ -24,7 +24,7 @@ export async function generateMetadata({
   return postMetadata(post, SLUG);
 }
 
-export default async function FreePostPage({
+export default async function CommunityPostPage({
   params,
 }: {
   params: Promise<{ id: string }>;

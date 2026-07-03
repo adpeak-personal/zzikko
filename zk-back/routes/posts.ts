@@ -151,8 +151,8 @@ export default async function postRoutes(app: FastifyInstance) {
     if (sub_slug) {
       conds.push('p.sub_slug = ?');
       baseParams.push(sub_slug);
-    } else if (board_slug === 'free') {
-      // free 전체 탭: AI 자동 발행 blog 서브는 일반 유저에게 노출하지 않음.
+    } else if (board_slug === 'community') {
+      // 커뮤니티 전체 탭: AI 자동 발행 blog 서브는 일반 유저에게 노출하지 않음.
       // (블로그 서브 탭을 명시적으로 눌러 sub_slug=blog 로 들어오면 위 조건이 우선 적용됨)
       conds.push("(p.sub_slug IS NULL OR p.sub_slug <> 'blog')");
     }

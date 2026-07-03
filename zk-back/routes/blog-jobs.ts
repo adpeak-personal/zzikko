@@ -45,12 +45,13 @@ function parseKeywordsCsv(csv: string | null): string[] {
 const DEDUPE_WINDOW_DAYS = 20;
 const MAX_ITEMS = 200;
 
-// AI 자동 발행 글은 자유게시판(board_slug=free) 하위의 blog 서브(sub_slug=blog) 로 저장.
-// 자유게시판 서브 탭에서 blog 는 어드민에게만 노출 (일반 유저에게는 숨김) — SEO 는 URL 로만 크롤.
-const AI_BLOG_SLUG = 'free';
+// AI 자동 발행 글은 커뮤니티(board_slug=community) 하위의 blog 서브(sub_slug=blog) 로 저장.
+// 커뮤니티 서브 탭에서 blog 는 어드민에게만 노출 (일반 유저에게는 숨김) — SEO 는 URL 로만 크롤.
+const AI_BLOG_SLUG = 'community';
 const AI_BLOG_SUB_SLUG = 'blog';
-// GCS 이미지 폴더 prefix. 기존 blog/* 파일은 그대로 두고, 신규 업로드는 free/blog/* 로 이동.
-const AI_BLOG_GCS_PREFIX = 'free/blog';
+// GCS 이미지 폴더 prefix. 기존 free/blog/* 파일은 마이그레이션 SQL 로 URL 만 갱신되고,
+// 실제 GCS 오브젝트는 그대로 유지 (오브젝트 이동은 비용/시간 소요) → 신규만 community/blog/*.
+const AI_BLOG_GCS_PREFIX = 'community/blog';
 
 // AI 가 발행한 글의 작성자(어드민 계정). 다른 계정으로 바꾸려면 .env 의 AI_BLOG_AUTHOR_ID 설정.
 const AI_BLOG_AUTHOR_ID = Number(process.env.AI_BLOG_AUTHOR_ID || 13);
@@ -337,10 +338,10 @@ export default async function blogJobsRoutes(app: FastifyInstance) {
 
   // PATCH /api/blog-jobs/:id/complete
   //   Body: { content, thumbnail_url? }
-  //   1) 본문의 tmp/* 이미지를 free/blog/* 로 영구 이동 + URL 치환
-  //   2) 본문 첫 이미지로 썸네일 생성 (free/blog/{date}/thumb_*.webp)
-  //   3) posts 테이블에 board_slug='free', sub_slug='blog', user_id=AI_BLOG_AUTHOR_ID 로 INSERT
-  //   4) blog_jobs.status='DONE', result_url='/posts/free/{post_id}', published_at=NOW()
+  //   1) 본문의 tmp/* 이미지를 community/blog/* 로 영구 이동 + URL 치환
+  //   2) 본문 첫 이미지로 썸네일 생성 (community/blog/{date}/thumb_*.webp)
+  //   3) posts 테이블에 board_slug='community', sub_slug='blog', user_id=AI_BLOG_AUTHOR_ID 로 INSERT
+  //   4) blog_jobs.status='DONE', result_url='/posts/community/{post_id}', published_at=NOW()
   //   3~4 는 트랜잭션으로 묶음 (1~2 는 GCS 작업이라 트랜잭션 밖).
   app.patch<{
     Params: { id: string };

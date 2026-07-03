@@ -5,7 +5,7 @@ import type { SubCategoryNav } from "@/config/navigation";
 import { useAuthStore } from "@/store/auth";
 
 type Props = {
-  /** 부모 카테고리 slug (e.g. "free") */
+  /** 부모 카테고리 slug (e.g. "community") */
   parentSlug: string;
   /** navigation.ts 에 정의된 서브 카테고리들 */
   subs: SubCategoryNav[];

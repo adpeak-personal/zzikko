@@ -271,7 +271,7 @@ export default async function aiTitlesRoutes(app: FastifyInstance) {
     // Gemini 에 "쓰지 마세요" 목록을 넣는 대신, 애초에 신선한 pool 만 보여줘 프롬프트를 짧게 유지.
     const [postKwRows] = await app.db.query<PostKeywordRow[]>(
       `SELECT keywords FROM posts
-        WHERE board_slug = 'free' AND sub_slug = 'blog' AND status = 'ACTIVE'
+        WHERE board_slug = 'community' AND sub_slug = 'blog' AND status = 'ACTIVE'
           AND keywords IS NOT NULL
           AND created_at >= NOW() - INTERVAL ? DAY`,
       [DEDUPE_WINDOW_DAYS],

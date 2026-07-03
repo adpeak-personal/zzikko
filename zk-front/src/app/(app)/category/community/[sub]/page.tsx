@@ -12,16 +12,16 @@ export async function generateMetadata({
   params: Promise<{ sub: string }>;
 }) {
   const { sub } = await params;
-  return categoryMetadata("free", sub);
+  return categoryMetadata("community", sub);
 }
 
-export default async function FreeBoardSubPage({
+export default async function CommunityBoardSubPage({
   params,
 }: {
   params: Promise<{ sub: string }>;
 }) {
   const { sub } = await params;
-  const board = CATEGORIES.find((c) => c.slug === "free");
+  const board = CATEGORIES.find((c) => c.slug === "community");
   const subs = board?.subs ?? [];
   const subCat = subs.find((s) => s.slug === sub);
   if (!subCat) notFound();
@@ -29,11 +29,11 @@ export default async function FreeBoardSubPage({
   return (
     <div className="space-y-6">
       <CategoryHeader
-        slug="free"
-        cta={<WriteButton label="글쓰기" href={`/write?board=free&sub=${sub}`} />}
+        slug="community"
+        cta={<WriteButton label="글쓰기" href={`/write?board=community&sub=${sub}`} />}
       />
-      <SubCategoryTabs parentSlug="free" subs={subs} current={sub} />
-      <BoardListClient slug="free" subSlug={sub} />
+      <SubCategoryTabs parentSlug="community" subs={subs} current={sub} />
+      <BoardListClient slug="community" subSlug={sub} showRating={subCat.showRating} />
       <Pagination />
     </div>
   );
