@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { CATEGORIES } from "@/config/navigation";
 import { getPostDetailCached } from "@/service/posts/server";
+import { getBoardSubs } from "@/service/board-subs/server";
 import { nestComments } from "@/lib/utils";
 import PostContent from "@/components/common/PostContent";
 import PostBreadcrumb from "@/components/posts/PostBreadcrumb";
@@ -34,7 +35,9 @@ export default async function CommunityPostPage({
   if (!post) notFound();
 
   const board = CATEGORIES.find((c) => c.slug === SLUG);
-  const sub = board?.subs?.find((s) => s.slug === post.sub_slug);
+  // sub badge 는 board_subs 테이블에서 lookup — post.sub_slug 기준.
+  const subs = post.sub_slug ? await getBoardSubs(SLUG) : [];
+  const sub = post.sub_slug ? subs.find((s) => s.slug === post.sub_slug) : undefined;
   const comments = nestComments(post.comments);
 
   return (

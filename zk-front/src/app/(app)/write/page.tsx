@@ -9,6 +9,7 @@ import { apiFetch } from "@/lib/auth";
 import { useAuthStore } from "@/store/auth";
 import { MALLS } from "@/data/constants";
 import { CATEGORIES } from "@/config/navigation";
+import { useBoardSubs } from "@/service/board-subs/queries";
 
 function parsePriceFromTitle(title: string): number | null {
   // "19,900원" / "19900원"
@@ -39,6 +40,11 @@ function WriteForm() {
   const subSlug = searchParams.get("sub") ?? undefined;
   const board = CATEGORIES.find((c) => c.slug === boardSlug);
   const isHotdeal = boardSlug === "hotdeal";
+  // 서브 타이틀 표시용 — sub 파라미터가 있을 때만 fetch. queries.ts 가 enabled 로 방어함.
+  const { data: subsData } = useBoardSubs(subSlug ? boardSlug : "");
+  const subTitle = subSlug
+    ? subsData?.items.find((s) => s.slug === subSlug)?.title
+    : undefined;
 
   const [title, setTitle] = useState("");
   const [parsedPrice, setParsedPrice] = useState<number | null>(null);
@@ -118,9 +124,9 @@ function WriteForm() {
           </Link>
           <span className="text-white font-bold text-sm flex-1">
             {board?.title ?? boardSlug} 등록
-            {subSlug && board?.subs?.find((s) => s.slug === subSlug) && (
+            {subTitle && (
               <span className="ml-1.5 text-xs font-normal text-slate-400">
-                · {board.subs.find((s) => s.slug === subSlug)?.title}
+                · {subTitle}
               </span>
             )}
           </span>

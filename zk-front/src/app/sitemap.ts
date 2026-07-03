@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import { CATEGORIES } from "@/config/navigation";
 import { siteConfig } from "@/lib/seo";
 import { BACK_API } from "@/lib/backend-url";
+import { getBoardSubs } from "@/service/board-subs/server";
 
 // 빌드 타임 prerender 대상에서 제외 — 도커 빌드 중엔 백엔드에 접근이 안 돼 fetch 가 hang 한다.
 // 런타임 SSR + Cache-Control 헤더로 CDN/브라우저에서 5분 캐시.
@@ -39,22 +40,26 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
   ];
 
-  for (const cat of CATEGORIES) {
-    staticUrls.push({
-      url: `${siteConfig.siteUrl}/category/${cat.slug}`,
-      lastModified: now,
-      changeFrequency: "hourly",
-      priority: cat.hiddenFromNav ? 0.5 : 0.8,
-    });
-    for (const sub of cat.subs ?? []) {
+  // subs 를 가진 board 는 DB 조회. 정적 카테고리는 subs 가 없어도 정상 동작.
+  await Promise.all(
+    CATEGORIES.map(async (cat) => {
       staticUrls.push({
-        url: `${siteConfig.siteUrl}/category/${cat.slug}/${sub.slug}`,
+        url: `${siteConfig.siteUrl}/category/${cat.slug}`,
         lastModified: now,
         changeFrequency: "hourly",
-        priority: 0.6,
+        priority: cat.hiddenFromNav ? 0.5 : 0.8,
       });
-    }
-  }
+      const subs = await getBoardSubs(cat.slug);
+      for (const sub of subs) {
+        staticUrls.push({
+          url: `${siteConfig.siteUrl}/category/${cat.slug}/${sub.slug}`,
+          lastModified: now,
+          changeFrequency: "hourly",
+          priority: sub.hidden_from_nav ? 0.4 : 0.6,
+        });
+      }
+    }),
+  );
 
   // 동적 URL: 활성 게시글 (최근 5000개, 백엔드가 정렬)
   const posts = await fetchAllPosts();

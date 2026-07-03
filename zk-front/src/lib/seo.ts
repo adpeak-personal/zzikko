@@ -61,13 +61,15 @@ export function stripHtmlToText(html: string | null | undefined, maxLen = 160): 
  * 카테고리 페이지 metadata 팩토리.
  * 각 `/category/<slug>/page.tsx` 에서:
  *   export const metadata = categoryMetadata("hotdeal");
+ *
+ * subSlug 만 있고 subTitle 이 없으면 slug 자체가 표시됨 (metadata 만 최소 동작).
+ * DB 에서 서브 타이틀을 이미 가져온 경우 subTitle 로 넘겨 정확한 h1 signal 유지.
  */
-export function categoryMetadata(slug: string, subSlug?: string): Metadata {
+export function categoryMetadata(slug: string, subSlug?: string, subTitle?: string): Metadata {
   const board = CATEGORIES.find((c) => c.slug === slug);
-  const sub = subSlug ? board?.subs?.find((s) => s.slug === subSlug) : undefined;
-
   const boardTitle = board?.title ?? slug;
-  const title = sub ? `${boardTitle} · ${sub.title}` : boardTitle;
+  const subLabel = subTitle ?? subSlug;
+  const title = subLabel ? `${boardTitle} · ${subLabel}` : boardTitle;
   const desc = board?.desc
     ? `${board.desc} — ${siteConfig.description}`
     : siteConfig.description;

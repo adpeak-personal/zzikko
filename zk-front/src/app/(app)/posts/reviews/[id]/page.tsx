@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { CATEGORIES } from "@/config/navigation";
 import { getPostDetailCached } from "@/service/posts/server";
+import { getBoardSubs } from "@/service/board-subs/server";
 import { nestComments } from "@/lib/utils";
 import PostContent from "@/components/common/PostContent";
 import PostBreadcrumb from "@/components/posts/PostBreadcrumb";
@@ -34,6 +35,8 @@ export default async function ReviewsPostPage({
   if (!post) notFound();
 
   const board = CATEGORIES.find((c) => c.slug === SLUG);
+  const subs = post.sub_slug ? await getBoardSubs(SLUG) : [];
+  const sub = post.sub_slug ? subs.find((s) => s.slug === post.sub_slug) : undefined;
   const comments = nestComments(post.comments);
   const tags: string[] = (post.extra_data as any)?.tags ?? [];
 
@@ -43,6 +46,15 @@ export default async function ReviewsPostPage({
         <PostBreadcrumb board={board} title={post.title} />
         <PostOwnerActions postId={post.id} authorId={post.user_id} boardSlug={post.board_slug} />
       </div>
+
+      {sub && (
+        <div className="text-xs text-slate-500">
+          <span className="inline-flex items-center gap-1 bg-slate-100 px-2 py-1 rounded-md font-bold">
+            {sub.icon && <span>{sub.icon}</span>}
+            {sub.title}
+          </span>
+        </div>
+      )}
 
       <PostJsonLd post={post} />
 

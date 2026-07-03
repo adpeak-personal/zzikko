@@ -2,14 +2,13 @@ import CategoryHeader, { WriteButton } from "@/components/category/CategoryHeade
 import BoardListClient from "@/components/category/BoardListClient";
 import Pagination from "@/components/category/Pagination";
 import SubCategoryTabs from "@/components/category/SubCategoryTabs";
-import { CATEGORIES } from "@/config/navigation";
 import { categoryMetadata } from "@/lib/seo";
+import { getBoardSubs } from "@/service/board-subs/server";
 
 export const metadata = categoryMetadata("community");
 
-export default function CommunityBoardPage() {
-  const board = CATEGORIES.find((c) => c.slug === "community");
-  const subs = board?.subs ?? [];
+export default async function CommunityBoardPage() {
+  const subs = await getBoardSubs("community");
 
   return (
     <div className="space-y-6">

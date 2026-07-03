@@ -1,3 +1,6 @@
+// 상위 카테고리(게시판) 정적 정의.
+// 서브카테고리는 DB(`board_subs`) 에서 어드민이 관리 — 여기 배열에는 두지 않음.
+// 렌더 시엔 `service/board-subs/server.ts` 의 `getBoardSubs(slug)` 를 사용.
 export type CategoryNav = {
   slug: string;
   title: string;
@@ -7,20 +10,10 @@ export type CategoryNav = {
   text: string;
   /** true 면 메가메뉴/모바일 사이드바에서 숨김. URL 접근 / CategoryHeader 메타데이터는 그대로 동작. */
   hiddenFromNav?: boolean;
-  /** 1뎁스 더 — 자유게시판 같은 게시판은 sub_slug 로 한번 더 분류 */
-  subs?: SubCategoryNav[];
-};
-
-export type SubCategoryNav = {
-  slug: string;
-  title: string;
-  icon?: string;
-  /** true 면 서브 탭에서 어드민에게만 노출. URL 접근 자체는 public 유지 (SEO 크롤 가능). */
-  hiddenFromNav?: boolean;
 };
 
 export const CATEGORIES: CategoryNav[] = [
-   {
+  {
     slug: "hotdeal",
     title: "핫딜 정보",
     icon: "🔥",
@@ -68,9 +61,6 @@ export const CATEGORIES: CategoryNav[] = [
     color: "bg-orange-50",
     text: "text-orange-600",
   },
-  // ──────────────────────────────────────────────────────────────────
-  // 커뮤니티 — reviews/tips/qna 를 sub 로 통합. sub_slug 로 1뎁스 분류.
-  // ──────────────────────────────────────────────────────────────────
   {
     slug: "community",
     title: "커뮤니티",
@@ -78,14 +68,5 @@ export const CATEGORIES: CategoryNav[] = [
     desc: "후기·꿀팁·질문·잡담까지 유저 커뮤니티",
     color: "bg-slate-50",
     text: "text-slate-700",
-    subs: [
-      { slug: "tips", title: "꿀팁", icon: "💡" },
-      { slug: "qna", title: "질문·답변", icon: "❓" },
-      { slug: "chat", title: "잡담", icon: "🗨️" },
-      { slug: "humor", title: "유머", icon: "😆" },
-      { slug: "info", title: "정보공유", icon: "💡" },
-      // AI 자동 발행 블로그 — 어드민에게만 탭 노출. URL/SEO 는 public 유지.
-      { slug: "blog", title: "블로그", icon: "📰", hiddenFromNav: true },
-    ],
   },
 ];
