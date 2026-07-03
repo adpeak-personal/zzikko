@@ -15,6 +15,8 @@ export type SubCategoryNav = {
   slug: string;
   title: string;
   icon?: string;
+  /** true 면 서브 탭에서 어드민에게만 노출. URL 접근 자체는 public 유지 (SEO 크롤 가능). */
+  hiddenFromNav?: boolean;
 };
 
 export const CATEGORIES: CategoryNav[] = [
@@ -98,18 +100,8 @@ export const CATEGORIES: CategoryNav[] = [
       { slug: "humor", title: "유머", icon: "😆" },
       { slug: "question", title: "질문", icon: "❓" },
       { slug: "info", title: "정보공유", icon: "💡" },
+      // AI 자동 발행 블로그 — 어드민에게만 탭 노출. URL/SEO 는 public 유지.
+      { slug: "blog", title: "블로그", icon: "📰", hiddenFromNav: true },
     ],
-  },
-  // ──────────────────────────────────────────────────────────────────
-  // AI 자동 발행 블로그 — 메인 네비에서는 숨김. 직접 URL/푸터로만 접근.
-  // ──────────────────────────────────────────────────────────────────
-  {
-    slug: "blog",
-    title: "Blog",
-    icon: "📰",
-    desc: "정보성 블로그 글",
-    color: "bg-zinc-50",
-    text: "text-zinc-700",
-    hiddenFromNav: true,
   },
 ];

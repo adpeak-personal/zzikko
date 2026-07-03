@@ -45,9 +45,12 @@ function parseKeywordsCsv(csv: string | null): string[] {
 const DEDUPE_WINDOW_DAYS = 20;
 const MAX_ITEMS = 200;
 
-// AI 자동 발행 글이 들어갈 게시판 slug. 다른 카테고리와 같은 선상에서 노출되지만,
-// 메인 네비게이션에서는 hiddenFromNav 처리되어 찾기 어렵게 둠.
-const AI_BLOG_SLUG = 'blog';
+// AI 자동 발행 글은 자유게시판(board_slug=free) 하위의 blog 서브(sub_slug=blog) 로 저장.
+// 자유게시판 서브 탭에서 blog 는 어드민에게만 노출 (일반 유저에게는 숨김) — SEO 는 URL 로만 크롤.
+const AI_BLOG_SLUG = 'free';
+const AI_BLOG_SUB_SLUG = 'blog';
+// GCS 이미지 폴더 prefix. 기존 blog/* 파일은 그대로 두고, 신규 업로드는 free/blog/* 로 이동.
+const AI_BLOG_GCS_PREFIX = 'free/blog';
 
 // AI 가 발행한 글의 작성자(어드민 계정). 다른 계정으로 바꾸려면 .env 의 AI_BLOG_AUTHOR_ID 설정.
 const AI_BLOG_AUTHOR_ID = Number(process.env.AI_BLOG_AUTHOR_ID || 13);
@@ -303,9 +306,15 @@ export default async function blogJobsRoutes(app: FastifyInstance) {
       );
       keywords = kwRows.map((r) => r.keyword);
     }
-    // 워커가 이미지 GCS 업로드 시 사용할 폴더 prefix — 게시판 slug 그대로.
-    // 지금은 상수(AI_BLOG_SLUG)지만, 이후 blog_jobs 에 board_slug 컬럼 추가 시 job.board_slug 로 교체.
-    return { job: { ...job, keywords, board_slug: AI_BLOG_SLUG } };
+    // 워커가 이미지 GCS 업로드 시 사용할 폴더 prefix — 게시판 slug/sub 기준.
+    return {
+      job: {
+        ...job,
+        keywords,
+        board_slug: AI_BLOG_SLUG,
+        sub_slug: AI_BLOG_SUB_SLUG,
+      },
+    };
   });
 
   // PATCH /api/blog-jobs/:id/claim
@@ -328,10 +337,10 @@ export default async function blogJobsRoutes(app: FastifyInstance) {
 
   // PATCH /api/blog-jobs/:id/complete
   //   Body: { content, thumbnail_url? }
-  //   1) 본문의 tmp/* 이미지를 blog/* 로 영구 이동 + URL 치환
-  //   2) 본문 첫 이미지로 썸네일 생성 (blog/{date}/thumb_*.webp)
-  //   3) posts 테이블에 board_slug='blog', user_id=AI_BLOG_AUTHOR_ID 로 INSERT
-  //   4) blog_jobs.status='DONE', result_url='/posts/blog/{post_id}', published_at=NOW()
+  //   1) 본문의 tmp/* 이미지를 free/blog/* 로 영구 이동 + URL 치환
+  //   2) 본문 첫 이미지로 썸네일 생성 (free/blog/{date}/thumb_*.webp)
+  //   3) posts 테이블에 board_slug='free', sub_slug='blog', user_id=AI_BLOG_AUTHOR_ID 로 INSERT
+  //   4) blog_jobs.status='DONE', result_url='/posts/free/{post_id}', published_at=NOW()
   //   3~4 는 트랜잭션으로 묶음 (1~2 는 GCS 작업이라 트랜잭션 밖).
   app.patch<{
     Params: { id: string };
@@ -372,18 +381,18 @@ export default async function blogJobsRoutes(app: FastifyInstance) {
       //   1) 워커가 보낸 thumbnail_url — it_blog 가 이미 body 첫 이미지의 raw 로 썸을 만들어 올려두었음.
       //      우리 버킷이면 그대로 사용, 외부 URL 이면 다운로드→GCS 업로드로 재생성.
       //   2) 없으면 본문 첫 이미지로 auto 생성.
-      const finalContent = await finalizeTmpUrls(content, AI_BLOG_SLUG);
+      const finalContent = await finalizeTmpUrls(content, AI_BLOG_GCS_PREFIX);
       let finalThumb: string | null = null;
       if (thumbnail_url) {
-        const finalizedThumb = await finalizeTmpUrls(thumbnail_url, AI_BLOG_SLUG);
+        const finalizedThumb = await finalizeTmpUrls(thumbnail_url, AI_BLOG_GCS_PREFIX);
         if (finalizedThumb.startsWith('/')) {
           finalThumb = finalizedThumb;
         } else {
-          finalThumb = await makeThumbFromUrl(finalizedThumb, AI_BLOG_SLUG);
+          finalThumb = await makeThumbFromUrl(finalizedThumb, AI_BLOG_GCS_PREFIX);
         }
       }
       if (!finalThumb) {
-        finalThumb = await generateThumbnail(finalContent, AI_BLOG_SLUG);
+        finalThumb = await generateThumbnail(finalContent, AI_BLOG_GCS_PREFIX);
       }
 
       const conn = await app.db.getConnection();
@@ -395,9 +404,9 @@ export default async function blogJobsRoutes(app: FastifyInstance) {
         // keywords 도 blog_jobs 에서 그대로 propagate → AI 제목 생성 시 이력 dedup 에 사용.
         const displayNickname = await pickRandomAlias(app, AI_BLOG_AUTHOR_ID);
         const [postResult] = await conn.query<ResultSetHeader>(
-          `INSERT INTO posts (board_slug, user_id, display_nickname, title, keywords, content, thumbnail_url)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [AI_BLOG_SLUG, AI_BLOG_AUTHOR_ID, displayNickname, job.title, job.keywords ?? null, finalContent, finalThumb],
+          `INSERT INTO posts (board_slug, sub_slug, user_id, display_nickname, title, keywords, content, thumbnail_url)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [AI_BLOG_SLUG, AI_BLOG_SUB_SLUG, AI_BLOG_AUTHOR_ID, displayNickname, job.title, job.keywords ?? null, finalContent, finalThumb],
         );
         const postId = postResult.insertId;
 
@@ -444,6 +453,6 @@ export default async function blogJobsRoutes(app: FastifyInstance) {
     return { ok: true, id };
   });
 
-  // 공개 목록/상세는 표준 /api/posts/load_lists?board_slug=blog 와
+  // 공개 목록/상세는 표준 /api/posts/load_lists?board_slug=free&sub_slug=blog 와
   // /api/posts/detail/:id 가 그대로 처리한다.
 }

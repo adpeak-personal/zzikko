@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
 import type { SubCategoryNav } from "@/config/navigation";
+import { useAuthStore } from "@/store/auth";
 
 type Props = {
   /** 부모 카테고리 slug (e.g. "free") */
@@ -11,7 +14,12 @@ type Props = {
 };
 
 export default function SubCategoryTabs({ parentSlug, subs, current }: Props) {
-  const items = [{ slug: undefined as string | undefined, title: "전체", icon: "🗂️" }, ...subs];
+  const { user } = useAuthStore();
+  const isAdmin = user?.role === "ADMIN" || user?.role === "SUB_ADMIN";
+
+  // hiddenFromNav 서브는 어드민만 볼 수 있음. 단, 현재 URL 로 접근 중이면 활성 표시를 위해 그대로 남김.
+  const visibleSubs = subs.filter((s) => !s.hiddenFromNav || isAdmin || s.slug === current);
+  const items = [{ slug: undefined as string | undefined, title: "전체", icon: "🗂️" }, ...visibleSubs];
 
   return (
     <div className="flex flex-wrap gap-2">

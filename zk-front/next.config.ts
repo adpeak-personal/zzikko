@@ -3,6 +3,22 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   async redirects() {
     return [
+      // 블로그 카테고리 free/blog 이관 (2026-07 SEO 인덱스 자산 승계용). 개별 상수 우선.
+      {
+        source: "/posts/blog/:id(\\d+)",
+        destination: "/posts/free/:id",
+        permanent: true,
+      },
+      {
+        source: "/posts/blog",
+        destination: "/category/free/blog",
+        permanent: true,
+      },
+      {
+        source: "/category/blog",
+        destination: "/category/free/blog",
+        permanent: true,
+      },
       {
         source: "/posts/:slug((?!.*\\d+$)[^/]+)",
         destination: "/category/:slug",
