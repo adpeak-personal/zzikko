@@ -33,7 +33,7 @@ export default async function CommunityBoardSubPage({
         cta={<WriteButton label="글쓰기" href={`/write?board=community&sub=${sub}`} />}
       />
       <SubCategoryTabs parentSlug="community" subs={subs} current={sub} />
-      <BoardListClient slug="community" subSlug={sub} showRating={subCat.showRating} />
+      <BoardListClient slug="community" subSlug={sub} />
       <Pagination />
     </div>
   );

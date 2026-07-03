@@ -17,8 +17,6 @@ export type SubCategoryNav = {
   icon?: string;
   /** true 면 서브 탭에서 어드민에게만 노출. URL 접근 자체는 public 유지 (SEO 크롤 가능). */
   hiddenFromNav?: boolean;
-  /** true 면 서브 리스트에서 별점(rating) 을 노출. reviews 서브 전용. */
-  showRating?: boolean;
 };
 
 export const CATEGORIES: CategoryNav[] = [
@@ -55,6 +53,14 @@ export const CATEGORIES: CategoryNav[] = [
     text: "text-purple-600",
   },
   {
+    slug: "reviews",
+    title: "이용후기",
+    icon: "⭐️",
+    desc: "실제 이용자 리얼 리뷰",
+    color: "bg-yellow-50",
+    text: "text-yellow-600",
+  },
+  {
     slug: "devices",
     title: "휴대폰 정보",
     icon: "📱",
@@ -73,7 +79,6 @@ export const CATEGORIES: CategoryNav[] = [
     color: "bg-slate-50",
     text: "text-slate-700",
     subs: [
-      { slug: "reviews", title: "이용후기", icon: "⭐️", showRating: true },
       { slug: "tips", title: "꿀팁", icon: "💡" },
       { slug: "qna", title: "질문·답변", icon: "❓" },
       { slug: "chat", title: "잡담", icon: "🗨️" },

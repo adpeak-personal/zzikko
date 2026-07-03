@@ -137,6 +137,21 @@ CREATE TABLE `comments` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
+CREATE TABLE board_subs (
+  id           INT PRIMARY KEY AUTO_INCREMENT,
+  board_slug   VARCHAR(50) NOT NULL COMMENT '상위 게시판 slug: community, reviews, ...',
+  slug         VARCHAR(50) NOT NULL COMMENT 'URL 세그먼트 (예: hotdeal, offline)',
+  title        VARCHAR(100) NOT NULL,
+  icon         VARCHAR(20) DEFAULT NULL COMMENT '이모지 1자',
+  hidden_from_nav TINYINT(1) NOT NULL DEFAULT 0 COMMENT '1이면 어드민만 서브 탭 노출',
+  sort_order   INT NOT NULL DEFAULT 0,
+  created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_board_sub (board_slug, slug),
+  INDEX idx_board_order (board_slug, sort_order, id)
+);
+
+
 -- =====================================================================
 -- 게시글 좋아요/추천 (유저당 게시글 1회 — UNIQUE 로 중복 방지)
 -- =====================================================================

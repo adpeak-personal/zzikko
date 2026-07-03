@@ -21,11 +21,6 @@ const nextConfig: NextConfig = {
       { source: "/category/free/:sub", destination: "/category/community/:sub", permanent: true },
       { source: "/category/free", destination: "/category/community", permanent: true },
       {
-        source: "/posts/reviews/:id(\\d+)",
-        destination: "/posts/community/:id",
-        permanent: true,
-      },
-      {
         source: "/posts/tips/:id(\\d+)",
         destination: "/posts/community/:id",
         permanent: true,
@@ -35,7 +30,6 @@ const nextConfig: NextConfig = {
         destination: "/posts/community/:id",
         permanent: true,
       },
-      { source: "/category/reviews", destination: "/category/community/reviews", permanent: true },
       { source: "/category/tips", destination: "/category/community/tips", permanent: true },
       { source: "/category/qna", destination: "/category/community/qna", permanent: true },
       {
