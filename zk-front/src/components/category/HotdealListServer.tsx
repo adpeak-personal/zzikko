@@ -1,21 +1,17 @@
-"use client";
-
 import Image from "next/image";
 import Link from "next/link";
-import { useBoardPosts } from "@/service/posts";
+import { getBoardPostsCached } from "@/service/posts/server";
+import { POSTS_PER_PAGE } from "@/lib/board";
+import Pagination from "./Pagination";
 
-export default function HotdealListClient() {
-  const { data, isPending, isError } = useBoardPosts("hotdeal");
+type Props = {
+  page?: number;
+};
 
-  if (isPending) {
-    return (
-      <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center text-sm text-slate-400">
-        불러오는 중...
-      </div>
-    );
-  }
+export default async function HotdealListServer({ page = 1 }: Props) {
+  const data = await getBoardPostsCached("hotdeal", page, POSTS_PER_PAGE);
 
-  if (isError) {
+  if (!data) {
     return (
       <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center text-sm text-red-400">
         게시글을 불러오지 못했어요. 잠시 후 다시 시도해주세요.
@@ -23,6 +19,9 @@ export default function HotdealListClient() {
     );
   }
 
+  // 서버 컴포넌트 — 요청당 1회 렌더이므로 Date.now() 는 안정적. purity 룰은 클라이언트 훅 대상.
+  // eslint-disable-next-line react-hooks/purity
+  const now = Date.now();
   const deals = data.data.map((p) => ({
     id: p.id,
     title: p.title,
@@ -31,7 +30,7 @@ export default function HotdealListClient() {
     views: p.views,
     thumb: p.thumb,
     daysAgo: Math.floor(
-      (Date.now() - new Date(p.created_at).getTime()) / (1000 * 60 * 60 * 24),
+      (now - new Date(p.created_at).getTime()) / (1000 * 60 * 60 * 24),
     ),
     mall: p.extra_data?.mall ?? "-",
     price: p.extra_data?.price ?? 0,
@@ -49,6 +48,7 @@ export default function HotdealListClient() {
   }
 
   return (
+    <div className="space-y-6">
     <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
       <div className="hidden md:grid grid-cols-[72px_80px_1fr_110px_90px_70px_70px_90px] gap-4 px-5 py-3 bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500">
         <div className="text-center">썸네일</div>
@@ -134,6 +134,12 @@ export default function HotdealListClient() {
           </li>
         ))}
       </ul>
+    </div>
+      <Pagination
+        basePath="/category/hotdeal"
+        currentPage={data.meta.page}
+        totalPages={data.meta.totalPages}
+      />
     </div>
   );
 }

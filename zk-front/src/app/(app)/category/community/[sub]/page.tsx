@@ -1,9 +1,9 @@
 import { notFound } from "next/navigation";
 import CategoryHeader, { WriteButton } from "@/components/category/CategoryHeader";
-import BoardListClient from "@/components/category/BoardListClient";
-import Pagination from "@/components/category/Pagination";
+import BoardListServer from "@/components/category/BoardListServer";
 import SubCategoryTabs from "@/components/category/SubCategoryTabs";
 import { categoryMetadata } from "@/lib/seo";
+import { parsePage } from "@/lib/board";
 import { getBoardSubs } from "@/service/board-subs/server";
 
 export async function generateMetadata({
@@ -19,10 +19,12 @@ export async function generateMetadata({
 
 export default async function CommunityBoardSubPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ sub: string }>;
+  searchParams: Promise<{ page?: string }>;
 }) {
-  const { sub } = await params;
+  const [{ sub }, { page }] = await Promise.all([params, searchParams]);
   const subs = await getBoardSubs("community");
   const subCat = subs.find((s) => s.slug === sub);
   if (!subCat) notFound();
@@ -34,8 +36,7 @@ export default async function CommunityBoardSubPage({
         cta={<WriteButton label="글쓰기" href={`/write?board=community&sub=${sub}`} />}
       />
       <SubCategoryTabs parentSlug="community" subs={subs} current={sub} />
-      <BoardListClient slug="community" subSlug={sub} />
-      <Pagination />
+      <BoardListServer slug="community" subSlug={sub} page={parsePage(page)} />
     </div>
   );
 }

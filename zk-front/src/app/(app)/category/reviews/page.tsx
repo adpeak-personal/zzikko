@@ -1,14 +1,19 @@
 import CategoryHeader, { WriteButton } from "@/components/category/CategoryHeader";
 import CategoryToolbar from "@/components/category/CategoryToolbar";
-import BoardListClient from "@/components/category/BoardListClient";
-import Pagination from "@/components/category/Pagination";
+import BoardListServer from "@/components/category/BoardListServer";
 import SubCategoryTabs from "@/components/category/SubCategoryTabs";
 import { categoryMetadata } from "@/lib/seo";
+import { parsePage } from "@/lib/board";
 import { getBoardSubs } from "@/service/board-subs/server";
 
 export const metadata = categoryMetadata("reviews");
 
-export default async function ReviewsPage() {
+export default async function ReviewsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
+  const { page } = await searchParams;
   const subs = await getBoardSubs("reviews");
 
   return (
@@ -16,8 +21,7 @@ export default async function ReviewsPage() {
       <CategoryHeader slug="reviews" cta={<WriteButton label="후기 작성" />} />
       <CategoryToolbar searchPlaceholder="기종·매장명 검색" />
       {subs.length > 0 && <SubCategoryTabs parentSlug="reviews" subs={subs} />}
-      <BoardListClient slug="reviews" showRating />
-      <Pagination />
+      <BoardListServer slug="reviews" showRating page={parsePage(page)} />
     </div>
   );
 }

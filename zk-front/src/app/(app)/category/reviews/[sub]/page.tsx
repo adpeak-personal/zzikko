@@ -1,10 +1,10 @@
 import { notFound } from "next/navigation";
 import CategoryHeader, { WriteButton } from "@/components/category/CategoryHeader";
 import CategoryToolbar from "@/components/category/CategoryToolbar";
-import BoardListClient from "@/components/category/BoardListClient";
-import Pagination from "@/components/category/Pagination";
+import BoardListServer from "@/components/category/BoardListServer";
 import SubCategoryTabs from "@/components/category/SubCategoryTabs";
 import { categoryMetadata } from "@/lib/seo";
+import { parsePage } from "@/lib/board";
 import { getBoardSubs } from "@/service/board-subs/server";
 
 export async function generateMetadata({
@@ -20,10 +20,12 @@ export async function generateMetadata({
 
 export default async function ReviewsSubPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ sub: string }>;
+  searchParams: Promise<{ page?: string }>;
 }) {
-  const { sub } = await params;
+  const [{ sub }, { page }] = await Promise.all([params, searchParams]);
   const subs = await getBoardSubs("reviews");
   const subCat = subs.find((s) => s.slug === sub);
   if (!subCat) notFound();
@@ -36,8 +38,7 @@ export default async function ReviewsSubPage({
       />
       <CategoryToolbar searchPlaceholder="기종·매장명 검색" />
       <SubCategoryTabs parentSlug="reviews" subs={subs} current={sub} />
-      <BoardListClient slug="reviews" subSlug={sub} showRating />
-      <Pagination />
+      <BoardListServer slug="reviews" subSlug={sub} showRating page={parsePage(page)} />
     </div>
   );
 }
