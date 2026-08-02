@@ -20,6 +20,7 @@ import aiTitlesRoutes from './routes/ai-titles';
 import blogJobsRoutes from './routes/blog-jobs';
 import aliasRoutes from './routes/aliases';
 import boardSubsRoutes from './routes/board-subs';
+import nworkRoutes from './routes/nwork';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -77,6 +78,7 @@ app.register(aiTitlesRoutes, { prefix: '/api/ai' });
 app.register(blogJobsRoutes, { prefix: '/api/blog-jobs' });
 app.register(aliasRoutes, { prefix: '/api/admin/aliases' });
 app.register(boardSubsRoutes, { prefix: '/api/board-subs' });
+app.register(nworkRoutes, { prefix: '/api/yongadm' });
 
 const PORT = Number(process.env.PORT || 4000);
 const HOST = process.env.HOST || '0.0.0.0';
