@@ -83,11 +83,31 @@ export default async function nworkRoutes(app: FastifyInstance) {
       ]);
       const sortCol = SORT_ALLOW.has(req.query.sort ?? '') ? req.query.sort! : 'n_idx';
       const sortOrder = (req.query.order ?? 'desc').toLowerCase() === 'asc' ? 'ASC' : 'DESC';
-      // 안정 정렬: 같은 값일 때 n_idx DESC 로 tie-break
-      const orderSql =
-        sortCol === 'n_idx'
-          ? `ORDER BY n_idx ${sortOrder}`
-          : `ORDER BY ${sortCol} ${sortOrder}, n_idx DESC`;
+      // 정렬 규칙:
+      //   task_role — TASK_ROLE_DEFAULTS 배열 순서(본체 → 준비 → 카테고리)로 정렬.
+      //                일반 문자열 정렬은 "블로그준비" < "블로그" 라 순서가 뒤집혀서 FIELD() 사용.
+      //   last_login_chk — NULL 을 항상 뒤로 (IS NULL 을 앞세움).
+      //   그 외 — 기본 컬럼 정렬 + n_idx DESC tie-break.
+      //   task_role 1순위 → last_login_chk DESC 2순위 → n_idx DESC 3순위.
+      const taskRoleFieldSql = `FIELD(task_role, ${TASK_ROLE_DEFAULTS.map(
+        () => '?',
+      ).join(', ')})`;
+      const taskRoleFieldParams: unknown[] =
+        sortCol === 'task_role' ? [...TASK_ROLE_DEFAULTS] : [];
+
+      const secondary =
+        sortCol === 'task_role'
+          ? ', last_login_chk IS NULL, last_login_chk DESC, n_idx DESC'
+          : sortCol === 'n_idx'
+          ? ''
+          : ', n_idx DESC';
+      const primary =
+        sortCol === 'task_role'
+          ? `${taskRoleFieldSql} ${sortOrder}`
+          : sortCol === 'last_login_chk'
+          ? `last_login_chk IS NULL, last_login_chk ${sortOrder}`
+          : `${sortCol} ${sortOrder}`;
+      const orderSql = `ORDER BY ${primary}${secondary}`;
 
       const where: string[] = [];
       const params: unknown[] = [];
@@ -118,7 +138,7 @@ export default async function nworkRoutes(app: FastifyInstance) {
            ${whereSql}
            ${orderSql}
           LIMIT ? OFFSET ?`,
-        [...params, limit, offset],
+        [...params, ...taskRoleFieldParams, limit, offset],
       );
 
       const [countRows] = await app.db.query<(RowDataPacket & { total: number })[]>(

@@ -12,13 +12,15 @@ import {
   type KeywordCategory,
 } from "@/service/keywords/types";
 
-const CATEGORIES: KeywordCategory[] = ["region", "phone_model"];
+const CATEGORIES: KeywordCategory[] = ["region", "phone_model", "site"];
 
 const PLACEHOLDER: Record<KeywordCategory, string> = {
   region:
     "쉼표(,) 또는 줄바꿈으로 여러 개 한 번에 추가할 수 있어요.\n예) 강남, 강남구, 서초, 서초구, 송파, 잠실, 사당",
   phone_model:
     "쉼표(,) 또는 줄바꿈으로 여러 개 한 번에 추가할 수 있어요.\n예) 갤럭시 S26, 아이폰 17 프로, 갤럭시 Z플립7, 아이폰 17",
+  site:
+    "쉼표(,) 또는 줄바꿈으로 여러 개 한 번에 추가할 수 있어요.\n예) 숭의역 라온프라이빗, 해운대 르엘 리버파크센텀",
 };
 
 // 한글/영문/숫자/공백만 허용, 나머지 특수문자 제거. 공백 중복 정리.
@@ -104,7 +106,7 @@ export default function KeywordsPage() {
       <div>
         <h1 className="text-2xl font-extrabold text-slate-900">키워드 관리</h1>
         <p className="mt-1 text-sm text-slate-500">
-          블로그 글 작성에 사용되는 지역 · 휴대폰 기종 키워드를 관리합니다.
+          블로그 글 작성에 사용되는 지역 · 휴대폰 기종 · 현장 키워드를 관리합니다.
         </p>
       </div>
 

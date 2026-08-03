@@ -6,11 +6,12 @@ import type { NworkRow, SortOrder } from "@/service/nwork/types";
 
 const PAGE_SIZE = 30;
 const SORTABLE_TASK_ROLE = "task_role";
+const SORTABLE_LAST_LOGIN = "last_login_chk";
 
 // 페이지 기본값
 const DEFAULT_USE_STATUS: "" | "0" | "1" = "1";
 const DEFAULT_SORT: string | null = SORTABLE_TASK_ROLE;
-const DEFAULT_ORDER: SortOrder = "desc";
+const DEFAULT_ORDER: SortOrder = "asc";
 
 // ── 셀 컴포넌트 ─────────────────────────────────────────────
 
@@ -228,13 +229,8 @@ function NworkRowView({
   return (
     <tr className="border-b-2 border-slate-200 hover:bg-slate-50/60 align-top">
       <td className="px-3 py-3 text-slate-400 tabular-nums">{row.n_idx}</td>
-      <td className="px-2 py-2 min-w-[140px]">
-        <EditableText
-          value={row.n_id}
-          onSave={(v) => v !== null && patch({ n_id: v })}
-          disabled={isPending}
-          className="w-full text-sm font-bold text-slate-800 px-2 py-1 rounded border border-transparent hover:border-slate-200 focus:border-blue-400 focus:bg-white outline-none disabled:opacity-50"
-        />
+      <td className="px-3 py-3 text-sm font-bold text-slate-800 whitespace-nowrap">
+        {row.n_id}
       </td>
       <td className="px-2 py-2 hidden md:table-cell min-w-[140px]">
         <EditableText
@@ -580,7 +576,14 @@ export default function YongadmAccountsPage() {
                 <th className="px-3 py-3 font-bold hidden xl:table-cell text-right">UA</th>
                 <th className="px-3 py-3 font-bold hidden xl:table-cell">프로필</th>
                 <th className="px-3 py-3 font-bold">메모</th>
-                <th className="px-3 py-3 font-bold hidden lg:table-cell">최근로그인</th>
+                <SortableTh
+                  label="최근로그인"
+                  sortKey={SORTABLE_LAST_LOGIN}
+                  currentSort={sort}
+                  currentOrder={order}
+                  onSort={handleSort}
+                  className="hidden lg:table-cell"
+                />
                 <th className="px-3 py-3 font-bold hidden lg:table-cell">최근작업</th>
               </tr>
             </thead>

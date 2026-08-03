@@ -1,4 +1,4 @@
-export type KeywordCategory = "region" | "phone_model";
+export type KeywordCategory = "region" | "phone_model" | "site";
 
 export interface Keyword {
   id: number;
@@ -36,4 +36,5 @@ export interface BulkDeleteKeywordsResponse {
 export const KEYWORD_CATEGORY_LABEL: Record<KeywordCategory, string> = {
   region: "지역",
   phone_model: "기종",
+  site: "현장",
 };

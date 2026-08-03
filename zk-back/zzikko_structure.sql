@@ -215,7 +215,7 @@ CREATE TABLE `devices` (
 -- 키워드 정리 (지역 / 기종 ++)
 CREATE TABLE `keywords` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `category` enum('region','phone_model') NOT NULL,  -- 나중에 '통신사','사은품' 등 추가하기 쉬움
+  `category` enum('region','phone_model','site') NOT NULL,  -- region=지역, phone_model=기종, site=현장(부동산 단지 등)
   `name` varchar(80) NOT NULL,                       -- "강남", "갤럭시 S26"
   `sort_order` int DEFAULT 0,                        -- 어드민에서 드래그 정렬
   `is_active` tinyint(1) DEFAULT 1,
@@ -292,4 +292,43 @@ CREATE TABLE `blog_job_keywords` (
   KEY `idx_keyword_recent` (`keyword`,`created_at`),
   CONSTRAINT `blog_job_keywords_ibfk_1`
     FOREIGN KEY (`job_id`) REFERENCES `blog_jobs` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- =====================================================================
+-- 네이버 블로그 예약 발행 작업 (nblog_jobs)
+-- /yongadm/blog 페이지에서 계정×카테고리 조합으로 등록 → 파이썬 워커(n_blog_writer)가
+-- scheduled_at 이 지난 PENDING 을 폴링해서 네이버 블로그에 실제로 글을 씀.
+--
+-- blog_jobs 와 분리한 이유:
+--   - blog_jobs 는 자체 사이트(community/blog 서브)로 발행되는 AI 글
+--   - nblog_jobs 는 외부(네이버) 계정 로그인 후 그 계정의 블로그로 발행
+--   → 워커·타겟·필요 컬럼(계정, 카테고리) 이 달라서 섞으면 지저분해짐
+--
+-- category 별 프롬프트/키워드 사용법 (파이썬 title_generator.py 와 1:1):
+--   cate1 (연예인) · cate2 (음식)  → 워커가 웹검색으로 제목 자동 생성 후 keyword 추출
+--                                    → INSERT 시 keyword 는 NULL, 워커가 complete 시 채움
+--   cate3 (부동산) · cate4 (모바일) → 사용자가 준 keyword 로 제목만 다듬음
+--                                    → INSERT 시 keyword 필수 (앱 레이어 검증)
+--
+-- 상태값은 프론트/워커의 status enum 과 1:1.
+-- =====================================================================
+CREATE TABLE `nblog_jobs` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `n_idx` int NOT NULL,                                                 -- 어느 nwork 계정으로 발행할지 (FK)
+  `category` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL,           -- 'cate1'|'cate2'|'cate3'|'cate4'
+  `keyword` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,       -- cate3/4 는 INSERT 시 필수, cate1/2 는 워커가 채움
+  `title` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,         -- 워커가 생성 후 채움
+  `scheduled_at` datetime NOT NULL,                                     -- 예약 발행 시각
+  `status` enum('PENDING','PROCESSING','DONE','FAILED') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'PENDING',
+  `result_url` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,    -- 발행된 네이버 블로그 글 URL
+  `error` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,                 -- 실패 사유
+  `published_at` datetime DEFAULT NULL,                                 -- 실제로 발행된 시각 (워커가 채움)
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_due` (`status`,`scheduled_at`),                              -- 워커의 /due 조회 (PENDING 중 가장 이른 것)
+  KEY `idx_n_idx` (`n_idx`),
+  CONSTRAINT `fk_nblog_jobs_nwork` FOREIGN KEY (`n_idx`)
+    REFERENCES `nwork` (`n_idx`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

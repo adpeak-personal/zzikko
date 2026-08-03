@@ -3,7 +3,7 @@ import type { RowDataPacket, ResultSetHeader } from 'mysql2';
 
 interface KeywordRow extends RowDataPacket {
   id: number;
-  category: 'region' | 'phone_model';
+  category: 'region' | 'phone_model' | 'site';
   name: string;
   sort_order: number;
   is_active: number;
@@ -11,7 +11,7 @@ interface KeywordRow extends RowDataPacket {
   updated_at: string;
 }
 
-const CATEGORIES = ['region', 'phone_model'] as const;
+const CATEGORIES = ['region', 'phone_model', 'site'] as const;
 type Category = (typeof CATEGORIES)[number];
 
 function isCategory(value: unknown): value is Category {
