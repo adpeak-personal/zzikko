@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/auth";
-import type { NblogJobCategory } from "./mutations";
+import type { NblogJobCategory, NblogLinkStyle } from "./mutations";
 
 export type NblogJobStatus = "PENDING" | "PROCESSING" | "DONE" | "FAILED";
 
@@ -10,6 +10,9 @@ export interface NblogJob {
   category: NblogJobCategory;
   keyword: string | null;
   title: string | null;
+  link: string | null;
+  link_style: NblogLinkStyle | null;
+  link_keyword: string | null;
   scheduled_at: string; // 'YYYY-MM-DD HH:MM:SS'
   status: NblogJobStatus;
   result_url: string | null;

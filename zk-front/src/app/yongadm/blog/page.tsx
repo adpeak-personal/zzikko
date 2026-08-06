@@ -20,6 +20,7 @@ import {
   type NblogJob,
   type NblogJobStatus,
 } from "@/service/nblog-jobs/queries";
+import type { NblogLinkStyle } from "@/service/nblog-jobs/mutations";
 import { distributeTimes, toLocalInputValue } from "@/lib/blog-schedule";
 
 const BLOG_ROLE = "블로그";
@@ -51,6 +52,17 @@ type Reservation = {
   /** [AI 제목 생성] 눌러야 채워짐. 안 채워도 저장 가능(워커가 실행 시 채움) */
   title?: string;
   titleError?: string;
+  /** 본문에 삽입할 링크 (선택) */
+  link?: string;
+  linkStyle?: NblogLinkStyle;
+  /** anchor 스타일일 때 앵커 텍스트 오버라이드. 비면 워커가 keyword 로 폴백. */
+  linkKeyword?: string;
+};
+
+const LINK_STYLE_LABEL: Record<NblogLinkStyle, string> = {
+  anchor: "키워드",
+  onbox: "박스",
+  nobox: "텍스트",
 };
 
 // cate3/4 는 사용자가 넣은 키워드 풀에서 뽑음. cate1/2 는 별도 입력 불필요.
@@ -455,6 +467,7 @@ function KeywordPoolSection({
 function PreviewSection({
   reservations,
   onRemove,
+  onUpdate,
   onSave,
   isSaving,
   onGenerateTitles,
@@ -463,6 +476,7 @@ function PreviewSection({
 }: {
   reservations: Reservation[];
   onRemove: (id: string) => void;
+  onUpdate: (id: string, patch: Partial<Reservation>) => void;
   onSave: () => void;
   isSaving: boolean;
   onGenerateTitles: () => void;
@@ -556,6 +570,7 @@ function PreviewSection({
                 <th className="px-4 py-3 font-bold">카테고리</th>
                 <th className="px-4 py-3 font-bold">키워드</th>
                 <th className="px-4 py-3 font-bold">제목</th>
+                <th className="px-4 py-3 font-bold">링크 (선택)</th>
                 <th className="px-4 py-3 font-bold w-12" />
               </tr>
             </thead>
@@ -563,6 +578,7 @@ function PreviewSection({
               {reservations.map((r, i) => {
                 const cat = CATEGORIES.find((c) => c.key === r.category)!;
                 const needsKw = r.category === "cate3" || r.category === "cate4";
+                const linkStyle = r.linkStyle ?? "anchor";
                 return (
                   <tr
                     key={r.id}
@@ -614,6 +630,66 @@ function PreviewSection({
                           미생성 (워커가 실행 시 채움)
                         </span>
                       )}
+                    </td>
+                    <td className="px-4 py-2 min-w-[260px]">
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="url"
+                            value={r.link ?? ""}
+                            onChange={(e) => {
+                              const link = e.target.value;
+                              // URL 이 비면 style/linkKeyword 도 초기화, 있으면 기본 anchor
+                              onUpdate(r.id, {
+                                link: link || undefined,
+                                linkStyle: link ? (r.linkStyle ?? "anchor") : undefined,
+                                linkKeyword: link ? r.linkKeyword : undefined,
+                              });
+                            }}
+                            placeholder="https://..."
+                            className="flex-1 min-w-[140px] text-xs px-2 py-1 rounded border border-slate-200 focus:border-blue-400 outline-none"
+                          />
+                          <select
+                            value={linkStyle}
+                            disabled={!r.link}
+                            onChange={(e) => {
+                              const next = e.target.value as NblogLinkStyle;
+                              onUpdate(r.id, {
+                                linkStyle: next,
+                                // anchor 아닐 땐 linkKeyword 는 무의미 → 초기화
+                                linkKeyword: next === "anchor" ? r.linkKeyword : undefined,
+                              });
+                            }}
+                            className="text-[11px] font-bold px-1.5 py-1 rounded border border-slate-200 bg-white disabled:opacity-40 disabled:cursor-not-allowed"
+                            title="anchor=키워드에 링크 · onbox=박스 · nobox=텍스트"
+                          >
+                            {(Object.keys(LINK_STYLE_LABEL) as NblogLinkStyle[]).map(
+                              (k) => (
+                                <option key={k} value={k}>
+                                  {LINK_STYLE_LABEL[k]}
+                                </option>
+                              ),
+                            )}
+                          </select>
+                        </div>
+                        {r.link && linkStyle === "anchor" && (
+                          <input
+                            type="text"
+                            value={r.linkKeyword ?? ""}
+                            onChange={(e) =>
+                              onUpdate(r.id, {
+                                linkKeyword: e.target.value || undefined,
+                              })
+                            }
+                            placeholder={
+                              r.keyword
+                                ? `앵커 텍스트 (기본: ${r.keyword})`
+                                : "앵커 텍스트 (비우면 keyword 사용)"
+                            }
+                            className="text-xs px-2 py-1 rounded border border-dashed border-slate-200 focus:border-blue-400 focus:border-solid outline-none text-slate-600"
+                          />
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-2 text-center">
                       <button
@@ -755,6 +831,7 @@ function ReservationsListSection() {
                 <th className="px-4 py-3 font-bold">카테고리</th>
                 <th className="px-4 py-3 font-bold">키워드</th>
                 <th className="px-4 py-3 font-bold">제목</th>
+                <th className="px-4 py-3 font-bold">링크</th>
                 <th className="px-4 py-3 font-bold">상태</th>
                 <th className="px-4 py-3 font-bold w-12" />
               </tr>
@@ -812,6 +889,38 @@ function ReservationsListSection() {
                         <div className="mt-0.5 text-[11px] text-red-500 line-clamp-2">
                           {job.error}
                         </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-sm max-w-[220px]">
+                      {job.link ? (
+                        <div className="flex flex-col gap-0.5">
+                          <a
+                            href={job.link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-blue-600 hover:underline truncate"
+                            title={job.link}
+                          >
+                            {job.link}
+                          </a>
+                          <div className="flex items-center gap-1 flex-wrap">
+                            {job.link_style && (
+                              <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                                {LINK_STYLE_LABEL[job.link_style]}
+                              </span>
+                            )}
+                            {job.link_style === "anchor" && job.link_keyword && (
+                              <span
+                                className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded truncate max-w-[140px]"
+                                title={`앵커: ${job.link_keyword}`}
+                              >
+                                🔗 {job.link_keyword}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-slate-300">-</span>
                       )}
                     </td>
                     <td className="px-4 py-3">
@@ -1008,6 +1117,12 @@ export default function YongadmBlogPage() {
           keyword: r.keyword ?? undefined,
           title: r.title,
           scheduled_at: r.scheduledAt.toISOString(),
+          link: r.link,
+          link_style: r.link ? r.linkStyle ?? "anchor" : undefined,
+          link_keyword:
+            r.link && (r.linkStyle ?? "anchor") === "anchor"
+              ? r.linkKeyword
+              : undefined,
         })),
       });
       alert(`${result.saved}건 발행 예약 완료`);
@@ -1122,6 +1237,11 @@ export default function YongadmBlogPage() {
         reservations={reservations}
         onRemove={(id) =>
           setReservations((prev) => prev.filter((r) => r.id !== id))
+        }
+        onUpdate={(id, patch) =>
+          setReservations((prev) =>
+            prev.map((r) => (r.id === id ? { ...r, ...patch } : r)),
+          )
         }
         onSave={handleSave}
         isSaving={saveMut.isPending}

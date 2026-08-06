@@ -16,6 +16,8 @@ import type { RowDataPacket, ResultSetHeader } from 'mysql2';
 
 const VALID_CATEGORIES = ['cate1', 'cate2', 'cate3', 'cate4'] as const;
 type Category = (typeof VALID_CATEGORIES)[number];
+const VALID_LINK_STYLES = ['anchor', 'onbox', 'nobox'] as const;
+type LinkStyle = (typeof VALID_LINK_STYLES)[number];
 const MAX_ITEMS = 500;
 
 interface InputItem {
@@ -24,6 +26,10 @@ interface InputItem {
   keyword?: string;
   title?: string;
   scheduled_at: string;
+  link?: string;
+  link_style?: string;
+  /** anchor 스타일일 때 사용할 앵커 텍스트. 비면 워커가 keyword 로 폴백. */
+  link_keyword?: string;
 }
 
 interface JobRow extends RowDataPacket {
@@ -32,6 +38,9 @@ interface JobRow extends RowDataPacket {
   category: Category;
   keyword: string | null;
   title: string | null;
+  link: string | null;
+  link_style: LinkStyle | null;
+  link_keyword: string | null;
   scheduled_at: string;
   status: 'PENDING' | 'PROCESSING' | 'DONE' | 'FAILED';
   result_url: string | null;
@@ -91,6 +100,9 @@ export default async function nblogJobsRoutes(app: FastifyInstance) {
                   keyword: { type: 'string', maxLength: 200 },
                   title: { type: 'string', maxLength: 255 },
                   scheduled_at: { type: 'string', minLength: 1 },
+                  link: { type: 'string', maxLength: 500 },
+                  link_style: { type: 'string', enum: [...VALID_LINK_STYLES] },
+                  link_keyword: { type: 'string', maxLength: 200 },
                 },
               },
             },
@@ -108,6 +120,9 @@ export default async function nblogJobsRoutes(app: FastifyInstance) {
         keyword: string | null;
         title: string | null;
         scheduled_at: string;
+        link: string | null;
+        link_style: LinkStyle | null;
+        link_keyword: string | null;
       }> = [];
       for (const it of items) {
         const cat = it.category as Category;
@@ -117,12 +132,32 @@ export default async function nblogJobsRoutes(app: FastifyInstance) {
         }
         const dt = toMysqlDateTime(it.scheduled_at);
         if (!dt) return reply.badRequest(`scheduled_at 형식 오류: ${it.scheduled_at}`);
+
+        // link / link_style 정합성 — 둘 다 있거나 둘 다 없거나
+        const link = it.link?.trim() || null;
+        const linkStyle = (it.link_style as LinkStyle | undefined) || null;
+        if (link && !linkStyle) {
+          return reply.badRequest(`link 이 있으면 link_style 도 필요합니다.`);
+        }
+        if (linkStyle && !link) {
+          return reply.badRequest(`link_style 만 있고 link 이 비어있습니다.`);
+        }
+        if (link && !/^https?:\/\//i.test(link)) {
+          return reply.badRequest(`link 는 http:// 또는 https:// 로 시작해야 합니다: ${link}`);
+        }
+        // link_keyword 는 링크가 있고 anchor 스타일일 때만 의미 있음. 그 외엔 조용히 무시.
+        const linkKw =
+          link && linkStyle === 'anchor' ? it.link_keyword?.trim() || null : null;
+
         cleaned.push({
           n_idx: it.n_idx,
           category: cat,
           keyword: kw,
           title: it.title?.trim() || null,
           scheduled_at: dt,
+          link,
+          link_style: linkStyle,
+          link_keyword: linkKw,
         });
       }
 
@@ -150,13 +185,17 @@ export default async function nblogJobsRoutes(app: FastifyInstance) {
         c.keyword,
         c.title,
         c.scheduled_at,
+        c.link,
+        c.link_style,
+        c.link_keyword,
       ]);
       const conn = await app.db.getConnection();
       let insertedIds: number[] = [];
       try {
         await conn.beginTransaction();
         const [result] = await conn.query<ResultSetHeader>(
-          `INSERT INTO nblog_jobs (n_idx, category, keyword, title, scheduled_at)
+          `INSERT INTO nblog_jobs
+             (n_idx, category, keyword, title, scheduled_at, link, link_style, link_keyword)
            VALUES ?`,
           [values],
         );
@@ -207,7 +246,8 @@ export default async function nblogJobsRoutes(app: FastifyInstance) {
       const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
       const [rows] = await app.db.query<JobWithAccountRow[]>(
-        `SELECT j.id, j.n_idx, j.category, j.keyword, j.title, j.scheduled_at,
+        `SELECT j.id, j.n_idx, j.category, j.keyword, j.title,
+                j.link, j.link_style, j.link_keyword, j.scheduled_at,
                 j.status, j.result_url, j.error, j.published_at,
                 j.created_at, j.updated_at,
                 n.n_id, n.work_user_agent, n.work_profile
@@ -259,7 +299,8 @@ export default async function nblogJobsRoutes(app: FastifyInstance) {
   // ───────────────────────────────────────────────────────────
   app.get('/due', async (_req) => {
     const [rows] = await app.db.query<JobWithAccountRow[]>(
-      `SELECT j.id, j.n_idx, j.category, j.keyword, j.title, j.scheduled_at,
+      `SELECT j.id, j.n_idx, j.category, j.keyword, j.title,
+              j.link, j.link_style, j.link_keyword, j.scheduled_at,
               j.status, j.result_url, j.error, j.published_at,
               j.created_at, j.updated_at,
               n.n_id, n.n_pwd, n.work_user_agent, n.work_profile

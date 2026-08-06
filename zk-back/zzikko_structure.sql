@@ -319,6 +319,9 @@ CREATE TABLE `nblog_jobs` (
   `category` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL,           -- 'cate1'|'cate2'|'cate3'|'cate4'
   `keyword` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,       -- cate3/4 는 INSERT 시 필수, cate1/2 는 워커가 채움
   `title` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,         -- 워커가 생성 후 채움
+  `link` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,          -- 본문에 삽입할 링크 (선택)
+  `link_style` enum('anchor','onbox','nobox') DEFAULT NULL,             -- anchor=키워드에 하이퍼링크, onbox=링크카드, nobox=URL 텍스트
+  `link_keyword` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,  -- anchor 스타일일 때 앵커 텍스트 오버라이드 (비면 keyword 사용)
   `scheduled_at` datetime NOT NULL,                                     -- 예약 발행 시각
   `status` enum('PENDING','PROCESSING','DONE','FAILED') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'PENDING',
   `result_url` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,    -- 발행된 네이버 블로그 글 URL

@@ -128,6 +128,73 @@ function EditableInt({
   );
 }
 
+// 비밀번호 전용 — 자동 저장 X. [변경] 버튼 눌러야 반영됨.
+// 중요 데이터라 blur/Enter 로 실수로 덮어쓰는 걸 막는다.
+function PasswordEditor({
+  value,
+  onSave,
+  disabled,
+}: {
+  value: string;
+  onSave: (v: string) => void;
+  disabled?: boolean;
+}) {
+  const [local, setLocal] = useState(value);
+  useEffect(() => setLocal(value), [value]);
+
+  const dirty = local !== value;
+  const invalid = dirty && local.trim() === "";
+
+  const commit = () => {
+    if (!dirty || invalid) return;
+    onSave(local);
+  };
+  const reset = () => setLocal(value);
+
+  return (
+    <div className="flex items-center gap-1">
+      <input
+        value={local}
+        disabled={disabled}
+        onChange={(e) => setLocal(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") commit();
+          else if (e.key === "Escape") reset();
+        }}
+        className={`flex-1 min-w-0 font-mono text-xs px-2 py-1 rounded border outline-none disabled:opacity-50 ${
+          dirty
+            ? invalid
+              ? "border-red-300 bg-red-50/40"
+              : "border-amber-300 bg-amber-50/40 focus:border-amber-400"
+            : "border-transparent hover:border-slate-200 focus:border-blue-400 focus:bg-white"
+        }`}
+      />
+      {dirty && (
+        <>
+          <button
+            type="button"
+            onClick={commit}
+            disabled={disabled || invalid}
+            title="비밀번호 변경 적용 (Enter)"
+            className="text-[11px] font-bold text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed px-2 py-1 rounded"
+          >
+            변경
+          </button>
+          <button
+            type="button"
+            onClick={reset}
+            disabled={disabled}
+            title="되돌리기 (Esc)"
+            className="text-[11px] font-bold text-slate-400 hover:text-slate-700 px-1"
+          >
+            ↺
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
 function UseStatusBadge({
   v,
   onToggle,
@@ -232,12 +299,11 @@ function NworkRowView({
       <td className="px-3 py-3 text-sm font-bold text-slate-800 whitespace-nowrap">
         {row.n_id}
       </td>
-      <td className="px-2 py-2 hidden md:table-cell min-w-[140px]">
-        <EditableText
+      <td className="px-2 py-2 hidden md:table-cell min-w-[180px]">
+        <PasswordEditor
           value={row.n_pwd}
-          onSave={(v) => v !== null && patch({ n_pwd: v })}
+          onSave={(v) => patch({ n_pwd: v })}
           disabled={isPending}
-          className="w-full font-mono text-xs text-slate-600 px-2 py-1 rounded border border-transparent hover:border-slate-200 focus:border-blue-400 focus:bg-white outline-none disabled:opacity-50"
         />
       </td>
       <td className="px-3 py-3">

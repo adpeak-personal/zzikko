@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/auth";
 
 export type NblogJobCategory = "cate1" | "cate2" | "cate3" | "cate4";
+export type NblogLinkStyle = "anchor" | "onbox" | "nobox";
 
 export interface NblogJobInputItem {
   n_idx: number;
@@ -9,6 +10,10 @@ export interface NblogJobInputItem {
   keyword?: string;
   title?: string;
   scheduled_at: string; // ISO 문자열
+  link?: string;
+  link_style?: NblogLinkStyle;
+  /** anchor 스타일일 때 앵커 텍스트 오버라이드. 비면 워커가 keyword 로 폴백. */
+  link_keyword?: string;
 }
 
 export interface BulkSaveNblogJobsInput {
