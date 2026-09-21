@@ -19,8 +19,16 @@
 #   - 도메인/HTTPS 가 필요하면 앞단에 nginx/traefik 서비스를 추가
 # ============================================================
 
+#
+# 이미지 (GitHub Actions 가 main 푸시마다 GHCR 에 빌드):
+#   docker compose pull && docker compose up -d   # 서버: 빌드 없이 최신 이미지로 교체
+#   docker compose up -d --build                  # 로컬: 소스에서 직접 빌드 (기존 방식)
+#   ZZIKKO_TAG=sha-abc1234 docker compose up -d   # 특정 커밋으로 롤백
+# ============================================================
+
 services:
   backend:
+    image: ghcr.io/adpeak-personal/zzikko-back:${ZZIKKO_TAG:-latest}
     build:
       context: ./zk-back
     container_name: zzikko-back
@@ -54,6 +62,7 @@ services:
       start_period: 10s
 
   frontend:
+    image: ghcr.io/adpeak-personal/zzikko-front:${ZZIKKO_TAG:-latest}
     build:
       context: ./zk-front
     container_name: zzikko-front

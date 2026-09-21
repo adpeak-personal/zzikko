@@ -1,0 +1,66 @@
+name: Build & Push zk-back to GHCR
+
+# 트리거:
+#  · main 푸시     → 배포 가능한 최신 이미지 (latest + git sha 태그)
+#  · dev 푸시      → 테스트용 이미지 (dev + git sha 태그). latest 는 건드리지 않는다
+#  · 수동 실행     → 재빌드가 필요할 때 GitHub Actions 화면에서 바로 실행
+#
+# 모노레포라서 zk-back/ 가 바뀐 푸시에만 돈다 (front 만 고쳤는데 back 을 다시 굽지 않게).
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - "zk-back/**"
+      - ".github/workflows/build-back.yml"
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  # → ghcr.io/<owner>/zzikko-back
+  IMAGE_NAME: ${{ github.repository }}-back
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    # packages: write 가 없으면 GHCR push 가 403 으로 막힌다.
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=dev,enable=${{ github.ref == 'refs/heads/dev' }}
+            type=sha,prefix=sha-,format=short
+
+      # 백엔드 시크릿(DB/카카오/GEMINI 키, GCS 키 파일)은 이미지에 넣지 않는다.
+      # 서버에서 docker-compose 의 env_file / 볼륨 마운트로 런타임에 주입.
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ./zk-back
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # scope 분리 — front 캐시와 서로 덮어쓰지 않게
+          cache-from: type=gha,scope=zk-back
+          cache-to: type=gha,mode=max,scope=zk-back

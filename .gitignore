@@ -2,6 +2,9 @@ node_modules/
 dist/
 *.log
 
+# DB 덤프 백업 (zk-back/zzikko_seed.sql 등 의도된 SQL 은 영향 없음)
+zzikko_backup_*.sql
+
 # env
 .env
 .env.local
