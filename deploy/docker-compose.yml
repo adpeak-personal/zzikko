@@ -1,0 +1,59 @@
+# ============================================================
+# zzikko — 서버 배포용 (소스 없이 GHCR 이미지만 받아서 실행)
+#
+# 이미지는 GitHub Actions 가 main 푸시마다 빌드한다 (.github/workflows/build-*.yml).
+# 로컬에서 소스로 빌드할 때는 루트의 docker-compose.yml 을 쓴다.
+#
+# 서버 배치 (/opt/zzikko):
+#   docker-compose.yml               ← 이 파일
+#   zk-back/.env                     ← DB/카카오/GEMINI/JWT 시크릿 (600)
+#   zk-back/community-gcs-key.json   ← GCS 서비스 계정 키 (600, 반드시 "파일"로 먼저 존재해야 함)
+#   zk-front/.env                    ← 런타임 env (NEXT_PUBLIC_* 는 빌드 때 이미 박혀 있음)
+#
+# 배포 / 롤백:
+#   docker compose pull && docker compose up -d
+#   ZZIKKO_TAG=sha-abc1234 docker compose up -d
+#
+# 외부 노출은 호스트 nginx 가 담당 (zzikko.co.kr: /api/ → 3041, 나머지 → 3040).
+# DB 는 외부 공용 DB 서버 (접속 정보는 zk-back/.env).
+# ============================================================
+
+services:
+  backend:
+    image: ghcr.io/adpeak-personal/zzikko-back:${ZZIKKO_TAG:-latest}
+    container_name: zzikko-back
+    ports:
+      - "127.0.0.1:3041:4000"
+    env_file:
+      - ./zk-back/.env
+    environment:
+      NODE_ENV: production
+      PORT: "4000"
+      HOST: "0.0.0.0"
+      TZ: Asia/Seoul
+      GCS_KEY_FILE: /app/secrets/gcs-key.json
+    volumes:
+      - ./zk-back/community-gcs-key.json:/app/secrets/gcs-key.json:ro
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "wget", "-qO-", "http://localhost:4000/health" ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  frontend:
+    image: ghcr.io/adpeak-personal/zzikko-front:${ZZIKKO_TAG:-latest}
+    container_name: zzikko-front
+    ports:
+      - "127.0.0.1:3040:3040"
+    env_file:
+      - ./zk-front/.env
+    environment:
+      NODE_ENV: production
+      TZ: Asia/Seoul
+      INTERNAL_BACK_API: "http://backend:4000"
+    depends_on:
+      backend:
+        condition: service_started
+    restart: unless-stopped

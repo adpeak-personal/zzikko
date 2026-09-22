@@ -5,6 +5,9 @@ dist/
 # DB 덤프 백업 (zk-back/zzikko_seed.sql 등 의도된 SQL 은 영향 없음)
 zzikko_backup_*.sql
 
+# 서버 전용 스크립트 (인프라 정보 포함, 서버에만 둔다)
+deploy/set-prod-env.sh
+
 # env
 .env
 .env.local

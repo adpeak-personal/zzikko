@@ -3,7 +3,7 @@ import mysql from 'mysql2/promise';
 export const db = mysql.createPool({
   host: process.env.DB_HOST,
   port: Number(process.env.DBPORT || 3306),
-  user: 'root',
+  user: process.env.DB_USER || 'root',
   password: process.env.DBPWD || '',
   database: process.env.SHEMA,
   waitForConnections: true,
