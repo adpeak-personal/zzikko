@@ -1,0 +1,36 @@
+{
+  "name": "@zzikko/backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "찍고 커뮤니티 API 서버 (Fastify + TypeScript + MySQL)",
+  "type": "module",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit",
+    "db:seed": "node scripts/seed.mjs",
+    "db:init": "mysql -u root -p -e \"source src/db/schema.sql\""
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^11.0.2",
+    "@fastify/cors": "^11.3.0",
+    "@fastify/jwt": "^9.1.0",
+    "@fastify/multipart": "^10.1.2",
+    "@fastify/static": "^10.1.4",
+    "@google-cloud/storage": "^8.2.0",
+    "dotenv": "^17.4.2",
+    "fastify": "^5.12.4",
+    "mysql2": "^3.11.5",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "tsx": "^4.23.13",
+    "typescript": "^5.7.3"
+  }
+}

@@ -1,0 +1,17 @@
+# 하위 폴더(frontend/ backend/)에도 각자 .gitignore 가 있다. 여기엔 공통인 것만.
+
+node_modules/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 에디터
+.vscode/
+.idea/
+
+# 비밀값은 .env.local 에만 넣는다 (.env 는 비밀이 아닌 공용 설정이라 올린다)
+.env.local
+.env.*.local
+*-key.json

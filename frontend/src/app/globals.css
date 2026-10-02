@@ -1,0 +1,143 @@
+@import "tailwindcss";
+
+@theme {
+  /* 브랜드 — 로고(찍고 체크마크) 원본 색 #fa6038 = zz-500 */
+  --color-zz-50: #fff4f0;
+  --color-zz-100: #ffe6dc;
+  --color-zz-200: #ffc8b4;
+  --color-zz-300: #ffa183;
+  --color-zz-400: #fd7a50;
+  --color-zz-500: #fa6038;
+  --color-zz-600: #e04521;
+  --color-zz-700: #ba3318;
+  --color-zz-800: #952915;
+  --color-zz-900: #7a2614;
+  --color-zz-950: #420f07;
+
+  /* 판매자·인증 표시 */
+  --color-shop-50: #e9f6f0;
+  --color-shop-500: #1f8f68;
+  --color-shop-700: #14684b;
+
+  /* 바탕 */
+  --color-paper: #f4f5f7;
+
+  --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
+    "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+
+  /* 큼직한 느낌을 위해 기본보다 한 단계 큰 본문 */
+  --text-base: 15px;
+}
+
+body {
+  background: var(--color-paper);
+  color: #16181b;
+  word-break: keep-all;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 썸네일 대체 그라디언트 — 실제 이미지가 붙기 전까지 사용 */
+.thumb-violet { background: linear-gradient(140deg, #a78bfa 0%, #6d28d9 100%); }
+.thumb-rose   { background: linear-gradient(140deg, #fda4af 0%, #be123c 100%); }
+.thumb-teal   { background: linear-gradient(140deg, #5eead4 0%, #0f766e 100%); }
+.thumb-amber  { background: linear-gradient(140deg, #fcd34d 0%, #b45309 100%); }
+.thumb-indigo { background: linear-gradient(140deg, #93c5fd 0%, #3730a3 100%); }
+.thumb-slate  { background: linear-gradient(140deg, #cbd5e1 0%, #334155 100%); }
+.thumb-zz     { background: linear-gradient(140deg, #ffa183 0%, #ba3318 100%); }
+
+.scrollbar-none { scrollbar-width: none; }
+.scrollbar-none::-webkit-scrollbar { display: none; }
+
+/* 글 본문의 줄바꿈 유지 */
+.post-body { white-space: pre-line; }
+
+/* ── 에디터 / 본문 공통 서식 ──────────────────────────────
+   .editor-content : 작성 화면(Tiptap), .post-content : 상세 화면(저장된 HTML)
+   두 곳의 결과가 같아 보이도록 같은 규칙을 함께 적용한다. */
+.editor-content, .post-content {
+  font-size: 15px;
+  line-height: 1.8;
+  color: #1f2933;
+}
+.editor-content > * + *, .post-content > * + * { margin-top: 0.75em; }
+
+.editor-content h2, .post-content h2 { font-size: 1.35em; font-weight: 700; margin-top: 1.4em; }
+.editor-content h3, .post-content h3 { font-size: 1.15em; font-weight: 700; margin-top: 1.2em; }
+
+.editor-content ul, .post-content ul { list-style: disc; padding-left: 1.4em; }
+.editor-content ol, .post-content ol { list-style: decimal; padding-left: 1.4em; }
+.editor-content li > p, .post-content li > p { margin: 0; }
+
+.editor-content blockquote, .post-content blockquote {
+  border-left: 3px solid var(--color-zz-300);
+  background: var(--color-zz-50);
+  padding: 0.6em 1em;
+  border-radius: 0 0.5rem 0.5rem 0;
+  color: #4a5568;
+}
+.editor-content hr, .post-content hr { border: 0; border-top: 1px solid #e5e7eb; margin: 1.5em 0; }
+.editor-content a, .post-content a { color: var(--color-zz-700); text-decoration: underline; }
+.editor-content img, .post-content img { max-width: 100%; height: auto; border-radius: 0.5rem; }
+.editor-content code, .post-content code {
+  background: #f3f4f6; border-radius: 0.25rem; padding: 0.1em 0.35em; font-size: 0.9em;
+}
+.editor-content pre, .post-content pre {
+  background: #1f2328; color: #e5e7eb;
+  padding: 0.9em 1.1em; border-radius: 0.5rem; overflow-x: auto;
+}
+.editor-content pre code, .post-content pre code { background: none; padding: 0; color: inherit; }
+
+/* 표 */
+.editor-content table, .post-content table {
+  border-collapse: collapse;
+  table-layout: fixed;
+  width: 100%;
+  margin: 1em 0;
+  overflow: hidden;
+}
+.editor-content td, .editor-content th,
+.post-content td, .post-content th {
+  border: 1px solid #d5dae1;
+  padding: 0.5em 0.7em;
+  vertical-align: top;
+  position: relative;
+  min-width: 3em;
+}
+.editor-content th, .post-content th {
+  background: var(--color-zz-50);
+  font-weight: 700;
+  text-align: left;
+}
+
+/* 편집 중에만 보이는 셀 선택 / 열 너비 조절 UI */
+.editor-content .selectedCell::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: rgb(250 96 56 / 14%);
+}
+.editor-content .column-resize-handle {
+  position: absolute; right: -2px; top: 0; bottom: -2px; width: 4px;
+  background: var(--color-zz-500); cursor: col-resize;
+}
+.editor-content.resize-cursor { cursor: col-resize; }
+
+/* 빈 문서 placeholder */
+.editor-content p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: #9ca3af;
+  float: left;
+  height: 0;
+  pointer-events: none;
+  white-space: pre-line;
+}
+
+/* ── 에디터 이미지 (크기 조절 / 정렬) ───────────────────── */
+/* 노드뷰 래퍼는 flex 라 정렬이 justify-content 로 처리된다 */
+.editor-content .editor-image { margin: 0.75em 0; }
+
+/* 읽기 화면은 노드뷰가 없으므로 style="text-align" 으로 정렬한다 */
+.post-content img { display: block; max-width: 100%; height: auto; }
+.post-content img[style*="text-align:center"],
+.post-content img[style*="text-align: center"] { margin-left: auto; margin-right: auto; }
+.post-content img[style*="text-align:right"],
+.post-content img[style*="text-align: right"] { margin-left: auto; margin-right: 0; }
+.post-content table { display: table; }

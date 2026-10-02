@@ -1,0 +1,10 @@
+node_modules/
+dist/
+uploads/
+*.log
+
+# 비밀값은 .env.local 에만. .env 는 비밀이 아닌 공용 설정이라 같이 올린다.
+.env.local
+.env.*.local
+gcs-key.json
+*-key.json
