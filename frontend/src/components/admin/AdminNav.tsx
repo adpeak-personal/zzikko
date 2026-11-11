@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BarChart3, Flag, LayoutDashboard, ListTree, MessageSquare, Newspaper, Scale, Settings, Store, Users } from 'lucide-react';
+import { BarChart3, Flag, KeyRound, LayoutDashboard, ListTree, MessageSquare, Newspaper, Scale, Settings, Store, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // 아이콘 컴포넌트는 서버→클라이언트로 넘길 수 없어서 메뉴 정의를 이 파일에 둔다
@@ -27,6 +27,11 @@ const SECTIONS = [
       { href: '/admin/users', label: '회원 관리', icon: Users, soon: true },
       { href: '/admin/shops', label: '판매자 인증', icon: Store, soon: true },
     ],
+  },
+  {
+    // 블로그 · 밴드 등 외부 자동화 프로그램의 작업 근거지
+    title: '작업',
+    items: [{ href: '/admin/nwork', label: '네이버 계정', icon: KeyRound }],
   },
   {
     title: '기타',

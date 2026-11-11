@@ -314,3 +314,27 @@ CREATE TABLE uploads (
   CONSTRAINT fk_uploads_user FOREIGN KEY (uploader_id) REFERENCES users (id) ON DELETE SET NULL,
   CONSTRAINT fk_uploads_post FOREIGN KEY (post_id)     REFERENCES posts (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- ─────────────────────────────────────────────────────────────
+-- 네이버 작업 계정 (nwork) — 블로그·밴드 등 외부 프로그램이 쓰는 계정
+-- 옛 찍고 DB 에서 옮겨 온 실데이터가 들어 있다. 위쪽 DROP 목록에 넣지 말 것 —
+-- 이 파일을 다시 돌려도 지워지지 않게 "없을 때만" 만든다.
+-- 컬럼 이름은 외부 프로그램이 그대로 쓰므로 바꾸지 않는다.
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS nwork (
+  n_idx           INT          NOT NULL AUTO_INCREMENT,
+  n_id            VARCHAR(100) NOT NULL,
+  n_pwd           VARCHAR(100) NOT NULL,
+  n_memo1         VARCHAR(255) DEFAULT NULL,
+  n_memo2         VARCHAR(255) DEFAULT NULL,
+  n_memo3         VARCHAR(255) DEFAULT NULL,
+  last_login_chk  DATETIME     DEFAULT NULL,
+  n_lastwork_at   DATETIME     DEFAULT NULL,
+  use_status      TINYINT(1)   NOT NULL DEFAULT 0,
+  task_role       VARCHAR(20)  NOT NULL DEFAULT '미사용',
+  work_used       TINYINT(1)   NOT NULL DEFAULT 0,
+  work_user_agent INT          DEFAULT NULL,
+  work_profile    VARCHAR(100) DEFAULT NULL,
+  PRIMARY KEY (n_idx),
+  UNIQUE KEY n_id (n_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

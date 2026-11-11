@@ -172,3 +172,34 @@ export interface Paged<T> {
   page: number;
   size: number;
 }
+
+/* ── 네이버 작업 계정 (nwork) — 어드민 전용 ── */
+
+export interface NworkAccount {
+  id: number;
+  /** 네이버 아이디 */
+  loginId: string;
+  /** 메모1 — 보통 이름 / 생년 / 이메일 */
+  memo1: string;
+  /** 메모2 — 최근 작업 기록 (예: "25-11-12 작업 완료") */
+  memo2: string;
+  memo3: string;
+  /** 'YYYY-MM-DD HH:MM:SS' */
+  lastLoginCheckAt: string | null;
+  lastWorkAt: string | null;
+  /** 로그인 가능한 계정인지 (막히면 false) */
+  usable: boolean;
+  /** 용도 — 미사용 · 밴드 · 블로그준비 · 블로그 … */
+  role: string;
+  /** 지금 어떤 프로그램이 쓰고 있는지 */
+  working: boolean;
+  userAgentId: number | null;
+  profile: string | null;
+}
+
+export interface NworkSummary {
+  total: number;
+  usable: number;
+  working: number;
+  roles: { role: string; count: number }[];
+}

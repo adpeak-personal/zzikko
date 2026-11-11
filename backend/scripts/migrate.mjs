@@ -75,6 +75,30 @@ const steps = [
        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`,
     ],
   },
+  {
+    // 운영 DB 에는 옛 찍고에서 옮긴 실데이터로 이미 있다 — 새로 까는 DB 에만 만들어진다
+    name: 'nwork — 네이버 작업 계정',
+    check: (c) => hasTable(c, 'nwork'),
+    sql: [
+      `CREATE TABLE IF NOT EXISTS nwork (
+         n_idx           INT          NOT NULL AUTO_INCREMENT,
+         n_id            VARCHAR(100) NOT NULL,
+         n_pwd           VARCHAR(100) NOT NULL,
+         n_memo1         VARCHAR(255) DEFAULT NULL,
+         n_memo2         VARCHAR(255) DEFAULT NULL,
+         n_memo3         VARCHAR(255) DEFAULT NULL,
+         last_login_chk  DATETIME     DEFAULT NULL,
+         n_lastwork_at   DATETIME     DEFAULT NULL,
+         use_status      TINYINT(1)   NOT NULL DEFAULT 0,
+         task_role       VARCHAR(20)  NOT NULL DEFAULT '미사용',
+         work_used       TINYINT(1)   NOT NULL DEFAULT 0,
+         work_user_agent INT          DEFAULT NULL,
+         work_profile    VARCHAR(100) DEFAULT NULL,
+         PRIMARY KEY (n_idx),
+         UNIQUE KEY n_id (n_id)
+       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`,
+    ],
+  },
 ];
 
 async function hasColumn(conn, table, column) {
