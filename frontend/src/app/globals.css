@@ -141,3 +141,24 @@ body {
 .post-content img[style*="text-align:right"],
 .post-content img[style*="text-align: right"] { margin-left: auto; margin-right: 0; }
 .post-content table { display: table; }
+
+/* 범위 선택에 걸린 이미지 — 글자처럼 파랗게 덮는다 (editor/extensions/SelectionDecoration)
+   덮개는 이미지 크기에 맞는 상자(.editor-image-box)에만 씌운다.
+   바깥 래퍼에 씌우면 이미지 옆 빈 공간까지 파래진다.
+   브랜드색(주황) 대신 브라우저 글자 선택과 같은 파랑을 쓴다 — 브랜드색으로 덮으면
+   사진이 "탁해진" 것처럼만 보이고 선택으로 안 읽힌다. */
+.editor-content .is-range-selected .editor-image-box::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 0.5rem;
+  background: rgb(59 130 246 / 0.45);
+  box-shadow: inset 0 0 0 2px rgb(59 130 246 / 0.9);
+  pointer-events: none;
+}
+
+/* 구분선은 덮을 면적이 없어 선 색으로 표시한다 */
+.editor-content hr.is-range-selected,
+.editor-content .is-range-selected hr {
+  border-top-color: rgb(59 130 246 / 0.9);
+}

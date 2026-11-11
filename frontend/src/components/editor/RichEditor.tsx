@@ -6,6 +6,7 @@ import { Placeholder } from "@tiptap/extension-placeholder";
 import { ImageView } from "./nodes/ImageView";
 import { ResizableImage, schemaExtensions } from "./schema";
 import { StickyAlign } from "./extensions/StickyAlign";
+import { SelectionDecoration } from "./extensions/SelectionDecoration";
 import { Toolbar } from "./toolbar/Toolbar";
 import { HtmlSource } from "./HtmlSource";
 import { ACCEPTED_IMAGE_TYPES, useImageUpload } from "./hooks/useImageUpload";
@@ -44,6 +45,8 @@ export function RichEditor({
       Placeholder.configure({ placeholder: placeholder ?? "내용을 입력하세요." }),
       // 고른 정렬이 다음 줄에도 이어지게 한다 (스키마 아님 — 편집 동작)
       StickyAlign,
+      // 전체 선택했을 때 이미지도 선택된 것으로 보이게
+      SelectionDecoration,
     ],
     content: defaultValue,
     editorProps: {

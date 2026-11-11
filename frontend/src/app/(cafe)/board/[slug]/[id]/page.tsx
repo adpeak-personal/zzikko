@@ -8,6 +8,7 @@ import type { Chipset, DealInfo, NewsArticle, PhoneSpec } from '@/lib/types';
 import { PostBody } from '@/components/board/PostBody';
 import { CommentSection } from '@/components/board/CommentSection';
 import { LikeButton } from '@/components/board/LikeButton';
+import { PostActions, ScrapButton } from '@/components/board/PostActions';
 import { NewsDetail } from '@/components/news/NewsDetail';
 import { SpecDetail } from '@/components/specs/SpecDetail';
 import { Avatar, Card, CarrierTag, LevelBadge, SellerBadge, Tag } from '@/components/ui';
@@ -113,6 +114,11 @@ export default async function PostPage({ params }: Params) {
                 </span>
               </div>
             </div>
+
+            {/* 수정·삭제는 본인과 운영진만 — 서버도 다시 확인한다 */}
+            {me && (me.id === post.authorId || me.role === '운영진') && (
+              <PostActions postId={post.id} boardSlug={post.boardSlug} />
+            )}
           </div>
         </header>
 
@@ -136,7 +142,8 @@ export default async function PostPage({ params }: Params) {
         )}
 
         <div className="flex items-center justify-center gap-2 border-t border-gray-100 py-5">
-          <LikeButton postId={post.id} likes={post.likes} canLike={Boolean(me)} />
+          <LikeButton postId={post.id} likes={post.likes} canLike={Boolean(me)} initialLiked={post.liked ?? false} />
+          <ScrapButton postId={post.id} initialScrapped={post.scrapped ?? false} canScrap={Boolean(me)} />
           <Link
             href={`/board/${post.boardSlug}`}
             className="flex items-center gap-1.5 rounded-xl border border-gray-200 px-5 py-2.5 font-bold text-gray-700 hover:border-gray-300"
@@ -146,7 +153,7 @@ export default async function PostPage({ params }: Params) {
         </div>
       </Card>
 
-      <CommentSection postId={post.id} comments={comments} canWrite={Boolean(me)} />
+      <CommentSection postId={post.id} postAuthorId={post.authorId} comments={comments} me={me} />
 
       {others.length > 0 && (
         <Card>

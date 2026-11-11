@@ -7,6 +7,37 @@ import type { UploadImage } from "../types";
 export const ACCEPTED_IMAGE_TYPES = "image/jpeg,image/png,image/gif,image/webp";
 
 /**
+ * 방금 넣은 이미지 뒤로 커서를 옮긴다.
+ *
+ * 위치를 미리 계산해 두지 않고 src 로 찾는다 — 업로드 주소에 UUID 가 들어 있어
+ * 문서에서 유일하고, ProseMirror 가 삽입 위치를 조정해도 안전하게 찾을 수 있다.
+ */
+function placeCursorAfterImage(editor: Editor, src: string, textAlign: string | null) {
+  let after: number | null = null;
+  editor.state.doc.descendants((node, pos) => {
+    if (after !== null) return false;
+    if (node.type.name === "image" && node.attrs.src === src) {
+      after = pos + node.nodeSize;
+      return false;
+    }
+    return true;
+  });
+  if (after === null) return;
+
+  // 이미지가 마지막이거나 뒤가 또 이미지면 글을 이어 쓸 자리가 없다 — 문단을 만들어 준다
+  const next = editor.state.doc.resolve(after).nodeAfter;
+  const chain = editor.chain();
+  if (!next?.isTextblock) {
+    chain.insertContentAt(after, {
+      type: "paragraph",
+      ...(textAlign ? { attrs: { textAlign } } : {}),
+    });
+  }
+  // 문단 안쪽(+1)으로 커서를 넣는다
+  chain.setTextSelection(after + 1).run();
+}
+
+/**
  * 이미지 업로드 + 본문 삽입.
  *
  * 툴바 버튼, 붙여넣기, 드래그&드롭 세 경로가 모두 이 훅을 쓴다.
@@ -39,6 +70,10 @@ export function useImageUpload(editor: Editor | null, uploadImage?: UploadImage)
             .focus()
             .setImage({ src: url, alt: file.name, ...(textAlign ? { textAlign } : {}) })
             .run();
+
+          // 삽입 직후 커서는 이미지 '앞' 에 남는다 — 그 상태로 엔터를 치면
+          // 새 줄이 이미지 위에 생긴다. 이어서 쓸 수 있게 뒤로 옮겨 준다.
+          placeCursorAfterImage(editor, url, textAlign);
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "이미지 업로드에 실패했어요.");

@@ -83,6 +83,9 @@ export interface Post {
   likes: number;
   commentCount: number;
   createdAt: string;
+  /** 로그인한 사람이 상세를 열었을 때만 채워진다 — 목록에는 없다 */
+  liked?: boolean;
+  scrapped?: boolean;
   deal?: DealInfo;
 }
 
@@ -94,6 +97,8 @@ export interface Comment {
   parentId: number | null;
   content: string;
   likes: number;
+  /** 로그인한 사람이 읽을 때만 채워진다 */
+  liked?: boolean;
   createdAt: string;
 }
 

@@ -76,8 +76,10 @@ export function ImageView({ node, updateAttributes, selected, editor }: NodeView
     >
       <div
         ref={wrapperRef}
+        // editor-image-box 는 이미지 크기에 딱 맞는 상자다 —
+        // 범위 선택 표시(globals.css)가 이 상자에만 덮이도록 붙여 둔 이름
         className={cn(
-          "relative inline-block max-w-full leading-none",
+          "editor-image-box relative inline-block max-w-full leading-none",
           selected && "outline outline-2 outline-offset-2 outline-zz-500",
         )}
         style={{ width: shownWidth ? `${shownWidth}%` : undefined }}

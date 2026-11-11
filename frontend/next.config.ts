@@ -1,6 +1,9 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
+  // Docker 이미지용. .next/standalone 에 실행에 필요한 파일만 모인다 (frontend/Dockerfile).
+  output: 'standalone',
+  // rewrites 는 빌드할 때 박힌다 — Docker 빌드에서는 API_URL 을 빌드 인자로 넘긴다.
   async rewrites() {
     const api = process.env.API_URL ?? 'http://127.0.0.1:4080';
     return [

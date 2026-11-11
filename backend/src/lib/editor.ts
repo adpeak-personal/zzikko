@@ -53,6 +53,24 @@ export function findFirstImage(doc: unknown): string | null {
   return found;
 }
 
+/**
+ * 본문에 쓰인 이미지 주소를 등장 순서대로 모은다.
+ *
+ * 글을 등록할 때 "이 글이 실제로 쓰는 이미지" 를 가려내는 데 쓴다.
+ * 여기 없는 이미지는 올렸다가 지운 것이므로 청소 대상이 된다.
+ */
+export function collectImages(doc: unknown): string[] {
+  const found: string[] = [];
+
+  const walk = (node: Node) => {
+    if (node.type === 'image' && typeof node.attrs?.src === 'string') found.push(node.attrs.src);
+    node.content?.forEach(walk);
+  };
+
+  if (doc && typeof doc === 'object') walk(doc as Node);
+  return found;
+}
+
 /** 빈 본문인지 — 글자도 이미지도 없으면 비어 있는 것으로 본다 */
 export function isEmptyDoc(doc: unknown): boolean {
   return toPlainText(doc).length === 0 && findFirstImage(doc) === null;

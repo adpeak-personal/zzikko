@@ -1,7 +1,8 @@
 import Link from 'next/link';
-import { ChevronRight, List, LogIn, PenSquare } from 'lucide-react';
+import { ChevronRight, LogIn, PenSquare } from 'lucide-react';
 import { getBoardGroups, getCurrentUser, getPosts, getShops } from '@/lib/data';
 import { Avatar, LevelBadge } from '@/components/ui';
+import { SidebarBoards } from './SidebarNav';
 import { formatNumber } from '@/lib/utils';
 
 export async function Sidebar() {
@@ -60,29 +61,7 @@ export async function Sidebar() {
         </Link>
       </section>
 
-      {/* 게시판 */}
-      <nav className="rounded-2xl border border-gray-200 bg-white py-2">
-        <Link href="/board/all" className="mx-2 mb-1 flex items-center gap-2 rounded-xl px-3 py-2.5 font-bold text-gray-900 hover:bg-gray-50">
-          <List size={16} className="text-gray-400" /> 전체글보기
-        </Link>
-        {boardGroups.map((group) => (
-          <div key={group.id} className="border-t border-gray-100 py-1.5">
-            <p className="px-5 py-1 text-xs font-bold text-gray-400">{group.name}</p>
-            <ul>
-              {group.boards.map((board) => (
-                <li key={board.id}>
-                  <Link
-                    href={`/board/${board.slug}`}
-                    className="flex items-center justify-between px-5 py-1.5 text-[15px] text-gray-700 hover:bg-zz-50 hover:text-zz-700"
-                  >
-                    <span>{board.name}</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
-      </nav>
+      <SidebarBoards boardGroups={boardGroups} />
 
       {/* 커뮤니티 현황 */}
       <section className="rounded-2xl border border-gray-200 bg-white px-4 py-3.5">

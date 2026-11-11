@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { PenSquare, Search } from 'lucide-react';
 import { apiGet } from '@/lib/api.server';
-import { getBoard, getBoards, getPosts, getShops } from '@/lib/data';
+import { getBoard, getBoards, getPosts, getShops, type PostQuery } from '@/lib/data';
 import type { Board, Chipset, NewsArticle, PhoneSpec } from '@/lib/types';
 import { PostTable } from '@/components/board/PostTable';
 import { DealTable } from '@/components/board/DealTable';
@@ -23,7 +23,7 @@ const ALL_BOARD: Board = {
   writeMode: 'editor',
 };
 
-type Params = { params: Promise<{ slug: string }>; searchParams: Promise<{ page?: string; category?: string; q?: string }> };
+type Params = { params: Promise<{ slug: string }>; searchParams: Promise<{ page?: string; category?: string; q?: string; scope?: string }> };
 
 async function loadBoard(slug: string) {
   return slug === 'all' ? ALL_BOARD : await getBoard(slug);
@@ -36,7 +36,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 
 export default async function BoardPage({ params, searchParams }: Params) {
   const { slug } = await params;
-  const { page: pageParam, category, q } = await searchParams;
+  const { page: pageParam, category, q, scope } = await searchParams;
   const board = await loadBoard(slug);
   if (!board) notFound();
 
@@ -48,7 +48,10 @@ export default async function BoardPage({ params, searchParams }: Params) {
 
   const hrefWith = (next: Record<string, string | undefined>) => {
     const search = new URLSearchParams();
-    Object.entries({ category, q, ...next }).forEach(([key, value]) => value && search.set(key, value));
+    // 범위는 검색어가 있을 때만 의미가 있다
+    Object.entries({ category, q, scope: q ? scope : undefined, ...next }).forEach(
+      ([key, value]) => value && search.set(key, value),
+    );
     const text = search.toString();
     return `/board/${slug}${text ? `?${text}` : ''}`;
   };
@@ -60,7 +63,14 @@ export default async function BoardPage({ params, searchParams }: Params) {
 
   const result = isContentBoard
     ? { items: [], notices: [], total: 0 }
-    : await getPosts({ boardSlug: slug === 'all' ? undefined : slug, category, q, page, size });
+    : await getPosts({
+        boardSlug: slug === 'all' ? undefined : slug,
+        category,
+        q,
+        scope: q ? (scope as PostQuery['scope']) : undefined,
+        page,
+        size,
+      });
 
   const shops = board.type === 'deal' ? await getShops() : [];
   const boardNames =
@@ -122,6 +132,16 @@ export default async function BoardPage({ params, searchParams }: Params) {
           <Pagination page={page} total={result.total} size={size} makeHref={(p) => hrefWith({ page: String(p) })} />
 
           <form className="mx-auto mt-5 flex max-w-md gap-2" action={`/board/${slug}`}>
+            <select
+              name="scope"
+              defaultValue={scope ?? 'title_content'}
+              className="rounded-lg border border-gray-200 bg-white px-2 text-sm text-gray-600"
+            >
+              <option value="title_content">제목+내용</option>
+              <option value="title">제목</option>
+              <option value="content">내용</option>
+              <option value="author">작성자</option>
+            </select>
             <input
               name="q"
               defaultValue={q}

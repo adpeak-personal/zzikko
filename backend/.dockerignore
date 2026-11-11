@@ -1,0 +1,9 @@
+node_modules
+dist
+uploads
+*.log
+# 로컬 설정(HOST=127.0.0.1 등)과 비밀값이 이미지에 들어가지 않게
+.env
+.env.*
+gcs-key.json
+*-key.json

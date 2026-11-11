@@ -1,0 +1,43 @@
+# 찍고 — 서버 배포용 (141.164.60.58:/opt/zzikko). 소스 없이 GHCR 이미지만 받는다.
+# 워크플로가 이 파일과 deploy.sh 를 서버로 복사한 뒤 deploy.sh 를 돌린다.
+#
+# 서버에만 있는 것 (git 에 없음):
+#   /opt/zzikko/.env.back   DATABASE_URL · JWT_SECRET · CORS_ORIGIN (600)
+#   /opt/zzikko/uploads/    업로드 이미지 (node 1000:1000 소유)
+#
+# 외부 노출은 호스트 nginx (zzikko.co.kr): /api/ → 3041, 나머지 → 3040.
+# DB 는 공용 DB 서버 158.247.244.167 의 zzikko_cafe.
+#
+# 롤백:  ZZIKKO_TAG=sha-<커밋> bash /opt/zzikko/deploy.sh
+
+name: zzikko
+
+services:
+  back:
+    image: ghcr.io/adpeak-personal/zzikko-back:${ZZIKKO_TAG:-latest}
+    container_name: zzikko-back
+    restart: unless-stopped
+    env_file:
+      - ./.env.back
+    environment:
+      NODE_ENV: production
+      HOST: "0.0.0.0"
+      PORT: "4080"
+      UPLOAD_DIR: uploads
+    volumes:
+      - ./uploads:/app/uploads
+    ports:
+      - "127.0.0.1:3041:4080"
+
+  front:
+    image: ghcr.io/adpeak-personal/zzikko-front:${ZZIKKO_TAG:-latest}
+    container_name: zzikko-front
+    restart: unless-stopped
+    environment:
+      # 서버 컴포넌트가 백엔드를 직접 부를 때 쓰는 주소 (src/lib/api.server.ts)
+      API_URL: http://back:4080
+    depends_on:
+      back:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:3040:4050"

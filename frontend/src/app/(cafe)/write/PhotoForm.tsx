@@ -39,13 +39,56 @@ function toDoc(photos: PhotoItem[], text: string): JSONContent {
   return { type: 'doc', content };
 }
 
-export function PhotoForm({ boardGroups, board }: { boardGroups: BoardGroup[]; board: Board }) {
+/**
+ * 저장된 문서를 다시 사진 + 글로 되돌린다 (수정 화면용).
+ *
+ * toDoc 의 역함수다 — 첫 이미지 앞까지가 본문 글, 이미지 뒤에 붙은 가운데 정렬 문단은
+ * 그 사진의 설명이다. 다른 화면(에디터)에서 쓴 글을 여기로 열면 구조가 다를 수 있으므로,
+ * 알아볼 수 있는 것만 살리고 나머지는 글로 모은다.
+ */
+function fromDoc(doc: JSONContent | null | undefined): { photos: PhotoItem[]; text: string } {
+  const photos: PhotoItem[] = [];
+  const lines: string[] = [];
+  let seenImage = false;
+
+  for (const node of doc?.content ?? []) {
+    if (node.type === 'image' && typeof node.attrs?.src === 'string') {
+      seenImage = true;
+      photos.push({ id: `${photos.length}-${node.attrs.src}`, url: node.attrs.src, caption: '' });
+      continue;
+    }
+
+    const text = (node.content ?? []).map((c) => (typeof c.text === 'string' ? c.text : '')).join('');
+
+    // 사진 바로 뒤의 가운데 정렬 문단은 그 사진의 설명
+    const last = photos[photos.length - 1];
+    if (seenImage && last && !last.caption && node.attrs?.textAlign === 'center' && text) {
+      last.caption = text;
+      continue;
+    }
+    if (!seenImage) lines.push(text);
+  }
+
+  return { photos, text: lines.join('\n').trim() };
+}
+
+export function PhotoForm({
+  boardGroups,
+  board,
+  editing,
+}: {
+  boardGroups: BoardGroup[];
+  board: Board;
+  /** 넘어오면 수정 모드 — 같은 폼을 쓰고 전송만 PATCH 로 바뀐다 */
+  editing?: Post;
+}) {
   const router = useRouter();
-  const [boardSlug, setBoardSlug] = useState(board.slug);
-  const [category, setCategory] = useState('');
-  const [title, setTitle] = useState('');
-  const [photos, setPhotos] = useState<PhotoItem[]>([]);
-  const [text, setText] = useState('');
+  const initial = fromDoc(editing?.contentJson as JSONContent | undefined);
+  const [boardSlug, setBoardSlug] = useState(editing?.boardSlug ?? board.slug);
+  const [category, setCategory] = useState(editing?.category ?? '');
+  const [title, setTitle] = useState(editing?.title ?? '');
+  const [photos, setPhotos] = useState<PhotoItem[]>(initial.photos);
+  const [text, setText] = useState(initial.text);
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
 
@@ -61,19 +104,28 @@ export function PhotoForm({ boardGroups, board }: { boardGroups: BoardGroup[]; b
 
     setSending(true);
     try {
-      const post = await apiFetch<Post>('/posts', {
-        method: 'POST',
-        body: JSON.stringify({
-          boardSlug,
-          title: title.trim(),
-          category: category || undefined,
-          contentJson: toDoc(photos, text),
-        }),
-      });
-      router.push(`/board/${post.boardSlug}/${post.id}`);
+      const doc = toDoc(photos, text);
+      const post = editing
+        ? await apiFetch<Post>(`/posts/${editing.id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ title: title.trim(), category: category || null, contentJson: doc }),
+          })
+        : await apiFetch<Post>('/posts', {
+            method: 'POST',
+            body: JSON.stringify({
+              boardSlug,
+              title: title.trim(),
+              category: category || undefined,
+              contentJson: doc,
+            }),
+          });
+
+      router.replace(`/board/${post.boardSlug}/${post.id}`);
       router.refresh();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : '글을 등록하지 못했어요.');
+      setError(
+        err instanceof ApiError ? err.message : editing ? '글을 수정하지 못했어요.' : '글을 등록하지 못했어요.',
+      );
       setSending(false);
     }
   };
@@ -90,6 +142,7 @@ export function PhotoForm({ boardGroups, board }: { boardGroups: BoardGroup[]; b
           setCategory('');
         }}
         onCategoryChange={setCategory}
+        lockBoard={Boolean(editing)}
       />
 
       <input

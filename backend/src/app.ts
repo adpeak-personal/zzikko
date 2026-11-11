@@ -10,6 +10,7 @@ import { sendError } from './lib/http.js';
 import { loadUser } from './lib/auth.js';
 import routes from './routes/index.js';
 import { UPLOAD_DIR, storageDescription, usingGcs } from './lib/storage.js';
+import { startMaintenance } from './lib/maintenance.js';
 
 /**
  * 모든 API 는 /api/v1 아래에 있다.
@@ -58,6 +59,9 @@ export async function buildApp({ logger = true } = {}) {
   app.setNotFoundHandler((_request, reply) => reply.code(404).send({ message: '없는 주소입니다.' }));
 
   await app.register(routes, { prefix: '/api/v1' });
+
+  // 글에 안 쓰인 이미지를 주기적으로 지운다
+  startMaintenance(app);
 
   return app;
 }

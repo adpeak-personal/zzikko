@@ -1,4 +1,4 @@
-import { query } from './api';
+import { ApiError, query } from './api';
 import { apiGet, apiGetOrNull } from './api.server';
 import type { Board, BoardGroup, Comment, Me, Paged, Post, PublicUser, Shop } from './types';
 
@@ -7,9 +7,23 @@ import type { Board, BoardGroup, Comment, Me, Paged, Post, PublicUser, Shop } fr
  * 화면은 백엔드 주소나 응답 형태를 직접 알 필요 없이 이 파일만 호출한다.
  */
 
+/**
+ * 게시판 목록.
+ *
+ * 헤더·사이드바가 모든 화면에서 부르므로, 백엔드에 닿지 못하면 메뉴만 비우고 넘어간다 —
+ * 백엔드를 재시작하는 동안 사이트 전체가 에러 화면이 되지 않게.
+ * (로그인 확인인 getCurrentUser 도 같은 이유로 실패를 삼킨다.)
+ */
 export async function getBoardGroups(): Promise<BoardGroup[]> {
-  const { items } = await apiGet<{ items: BoardGroup[] }>('/boards');
-  return items;
+  try {
+    const { items } = await apiGet<{ items: BoardGroup[] }>('/boards');
+    return items;
+  } catch (error) {
+    // 서버가 살아서 에러를 준 거라면 진짜 문제다 — 그건 그대로 터뜨린다
+    if (error instanceof ApiError) throw error;
+    console.warn('[getBoardGroups] 백엔드에 닿지 못했습니다', error);
+    return [];
+  }
 }
 
 export async function getBoards(): Promise<Board[]> {
@@ -20,11 +34,32 @@ export async function getBoard(slug: string): Promise<Board | null> {
   return apiGetOrNull<Board>(`/boards/${encodeURIComponent(slug)}`);
 }
 
+/**
+ * 수정 화면이 쓸 원본.
+ *
+ * 남의 글이면 서버가 403 을 준다 — 존재를 알려줄 필요가 없으니 null 로 덮는다.
+ */
+export async function getPostForEdit(id: number): Promise<Post | null> {
+  try {
+    return await apiGet<Post>(`/posts/${id}/edit`);
+  } catch (err) {
+    if (err instanceof ApiError && (err.status === 403 || err.status === 404)) return null;
+    throw err;
+  }
+}
+
+/** 내가 스크랩한 글 */
+export async function getMyScraps(page = 1, size = 20): Promise<Paged<Post>> {
+  return apiGet<Paged<Post>>(`/me/scraps${query({ page, size })}`);
+}
+
 export interface PostQuery {
   boardSlug?: string;
   category?: string;
   region?: string;
   q?: string;
+  /** 검색 범위 — 기본은 제목+내용 */
+  scope?: 'title_content' | 'title' | 'content' | 'author';
   authorId?: number;
   shopId?: number;
   sort?: 'latest' | 'popular';

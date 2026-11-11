@@ -7,14 +7,25 @@ import { apiFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 /** 좋아요 토글 — 로그인 안 했으면 로그인 화면으로 보낸다 */
-export function LikeButton({ postId, likes, canLike }: { postId: number; likes: number; canLike: boolean }) {
+export function LikeButton({
+  postId,
+  likes,
+  canLike,
+  initialLiked = false,
+}: {
+  postId: number;
+  likes: number;
+  canLike: boolean;
+  /** 서버가 알려준 "내가 이미 눌렀는지" — 없으면 안 누른 것으로 본다 */
+  initialLiked?: boolean;
+}) {
   const router = useRouter();
-  const [state, setState] = useState({ likes, liked: false });
+  const [state, setState] = useState({ likes, liked: initialLiked });
   const [busy, setBusy] = useState(false);
 
   const onClick = async () => {
     if (!canLike) {
-      router.push(`/login?next=/board`);
+      router.push(`/login?next=${encodeURIComponent(location.pathname)}`);
       return;
     }
     setBusy(true);

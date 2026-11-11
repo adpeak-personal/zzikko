@@ -1,11 +1,9 @@
 // 초기 데이터 넣기 — `npm run db:seed`
 // 스키마(src/db/schema.sql)를 적용한 뒤에 실행한다. 여러 번 돌려도 되도록 기존 데이터를 비우고 넣는다.
 // 모두 예시 데이터이며 실제 매장·시세·사양이 아니다.
-import { config as loadEnv } from 'dotenv';
+import { loadEnv } from './env.mjs';
 
-// src/env.ts 와 같은 순서 — 한쪽만 고치지 말 것
-loadEnv({ quiet: true });
-loadEnv({ path: '.env.local', override: true, quiet: true });
+loadEnv();
 import { createPool } from 'mysql2/promise';
 import { randomBytes, scrypt as scryptCb } from 'node:crypto';
 import { promisify } from 'node:util';

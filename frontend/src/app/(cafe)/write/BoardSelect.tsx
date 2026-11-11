@@ -10,6 +10,7 @@ export function BoardSelect({
   categories,
   onBoardChange,
   onCategoryChange,
+  lockBoard = false,
 }: {
   boardGroups: BoardGroup[];
   boardSlug: string;
@@ -17,6 +18,8 @@ export function BoardSelect({
   categories?: string[];
   onBoardChange: (slug: string) => void;
   onCategoryChange: (category: string) => void;
+  /** 수정일 때 — 게시판 이동은 지원하지 않는다 (게시판마다 글쓰기 권한이 다르다) */
+  lockBoard?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-2 sm:flex-row">
@@ -24,7 +27,8 @@ export function BoardSelect({
         name="board"
         value={boardSlug}
         onChange={(e) => onBoardChange(e.target.value)}
-        className="rounded-lg border border-gray-200 px-3 py-2.5 text-sm sm:w-56"
+        disabled={lockBoard}
+        className="rounded-lg border border-gray-200 px-3 py-2.5 text-sm disabled:bg-gray-50 disabled:text-gray-500 sm:w-56"
       >
         {boardGroups.map((group) => (
           <optgroup key={group.id} label={group.name}>

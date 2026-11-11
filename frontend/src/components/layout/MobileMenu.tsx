@@ -6,6 +6,8 @@ import { usePathname } from 'next/navigation';
 import { Menu, PenSquare, X } from 'lucide-react';
 import { SITE } from '@/config/brand';
 import type { BoardGroup } from '@/lib/types';
+import { isActive } from '@/lib/menu';
+import { cn } from '@/lib/utils';
 import { BrandLogo } from './Logo';
 
 const TOOLS = [{ href: '/write', label: '글쓰기', icon: PenSquare }];
@@ -51,17 +53,34 @@ export function MobileMenu({ boardGroups }: { boardGroups: BoardGroup[] }) {
 
             <div className="min-h-0 flex-1 overflow-y-auto px-2 py-3">
               <ul className="mb-3">
-                {TOOLS.map((tool) => (
-                  <li key={tool.href}>
-                    <Link href={tool.href} className="flex items-center gap-2.5 rounded-xl px-3 py-3 font-semibold text-gray-800 hover:bg-zz-50">
-                      <tool.icon size={17} className="text-zz-500" />
-                      {tool.label}
-                    </Link>
-                  </li>
-                ))}
+                {TOOLS.map((tool) => {
+                  const active = isActive(pathname, tool.href);
+                  return (
+                    <li key={tool.href}>
+                      <Link
+                        href={tool.href}
+                        aria-current={active ? 'page' : undefined}
+                        className={cn(
+                          'flex items-center gap-2.5 rounded-xl px-3 py-3 font-semibold transition',
+                          active ? 'bg-zz-50 text-zz-700' : 'text-gray-800 hover:bg-zz-50',
+                        )}
+                      >
+                        <tool.icon size={17} className={active ? 'text-zz-600' : 'text-zz-500'} />
+                        {tool.label}
+                      </Link>
+                    </li>
+                  );
+                })}
               </ul>
 
-              <Link href="/board/all" className="mx-1 mb-2 block rounded-xl px-3 py-2.5 font-bold text-gray-900 hover:bg-gray-50">
+              <Link
+                href="/board/all"
+                aria-current={isActive(pathname, '/board/all') ? 'page' : undefined}
+                className={cn(
+                  'mx-1 mb-2 block rounded-xl px-3 py-2.5 font-bold transition',
+                  isActive(pathname, '/board/all') ? 'bg-zz-50 text-zz-700' : 'text-gray-900 hover:bg-gray-50',
+                )}
+              >
                 전체글보기
               </Link>
 
@@ -69,13 +88,26 @@ export function MobileMenu({ boardGroups }: { boardGroups: BoardGroup[] }) {
                 <div key={group.id} className="border-t border-gray-100 py-2">
                   <p className="px-4 py-1 text-xs font-bold text-gray-400">{group.name}</p>
                   <ul>
-                    {group.boards.map((board) => (
-                      <li key={board.id}>
-                        <Link href={`/board/${board.slug}`} className="block rounded-xl px-4 py-2 text-[15px] text-gray-700 hover:bg-zz-50">
-                          {board.name}
-                        </Link>
-                      </li>
-                    ))}
+                    {group.boards.map((board) => {
+                      const active = isActive(pathname, `/board/${board.slug}`);
+                      return (
+                        <li key={board.id}>
+                          <Link
+                            href={`/board/${board.slug}`}
+                            aria-current={active ? 'page' : undefined}
+                            className={cn(
+                              // 사이드바와 같은 방식 — 왼쪽 색 막대 + 연한 배경
+                              'block rounded-r-xl border-l-2 py-2 pl-3.5 pr-4 text-[15px] transition',
+                              active
+                                ? 'border-zz-600 bg-zz-50 font-bold text-zz-700'
+                                : 'border-transparent text-gray-700 hover:bg-zz-50',
+                            )}
+                          >
+                            {board.name}
+                          </Link>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               ))}

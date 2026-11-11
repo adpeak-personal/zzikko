@@ -1,8 +1,8 @@
 import { createWriteStream } from 'node:fs';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { pipeline } from 'node:stream/promises';
-import type { Readable } from 'node:stream';
+import { Readable } from 'node:stream';
 import { Storage } from '@google-cloud/storage';
 
 /**
@@ -34,6 +34,56 @@ export interface SavedFile {
   url: string;
   /** 저장 경로 (버킷 안 경로 또는 로컬 상대경로) */
   path: string;
+}
+
+/**
+ * 버퍼를 저장한다.
+ *
+ * 이미지는 sharp 로 가공하느라 어차피 전체를 메모리에 올려야 해서 스트림을 쓸 수 없다.
+ * (스트림 저장은 아래 saveFile 이 그대로 맡는다 — 가공 없이 넘기는 경우)
+ */
+export async function saveBuffer(objectPath: string, body: Buffer, contentType: string): Promise<SavedFile> {
+  return saveFile(objectPath, Readable.from(body), contentType);
+}
+
+/**
+ * 저장된 파일을 다시 읽는다. 없으면 null.
+ *
+ * 글을 등록할 때 첫 이미지의 썸네일을 만들려면 저장해 둔 본문용 이미지가 필요하다.
+ */
+export async function readFileAt(objectPath: string): Promise<Buffer | null> {
+  try {
+    if (storage && bucketName) {
+      const [body] = await storage.bucket(bucketName).file(objectPath).download();
+      return body;
+    }
+    return await readFile(join(UPLOAD_DIR, objectPath));
+  } catch {
+    // 없는 파일도 예외로 온다 — 부르는 쪽은 "없음" 으로만 알면 된다
+    return null;
+  }
+}
+
+/**
+ * 공개 주소 → 저장 경로.
+ *
+ * DB 에는 공개 주소(`/uploads/...` 또는 `https://cdn/...`)가 들어 있는데,
+ * 지우거나 다시 읽으려면 버킷 안 경로가 필요하다.
+ */
+export function toObjectPath(url: string): string | null {
+  const host = process.env.GCS_PUBLIC_HOST ?? (bucketName ? `https://storage.googleapis.com/${bucketName}` : null);
+  if (host && url.startsWith(`${host}/`)) return url.slice(host.length + 1);
+  if (url.startsWith('/uploads/')) return url.slice('/uploads/'.length);
+  // 우리 주소가 아니면 건드리지 않는다 (본문에 외부 이미지가 들어올 수 있다)
+  return null;
+}
+
+/** 여러 공개 주소를 한 번에 지운다 */
+export async function deleteByUrls(urls: string[]) {
+  for (const url of urls) {
+    const path = toObjectPath(url);
+    if (path) await deleteFile(path);
+  }
 }
 
 /**

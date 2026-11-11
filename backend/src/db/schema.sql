@@ -25,6 +25,8 @@ SET NAMES utf8mb4;
 
 -- 의존성 역순으로 삭제
 DROP TABLE IF EXISTS uploads;
+DROP TABLE IF EXISTS post_scraps;
+DROP TABLE IF EXISTS comment_likes;
 DROP TABLE IF EXISTS phone_specs;
 DROP TABLE IF EXISTS chipsets;
 DROP TABLE IF EXISTS news_articles;
@@ -135,9 +137,12 @@ CREATE TABLE posts (
   views         INT UNSIGNED NOT NULL DEFAULT 0,
   likes         INT UNSIGNED NOT NULL DEFAULT 0,
   comment_count INT UNSIGNED NOT NULL DEFAULT 0,
+  -- 실제로 지우지 않는다. 지우면 댓글·좋아요가 CASCADE 로 함께 날아가 복구할 수 없다
+  deleted_at    DATETIME     NULL COMMENT '지운 시각. NULL 이면 살아 있는 글',
   created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
+  KEY idx_posts_alive (deleted_at, created_at),
   KEY idx_posts_board_created (board_id, created_at DESC),
   KEY idx_posts_author (author_id),
   KEY idx_posts_notice (is_notice, created_at DESC),
@@ -172,9 +177,11 @@ CREATE TABLE comments (
   parent_id  INT UNSIGNED NULL COMMENT '대댓글',
   content    TEXT         NOT NULL,
   likes      INT UNSIGNED NOT NULL DEFAULT 0,
+  deleted_at DATETIME     NULL,
   created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   KEY idx_comments_post (post_id, created_at),
+  KEY idx_comments_alive (post_id, deleted_at),
   CONSTRAINT fk_comments_post FOREIGN KEY (post_id) REFERENCES posts (id) ON DELETE CASCADE,
   CONSTRAINT fk_comments_author FOREIGN KEY (author_id) REFERENCES users (id) ON DELETE CASCADE,
   CONSTRAINT fk_comments_parent FOREIGN KEY (parent_id) REFERENCES comments (id) ON DELETE CASCADE
@@ -193,6 +200,28 @@ CREATE TABLE post_likes (
 -- ---------------------------------------------------------------------
 -- IT 소식 (어드민이 관리하는 기사)
 -- ---------------------------------------------------------------------
+-- 스크랩(북마크) — 본인만 보는 값이라 공개 집계를 두지 않는다
+CREATE TABLE post_scraps (
+  post_id    INT UNSIGNED NOT NULL,
+  user_id    INT UNSIGNED NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (post_id, user_id),
+  KEY idx_post_scraps_user (user_id, created_at),
+  CONSTRAINT fk_post_scraps_post FOREIGN KEY (post_id) REFERENCES posts (id) ON DELETE CASCADE,
+  CONSTRAINT fk_post_scraps_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- comments.likes 는 이 표의 개수를 캐시한 값이다
+CREATE TABLE comment_likes (
+  comment_id INT UNSIGNED NOT NULL,
+  user_id    INT UNSIGNED NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (comment_id, user_id),
+  KEY idx_comment_likes_user (user_id),
+  CONSTRAINT fk_comment_likes_comment FOREIGN KEY (comment_id) REFERENCES comments (id) ON DELETE CASCADE,
+  CONSTRAINT fk_comment_likes_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
 CREATE TABLE news_articles (
   id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
   title      VARCHAR(120) NOT NULL,
@@ -273,8 +302,15 @@ CREATE TABLE uploads (
   mimetype   VARCHAR(100) NOT NULL,
   size       INT UNSIGNED NOT NULL,
   uploader_id INT UNSIGNED NULL,
+  -- NULL 이면 아직 어느 글에도 안 쓰인 파일 — 유예 시간이 지나면 청소 대상이다
+  post_id    INT UNSIGNED NULL,
+  thumb_url  VARCHAR(500) NULL COMMENT '목록용 축소본. 글 등록 시 첫 이미지에만 만든다',
+  width      SMALLINT UNSIGNED NULL,
+  height     SMALLINT UNSIGNED NULL,
   created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   KEY idx_uploads_created (created_at DESC),
-  CONSTRAINT fk_uploads_user FOREIGN KEY (uploader_id) REFERENCES users (id) ON DELETE SET NULL
+  KEY idx_uploads_orphan (post_id, created_at),
+  CONSTRAINT fk_uploads_user FOREIGN KEY (uploader_id) REFERENCES users (id) ON DELETE SET NULL,
+  CONSTRAINT fk_uploads_post FOREIGN KEY (post_id)     REFERENCES posts (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

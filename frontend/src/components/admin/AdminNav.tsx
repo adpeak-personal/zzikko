@@ -70,8 +70,11 @@ export function AdminNav() {
                           href={href}
                           aria-current={active ? 'page' : undefined}
                           className={cn(
-                            'flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition',
-                            active ? 'bg-zz-50 font-semibold text-zz-700' : 'text-gray-600 hover:bg-gray-100',
+                            // 선택 표시는 사이트 사이드바와 같은 방식 — 왼쪽 색 막대 + 연한 배경
+                            'flex items-center gap-2 rounded-lg border-l-2 py-2 pl-2.5 pr-3 text-sm transition',
+                            active
+                              ? 'border-zz-600 bg-zz-50 font-semibold text-zz-700'
+                              : 'border-transparent text-gray-600 hover:bg-gray-100',
                           )}
                         >
                           <Icon size={15} />
