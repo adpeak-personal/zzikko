@@ -29,7 +29,9 @@ export async function toApiError(res: Response) {
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api/v1${path}`, {
     ...init,
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
+    // 본문이 있을 때만 JSON 이라고 알린다. 본문 없는 POST(로그아웃 등)에 붙이면
+    // Fastify 가 "Body cannot be empty" 로 400 을 돌려준다.
+    headers: { ...(init?.body != null && { 'Content-Type': 'application/json' }), ...init?.headers },
   });
   if (!res.ok) throw await toApiError(res);
   return res.json() as Promise<T>;

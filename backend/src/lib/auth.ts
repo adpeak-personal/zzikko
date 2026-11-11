@@ -2,6 +2,7 @@ import { randomBytes, scrypt as scryptCb, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { forbidden, unauthorized } from './http.js';
+import { findById } from '../repositories/users.js';
 import type { MemberRole } from '../types.js';
 
 const scrypt = promisify(scryptCb) as (password: string, salt: Buffer, keylen: number) => Promise<Buffer>;
@@ -64,10 +65,18 @@ export async function requireAuth(request: FastifyRequest) {
   if (!request.user) throw unauthorized();
 }
 
-/** 운영진 전용 */
+/**
+ * 운영진 전용.
+ * 토큰 속 role 은 로그인 시점 값이라 권한을 바꿔도 토큰이 살아 있는 2주 동안 그대로다 —
+ * 운영진으로 올린 사람은 어드민이 403 으로 깨지고, 내린 사람은 계속 들어온다.
+ * 그래서 운영진 확인만은 매번 DB 를 본다 (화면 쪽 /auth/me 도 DB 기준이라 둘이 어긋나지 않는다).
+ */
 export async function requireAdmin(request: FastifyRequest) {
   if (!request.user) throw unauthorized();
-  if (request.user.role !== '운영진') throw forbidden('운영진만 사용할 수 있습니다.');
+  const row = await findById(request.user.id);
+  if (!row) throw unauthorized();
+  if (row.role !== '운영진') throw forbidden('운영진만 사용할 수 있습니다.');
+  request.user.role = row.role;
 }
 
 export function setSessionCookie(reply: FastifyReply, token: string) {
