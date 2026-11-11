@@ -10,7 +10,8 @@ COPY . .
 ARG API_URL=http://back:4080
 ENV API_URL=$API_URL \
     NEXT_TELEMETRY_DISABLED=1
-RUN npm run build
+# public 이 비어 있으면 git 에 안 올라가서 아래 COPY 가 깨진다 — 없으면 만든다
+RUN mkdir -p public && npm run build
 
 FROM node:22-bookworm-slim
 WORKDIR /app
