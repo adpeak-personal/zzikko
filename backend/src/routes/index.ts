@@ -11,6 +11,7 @@ import postRoutes from './posts.js';
 import contentRoutes from './content.js';
 import uploadRoutes from './uploads.js';
 import nworkRoutes from './nwork.js';
+import sellerRoutes from './seller.js';
 
 const boardPatchSchema = z.object({
   name: z.string().trim().min(1).max(40).optional(),
@@ -28,6 +29,7 @@ export default async function routes(app: FastifyInstance) {
   await app.register(postRoutes);
   await app.register(contentRoutes);
   await app.register(uploadRoutes);
+  await app.register(sellerRoutes);
   // 운영진 전용 훅을 플러그인 안에 거므로 다른 라우트에는 번지지 않는다
   await app.register(nworkRoutes);
 

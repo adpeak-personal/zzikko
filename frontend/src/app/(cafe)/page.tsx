@@ -231,11 +231,11 @@ export default async function HomePage() {
       {/* 판매자 참여 */}
       <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-gray-900 px-7 py-6 text-white">
         <div>
-          <p className="text-lg font-bold">판매자이신가요?</p>
-          <p className="mt-1 text-sm text-gray-300">인증을 받으면 성지 시세표에 우리 매장 조건을 올릴 수 있어요.</p>
+          <p className="text-lg font-bold">성지 운영하세요?</p>
+          <p className="mt-1 text-sm text-gray-300">조건만 보내주시면 저희가 올려드립니다. 수수료 없습니다.</p>
         </div>
-        <Link href="/guide#seller" className="flex items-center gap-1.5 rounded-xl bg-white px-5 py-3 font-bold text-gray-900 hover:bg-gray-100">
-          판매자 참여 안내 <ArrowRight size={16} />
+        <Link href="/seller" className="flex items-center gap-1.5 rounded-xl bg-white px-5 py-3 font-bold text-gray-900 hover:bg-gray-100">
+          무료로 입점 신청 <ArrowRight size={16} />
         </Link>
       </section>
     </div>

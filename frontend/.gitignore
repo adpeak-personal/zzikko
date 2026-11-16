@@ -4,3 +4,6 @@ out/
 *.log
 .env*
 !.env.example
+
+# 타입 빌드 캐시 — 빌드할 때마다 바뀌어서 diff 만 지저분해진다
+tsconfig.tsbuildinfo

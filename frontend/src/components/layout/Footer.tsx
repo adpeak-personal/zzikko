@@ -12,7 +12,7 @@ export function Footer() {
           <nav className="flex flex-wrap gap-5 text-sm text-gray-500" aria-label="하단 메뉴">
             <Link href="/board/notice" className="hover:text-gray-900">공지사항</Link>
             <Link href="/guide" className="hover:text-gray-900">이용 안내</Link>
-            <Link href="/guide#seller" className="hover:text-gray-900">판매자 참여</Link>
+            <Link href="/seller" className="hover:text-gray-900">판매자 입점</Link>
           </nav>
         </div>
         <p className="mt-5 border-t border-gray-100 pt-5 text-xs leading-relaxed text-gray-400">

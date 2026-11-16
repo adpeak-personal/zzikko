@@ -16,6 +16,8 @@ export const notFound = (what = '요청하신 내용') => new HttpError(404, `${
 export const badRequest = (message = '입력값을 확인해주세요.') => new HttpError(400, message);
 export const unauthorized = (message = '로그인이 필요합니다.') => new HttpError(401, message);
 export const forbidden = (message = '권한이 없습니다.') => new HttpError(403, message);
+export const tooManyRequests = (message = '요청이 너무 잦습니다. 잠시 후 다시 시도해주세요.') =>
+  new HttpError(429, message);
 
 /**
  * zod 로 입력을 검증한다.

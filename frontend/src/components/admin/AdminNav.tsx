@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BarChart3, Flag, KeyRound, LayoutDashboard, ListTree, MessageSquare, Newspaper, Scale, Settings, Store, Users } from 'lucide-react';
+import { BadgeCheck, BarChart3, Flag, KeyRound, LayoutDashboard, ListTree, MessageSquare, Newspaper, Scale, Settings, Store, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // 아이콘 컴포넌트는 서버→클라이언트로 넘길 수 없어서 메뉴 정의를 이 파일에 둔다
@@ -25,7 +25,8 @@ const SECTIONS = [
     title: '회원 · 판매자',
     items: [
       { href: '/admin/users', label: '회원 관리', icon: Users, soon: true },
-      { href: '/admin/shops', label: '판매자 인증', icon: Store, soon: true },
+      { href: '/admin/sellers', label: '판매자 신청', icon: Store },
+      { href: '/admin/shops', label: '판매자 인증', icon: BadgeCheck, soon: true },
     ],
   },
   {

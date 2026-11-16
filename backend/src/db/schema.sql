@@ -24,6 +24,7 @@ USE zzikko_cafe;
 SET NAMES utf8mb4;
 
 -- 의존성 역순으로 삭제
+DROP TABLE IF EXISTS seller_applications;
 DROP TABLE IF EXISTS uploads;
 DROP TABLE IF EXISTS post_scraps;
 DROP TABLE IF EXISTS comment_likes;
@@ -313,6 +314,28 @@ CREATE TABLE uploads (
   KEY idx_uploads_orphan (post_id, created_at),
   CONSTRAINT fk_uploads_user FOREIGN KEY (uploader_id) REFERENCES users (id) ON DELETE SET NULL,
   CONSTRAINT fk_uploads_post FOREIGN KEY (post_id)     REFERENCES posts (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- ─────────────────────────────────────────────────────────────
+-- 판매자 입점 신청 (/seller 페이지에서 들어온다)
+-- 회원가입과 별개다 — 아직 회원이 아닌 사람이 연락처만 남기는 창구다.
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE seller_applications (
+  id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  shop_name  VARCHAR(60)  NOT NULL COMMENT '매장 이름',
+  manager    VARCHAR(30)  NOT NULL COMMENT '담당자',
+  phone      VARCHAR(20)  NOT NULL COMMENT '숫자만 저장한다',
+  region     VARCHAR(20)  NOT NULL,
+  area       VARCHAR(60)  NULL COMMENT '시·군·구 (예: 강남구)',
+  carriers   JSON         NULL COMMENT '취급 통신사 ["SKT","KT"]',
+  channel    VARCHAR(30)  NULL COMMENT '지금 조건을 올리는 곳 — 카톡 · 밴드 · 뽐뿌 …',
+  message    TEXT         NULL COMMENT '하고 싶은 말',
+  status     ENUM('신청','연락중','승인','보류') NOT NULL DEFAULT '신청',
+  memo       TEXT         NULL COMMENT '운영진 메모 — 신청자에게 보이지 않는다',
+  created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_seller_apps (status, created_at DESC)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- ─────────────────────────────────────────────────────────────

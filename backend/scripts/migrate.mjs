@@ -99,6 +99,29 @@ const steps = [
        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`,
     ],
   },
+  {
+    name: 'seller_applications — 판매자 입점 신청',
+    check: (c) => hasTable(c, 'seller_applications'),
+    sql: [
+      `CREATE TABLE IF NOT EXISTS seller_applications (
+         id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+         shop_name  VARCHAR(60)  NOT NULL,
+         manager    VARCHAR(30)  NOT NULL,
+         phone      VARCHAR(20)  NOT NULL,
+         region     VARCHAR(20)  NOT NULL,
+         area       VARCHAR(60)  NULL,
+         carriers   JSON         NULL,
+         channel    VARCHAR(30)  NULL,
+         message    TEXT         NULL,
+         status     ENUM('신청','연락중','승인','보류') NOT NULL DEFAULT '신청',
+         memo       TEXT         NULL,
+         created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+         updated_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+         PRIMARY KEY (id),
+         KEY idx_seller_apps (status, created_at DESC)
+       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`,
+    ],
+  },
 ];
 
 async function hasColumn(conn, table, column) {

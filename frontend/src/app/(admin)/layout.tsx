@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ExternalLink, ShieldAlert } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
 import { AdminNav } from '@/components/admin/AdminNav';
 
 export const metadata = { title: { default: '어드민', template: '%s | 어드민' } };
@@ -14,11 +14,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             찍고
           </Link>
 
-          {/* 인증이 아직 없어서 이 화면은 누구나 접근할 수 있다. 감추지 말고 드러내 둔다. */}
-          <p className="flex min-w-0 flex-1 items-center gap-1.5 text-xs text-amber-300">
-            <ShieldAlert size={13} className="shrink-0" />
-            <span className="truncate">인증 미구현 — 배포 전 운영진 권한 검사 필요</span>
-          </p>
+          <div className="min-w-0 flex-1" />
 
           <Link href="/" className="flex shrink-0 items-center gap-1 text-xs text-gray-300 hover:text-white">
             <ExternalLink size={13} /> 사이트 보기

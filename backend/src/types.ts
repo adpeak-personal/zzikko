@@ -197,3 +197,25 @@ export interface NworkSummary {
   working: number;
   roles: { role: string; count: number }[];
 }
+
+/* ── 판매자 입점 신청 ── */
+
+export type SellerApplicationStatus = '신청' | '연락중' | '승인' | '보류';
+
+export interface SellerApplication {
+  id: number;
+  shopName: string;
+  manager: string;
+  /** 숫자만 — 화면에서 010-0000-0000 으로 다시 끊어 보여준다 */
+  phone: string;
+  region: string;
+  area: string | null;
+  carriers: string[];
+  /** 지금 조건을 올리는 곳 — 카톡 · 밴드 · 뽐뿌 … */
+  channel: string | null;
+  message: string | null;
+  status: SellerApplicationStatus;
+  /** 운영진 메모 — 신청자에게 보이지 않는다 */
+  memo: string | null;
+  createdAt: string;
+}
