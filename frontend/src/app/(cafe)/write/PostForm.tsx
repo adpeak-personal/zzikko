@@ -31,10 +31,13 @@ export function PostForm({
   boardGroups,
   board,
   editing,
+  canPostNotice = false,
 }: {
   boardGroups: BoardGroup[];
   board: Board;
   editing?: Post;
+  /** 운영진만 공지로 올릴 수 있다. 서버도 등급을 다시 확인한다 */
+  canPostNotice?: boolean;
 }) {
   const router = useRouter();
   const [boardSlug, setBoardSlug] = useState(editing?.boardSlug ?? board.slug);
@@ -45,6 +48,7 @@ export function PostForm({
     // 수정일 때는 아직 onChange 가 안 울렸어도 비어 있지 않다
     return { doc, empty: !editing?.contentJson };
   });
+  const [isNotice, setIsNotice] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
 
@@ -109,6 +113,7 @@ export function PostForm({
               boardSlug,
               title: title.trim(),
               category: category || undefined,
+              isNotice: canPostNotice && isNotice ? true : undefined,
               // 저장 정본은 JSON — 서버가 평문·썸네일을 여기서 뽑아낸다
               contentJson: content.doc,
             }),
@@ -171,10 +176,18 @@ export function PostForm({
           <span className="text-xs text-gray-400">임시저장됨 · {sinceLabel(savedAt)}</span>
         ) : editing ? (
           <span className="text-xs text-gray-400">수정해도 등록 시간은 그대로 유지돼요.</span>
-        ) : (
+        ) : canPostNotice ? (
           <label className="flex items-center gap-2 text-sm text-gray-600">
-            <input type="checkbox" defaultChecked className="accent-zz-600" /> 댓글 허용
+            <input
+              type="checkbox"
+              checked={isNotice}
+              onChange={(event) => setIsNotice(event.target.checked)}
+              className="accent-zz-600"
+            />
+            공지로 올리기
           </label>
+        ) : (
+          <span />
         )}
         <div className="flex gap-2">
           <button

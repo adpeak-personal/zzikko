@@ -226,6 +226,8 @@ export interface NewPost {
   category?: string | null;
   region?: string | null;
   contentJson: unknown;
+  /** 공지로 올릴지 — 라우트에서 운영진인지 확인한 뒤 넘긴다 */
+  isNotice?: boolean;
   deal?: Omit<DealInfo, 'shopId'> & { shopId: number };
 }
 
@@ -240,8 +242,8 @@ export async function createPost(input: NewPost): Promise<number> {
 
   return withTransaction(async (conn) => {
     const [result] = await conn.execute(
-      `INSERT INTO posts (board_id, author_id, category, region, title, content_json, content_text, thumb_url)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO posts (board_id, author_id, category, region, title, content_json, content_text, thumb_url, is_notice)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         board.id,
         input.authorId,
@@ -251,6 +253,7 @@ export async function createPost(input: NewPost): Promise<number> {
         JSON.stringify(content),
         text,
         thumb,
+        input.isNotice ? 1 : 0,
       ],
     );
     const postId = (result as { insertId: number }).insertId;

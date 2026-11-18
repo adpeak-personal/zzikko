@@ -46,7 +46,7 @@ export default async function WritePage({ searchParams }: { searchParams: Promis
       {board.writeMode === 'photo' ? (
         <PhotoForm boardGroups={writableGroups} board={board} />
       ) : (
-        <PostForm boardGroups={writableGroups} board={board} />
+        <PostForm boardGroups={writableGroups} board={board} canPostNotice={me.role === '운영진'} />
       )}
     </div>
   );

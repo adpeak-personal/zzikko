@@ -41,6 +41,8 @@ const createSchema = z.object({
   region: z.string().max(20).optional(),
   /** ProseMirror JSON — 본문 정본 */
   contentJson: z.unknown(),
+  /** 공지로 올리기 — 운영진만. 화면에서 가려도 여기서 다시 확인한다 */
+  isNotice: z.boolean().optional(),
   deal: dealSchema.optional(),
 });
 
@@ -109,6 +111,11 @@ export default async function postRoutes(app: FastifyInstance) {
       deal = { ...input.deal, shopId: shop.id };
     }
 
+    // 공지는 운영진만. 체크박스를 화면에서 숨기는 것만으로는 막히지 않는다
+    if (input.isNotice && user.role !== '운영진') {
+      throw forbidden('공지는 운영진만 올릴 수 있습니다.');
+    }
+
     const id = await posts.createPost({
       boardSlug: input.boardSlug,
       authorId: user.id,
@@ -116,6 +123,7 @@ export default async function postRoutes(app: FastifyInstance) {
       category: input.category ?? null,
       region: input.region ?? null,
       contentJson: input.contentJson,
+      isNotice: input.isNotice,
       deal,
     });
 
