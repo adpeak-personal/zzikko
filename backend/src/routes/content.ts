@@ -6,6 +6,8 @@ import * as content from '../repositories/content.js';
 import * as feed from '../repositories/newsFeed.js';
 import { SOURCES, fetchSource } from '../lib/news/feed.js';
 import { writeArticle } from '../lib/news/write.js';
+import { extractSpec } from '../lib/specs/extract.js';
+import { buildPairs, pairSlug } from '../lib/specs/pairs.js';
 import { aiReady, logUsage } from '../lib/anthropic.js';
 
 const idParam = z.object({ id: z.coerce.number().int().positive() });
@@ -189,6 +191,74 @@ export default async function contentRoutes(app: FastifyInstance) {
     const { id } = parse(idParam, request.params);
     await content.deleteNews(id);
     return { ok: true };
+  });
+
+  /**
+   * 사양 자료를 붙여넣으면 칸에 맞춰 정리해 돌려준다. **저장하지 않는다** —
+   * 못 채운 항목이 있을 수 있어 어드민에서 사람이 확인한 뒤 등록한다.
+   *
+   * 제조사 사양 페이지는 대부분 JS 로 그려져 서버가 직접 긁으면 안 나온다.
+   * 그래서 주소를 받지 않고 붙여넣은 글(또는 캡처)을 받는다.
+   */
+  app.post('/admin/specs/extract', { preHandler: requireAdmin }, async (request) => {
+    const { text } = parse(z.object({ text: z.string().min(10, '사양 자료를 넣어주세요.').max(40_000) }), request.body);
+    const out = await extractSpec({ text });
+    logUsage(request, '사양 정리', out.model, out.usage);
+
+    // 칩셋 이름이 잡혔으면 이미 등록된 것과 맞춰 본다
+    const chipsets = await content.listChipsets();
+    const matched = out.chipsetName
+      ? chipsets.find((item) => item.name.toLowerCase() === out.chipsetName.toLowerCase())
+      : undefined;
+
+    return {
+      spec: {
+        name: out.name,
+        brand: out.brand,
+        releaseDate: out.releaseDate,
+        retailPrice: out.retailPrice,
+        chipsetId: matched?.id ?? null,
+        display: out.display,
+        storage: out.storage,
+        battery: out.battery,
+        charging: out.charging,
+        cameraMain: out.cameraMain,
+        cameraFront: out.cameraFront,
+        weight: out.weight,
+        displayInch: out.displayInch,
+        refreshHz: out.refreshHz,
+        memoryGb: out.memoryGb,
+        batteryMah: out.batteryMah,
+        chargingWatt: out.chargingWatt,
+        cameraMainMp: out.cameraMainMp,
+        weightG: out.weightG,
+      },
+      missing: out.missing,
+      // 칩셋 이름은 읽었는데 등록된 게 없을 때 알려 준다
+      unknownChipset: out.chipsetName && !matched ? out.chipsetName : null,
+    };
+  });
+
+  /** 비교 페이지로 만들 짝 목록 — 프론트가 주소를 만들 때 쓴다 */
+  app.get('/compare', async () => {
+    const [specs, chipsets] = await Promise.all([content.listSpecs(), content.listChipsets()]);
+    return {
+      items: buildPairs(specs).map((pair) => ({
+        slug: pairSlug(pair.a, pair.b),
+        reason: pair.reason,
+        a: pair.a,
+        b: pair.b,
+      })),
+      chipsets,
+    };
+  });
+
+  app.get('/compare/:slug', async (request) => {
+    const { slug } = parse(z.object({ slug: z.string().max(200) }), request.params);
+    const [specs, chipsets] = await Promise.all([content.listSpecs(), content.listChipsets()]);
+    const pair = buildPairs(specs).find((item) => pairSlug(item.a, item.b) === slug);
+    if (!pair) throw notFound('비교');
+    return { a: pair.a, b: pair.b, reason: pair.reason, chipsets };
   });
 
   app.get('/admin/specs', { preHandler: requireAdmin }, async () => ({

@@ -24,8 +24,9 @@ export function CompareTable({
   specs: PhoneSpec[];
   chipsets: Chipset[];
   max: number;
-  onRemove: (id: number) => void;
-  onClear: () => void;
+  /** 없으면 "빼기"·"모두 해제" 버튼을 숨긴다 — /compare 처럼 짝이 고정된 화면용 */
+  onRemove?: (id: number) => void;
+  onClear?: () => void;
 }) {
   const [onlyDiff, setOnlyDiff] = useState(false);
 
@@ -47,13 +48,15 @@ export function CompareTable({
             차이 나는 항목만
           </label>
         )}
-        <button
-          type="button"
-          onClick={onClear}
-          className={cn('rounded-lg px-2.5 py-1 text-xs text-gray-500 hover:bg-white', specs.length <= 1 && 'ml-auto')}
-        >
-          모두 해제
-        </button>
+        {onClear && (
+          <button
+            type="button"
+            onClick={onClear}
+            className={cn('rounded-lg px-2.5 py-1 text-xs text-gray-500 hover:bg-white', specs.length <= 1 && 'ml-auto')}
+          >
+            모두 해제
+          </button>
+        )}
       </header>
 
       {specs.length === 1 ? (
@@ -75,14 +78,16 @@ export function CompareTable({
                           </Link>
                           <span className="block text-[11px] font-normal text-gray-400">{spec.brand}</span>
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => onRemove(spec.id)}
-                          aria-label={`${spec.name} 비교에서 빼기`}
-                          className="ml-auto rounded p-1 text-gray-300 hover:bg-gray-100 hover:text-gray-600"
-                        >
-                          <X size={13} />
-                        </button>
+                        {onRemove && (
+                          <button
+                            type="button"
+                            onClick={() => onRemove(spec.id)}
+                            aria-label={`${spec.name} 비교에서 빼기`}
+                            className="ml-auto rounded p-1 text-gray-300 hover:bg-gray-100 hover:text-gray-600"
+                          >
+                            <X size={13} />
+                          </button>
+                        )}
                       </span>
                     </th>
                   ))}

@@ -32,3 +32,20 @@ export async function apiGetOrNull<T>(path: string): Promise<T | null> {
     throw error;
   }
 }
+
+/**
+ * 로그인 쿠키 없이 부른다.
+ *
+ * `generateStaticParams` 는 **요청 없이 빌드 때 돌기 때문에** `cookies()` 를 부르면
+ * 바로 터진다. 거기서는 이 함수를 쓴다. 공개 목록만 가져오는 용도라 쿠키가 필요 없다.
+ */
+export async function apiGetPublic<T>(path: string): Promise<T | null> {
+  try {
+    const res = await fetch(`${SERVER_API}/api/v1${path}`, { cache: 'no-store' });
+    if (!res.ok) return null;
+    return (await res.json()) as T;
+  } catch {
+    // 빌드 중 백엔드가 안 떠 있을 수도 있다 — 그땐 주소를 안 만들고 넘어간다
+    return null;
+  }
+}

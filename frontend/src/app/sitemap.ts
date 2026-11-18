@@ -15,12 +15,14 @@ interface SitemapData {
   posts: { id: number; boardSlug: string; updatedAt: string }[];
   sise: { slug: string; updatedAt: string }[];
   boards: string[];
+  compare: string[];
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const fixed: MetadataRoute.Sitemap = [
     { url: SITE, lastModified: new Date(), changeFrequency: 'daily', priority: 1 },
     { url: `${SITE}/sise`, lastModified: new Date(), changeFrequency: 'daily', priority: 0.9 },
+    { url: `${SITE}/compare`, lastModified: new Date(), changeFrequency: 'weekly', priority: 0.8 },
     { url: `${SITE}/seller`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.7 },
     { url: `${SITE}/guide`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.4 },
   ];
@@ -47,6 +49,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: new Date(item.updatedAt),
       changeFrequency: 'weekly' as const,
       priority: 0.8,
+    })),
+    // 비교 페이지 — 사이트 안에 링크가 적어 사이트맵이 중요한 쪽이다
+    ...(data.compare ?? []).map((slug) => ({
+      url: `${SITE}/compare/${slug}`,
+      lastModified: new Date(),
+      changeFrequency: 'monthly' as const,
+      priority: 0.7,
     })),
     ...data.posts.map((post) => ({
       url: `${SITE}/board/${post.boardSlug}/${post.id}`,

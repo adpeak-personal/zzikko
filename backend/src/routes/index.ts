@@ -5,6 +5,8 @@ import { requireAdmin } from '../lib/auth.js';
 import * as boards from '../repositories/boards.js';
 import * as shops from '../repositories/shops.js';
 import * as sise from '../repositories/sise.js';
+import * as content from '../repositories/content.js';
+import { buildPairs, pairSlug } from '../lib/specs/pairs.js';
 import * as posts from '../repositories/posts.js';
 import * as users from '../repositories/users.js';
 import authRoutes from './auth.js';
@@ -33,15 +35,18 @@ export default async function routes(app: FastifyInstance) {
    * 목록 API(/posts)는 쪽으로 나뉘고 지운 글을 거르느라 전부 훑기엔 맞지 않아 따로 둔다.
    */
   app.get('/sitemap', async () => {
-    const [postRows, siseRows, boardGroups] = await Promise.all([
+    const [postRows, siseRows, boardGroups, specs] = await Promise.all([
       posts.listForSitemap(),
       sise.listPublishedSlugs(),
       boards.listBoardGroups(),
+      content.listSpecs(),
     ]);
     return {
       posts: postRows,
       sise: siseRows,
       boards: boardGroups.flatMap((group) => group.boards.map((board) => board.slug)),
+      // 비교 페이지는 사이트 안에 링크가 적어 사이트맵 비중이 크다
+      compare: buildPairs(specs).map((pair) => pairSlug(pair.a, pair.b)),
     };
   });
 
