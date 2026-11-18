@@ -123,6 +123,47 @@ const steps = [
     ],
   },
   {
+    // 시세 리포트는 posts 와 분리해 둔다 — 사이트에 노출되지 않아야 해서,
+    // posts 에 섞으면 모든 목록 조회에 필터를 걸어야 하고 하나만 빠뜨려도 새어 나간다.
+    name: 'sise_sheets / sise_reports — 시세 리포트 (SEO)',
+    check: (c) => hasTable(c, 'sise_reports'),
+    sql: [
+      `CREATE TABLE IF NOT EXISTS sise_sheets (
+         id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+         region     VARCHAR(20)  NOT NULL,
+         dated_on   DATE         NOT NULL COMMENT '시세 기준일. 올린 날이 아니라 표에 적힌 날',
+         image_url  VARCHAR(500) NOT NULL COMMENT '원본 시세표 이미지 (도메인 없는 경로)',
+         rows_json  JSON         NOT NULL,
+         note       VARCHAR(300) NOT NULL DEFAULT '',
+         created_by INT UNSIGNED NULL,
+         created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+         PRIMARY KEY (id),
+         KEY idx_sise_sheets_region (region, dated_on DESC),
+         CONSTRAINT fk_sise_sheets_user FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE SET NULL
+       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`,
+      `CREATE TABLE IF NOT EXISTS sise_reports (
+         id           INT UNSIGNED NOT NULL AUTO_INCREMENT,
+         sheet_id     INT UNSIGNED NOT NULL,
+         slug         VARCHAR(120) NOT NULL,
+         title        VARCHAR(200) NOT NULL,
+         summary      VARCHAR(300) NOT NULL DEFAULT '',
+         sections     JSON         NOT NULL COMMENT '{lead, highlights[], closing}',
+         changes      JSON         NULL,
+         compared_to  INT UNSIGNED NULL,
+         published    TINYINT(1)   NOT NULL DEFAULT 0,
+         published_at DATETIME     NULL,
+         views        INT UNSIGNED NOT NULL DEFAULT 0,
+         created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+         updated_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+         PRIMARY KEY (id),
+         UNIQUE KEY uq_sise_reports_slug (slug),
+         KEY idx_sise_reports_live (published, published_at DESC),
+         CONSTRAINT fk_sise_reports_sheet FOREIGN KEY (sheet_id) REFERENCES sise_sheets (id) ON DELETE CASCADE,
+         CONSTRAINT fk_sise_reports_prev FOREIGN KEY (compared_to) REFERENCES sise_sheets (id) ON DELETE SET NULL
+       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`,
+    ],
+  },
+  {
     // DB 에는 도메인 없는 경로(`/2026-11-18/uuid.webp`)만 둔다 — CDN 을 바꿔도 글을 안 고치게.
     // S3 를 켜고 키 방식 전환 전에 올라간 이미지는 전체 주소로 들어가 있어서 여기서 떼어낸다.
     // 이게 안 되면 uploads.url 과 본문 이미지 src 형식이 어긋나 "안 쓰인 이미지" 로 잘못 분류된다.

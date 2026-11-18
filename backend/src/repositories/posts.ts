@@ -203,6 +203,22 @@ export async function listNotices(limit = 2): Promise<Post[]> {
   return rows.map(toPost);
 }
 
+/**
+ * 사이트맵용 — 살아 있는 글의 주소 재료만.
+ *
+ * 본문·작성자를 끌어오지 않아 수만 건이어도 가볍다.
+ */
+export async function listForSitemap(): Promise<{ id: number; boardSlug: string; updatedAt: string }[]> {
+  const rows = await query<RowDataPacket & { id: number; slug: string; updated_at: string }>(
+    `SELECT p.id, b.slug, p.updated_at
+       FROM posts p JOIN boards b ON b.id = p.board_id
+      WHERE p.deleted_at IS NULL
+      ORDER BY p.updated_at DESC
+      LIMIT 20000`,
+  );
+  return rows.map((row) => ({ id: row.id, boardSlug: row.slug, updatedAt: row.updated_at }));
+}
+
 export async function getPost(id: number): Promise<Post | null> {
   const row = await queryOne<PostRow>(`${SELECT_POST} WHERE p.id = ? AND p.deleted_at IS NULL`, [id]);
   return row ? toPost(row) : null;

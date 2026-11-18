@@ -223,3 +223,68 @@ export interface SellerApplication {
   memo: string | null;
   createdAt: string;
 }
+
+/* ── 시세 리포트 (SEO·GEO) ───────────────────────────────────────────
+ * 사이트 게시판(posts)과 분리된 콘텐츠다. /sise 목록과 상세에만 나온다.
+ */
+
+/** 시세표의 한 칸. price 단위는 만원이고 음수는 페이백이다 (-23 = 23만원 페이백). */
+export interface SiseRow {
+  series: string;
+  model: string;
+  storage: string;
+  carrier: Carrier;
+  plan: string;
+  joinType: JoinType;
+  price: number;
+}
+
+/** 이미지에서 막 읽어낸 상태 — 사람이 확인한 뒤 저장한다 */
+export interface SiseSheetDraft {
+  note: string;
+  rows: SiseRow[];
+}
+
+export interface SiseSheet extends SiseSheetDraft {
+  id: number;
+  region: Region;
+  /** 시세 기준일 (YYYY-MM-DD) */
+  datedOn: string;
+  imageUrl: string;
+  createdAt: string;
+}
+
+/** 직전 시세표와 견준 결과. delta 가 음수면 싸졌다는 뜻이다. */
+export interface SiseChange {
+  model: string;
+  storage: string;
+  carrier: Carrier;
+  joinType: JoinType;
+  before: number;
+  after: number;
+  delta: number;
+}
+
+/** AI 가 쓰는 건 해설뿐이다 — 표는 rows 로 화면에서 그린다 */
+export interface SiseSections {
+  lead: string;
+  highlights: string[];
+  closing: string;
+}
+
+export interface SiseReport {
+  id: number;
+  slug: string;
+  title: string;
+  summary: string;
+  sections: SiseSections;
+  changes: SiseChange[];
+  published: boolean;
+  publishedAt: string | null;
+  views: number;
+  createdAt: string;
+  updatedAt: string;
+  sheet: SiseSheet;
+  /** 견준 직전 시세표의 기준일. 첫 글이면 null */
+  comparedTo: string | null;
+}

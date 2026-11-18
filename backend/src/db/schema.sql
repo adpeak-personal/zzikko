@@ -24,7 +24,9 @@ USE zzikko_cafe;
 SET NAMES utf8mb4;
 
 -- 의존성 역순으로 삭제
-DROP TABLE IF EXISTS seller_applications;
+DROP TABLE IF EXISTS
+  sise_reports,
+  sise_sheets, seller_applications;
 DROP TABLE IF EXISTS uploads;
 DROP TABLE IF EXISTS post_scraps;
 DROP TABLE IF EXISTS comment_likes;
@@ -344,6 +346,55 @@ CREATE TABLE seller_applications (
 -- 이 파일을 다시 돌려도 지워지지 않게 "없을 때만" 만든다.
 -- 컬럼 이름은 외부 프로그램이 그대로 쓰므로 바꾸지 않는다.
 -- ─────────────────────────────────────────────────────────────
+-- ---------------------------------------------------------------------
+-- 시세 리포트 (SEO·GEO 용)
+--
+-- 사이트 게시판(posts)과 **일부러 분리했다.** posts 에 "숨김" 칼럼을 더하면
+-- 목록·검색·공지·스크랩·작성자글·어드민통계 모든 조회에 필터를 걸어야 하고,
+-- 하나만 빠뜨려도 사이트에 노출된다. 따로 두면 그 위험이 없다.
+--
+-- 노출: /sise 목록과 상세만. 사이드바·헤더 메뉴에는 걸지 않는다.
+-- ---------------------------------------------------------------------
+CREATE TABLE sise_sheets (
+  id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  region     VARCHAR(20)  NOT NULL,
+  dated_on   DATE         NOT NULL COMMENT '시세 기준일. 올린 날이 아니라 표에 적힌 날',
+  image_url  VARCHAR(500) NOT NULL COMMENT '원본 시세표 이미지 (도메인 없는 경로)',
+  -- 추출된 행: [{series, model, storage, carrier, plan, joinType, price}]
+  -- price 단위는 만원, 음수는 페이백 (-23 = 23만원 페이백)
+  rows_json  JSON         NOT NULL,
+  note       VARCHAR(300) NOT NULL DEFAULT '' COMMENT '표 상단 조건문 (유심 이동 할인 등)',
+  created_by INT UNSIGNED NULL,
+  created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_sise_sheets_region (region, dated_on DESC),
+  CONSTRAINT fk_sise_sheets_user FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE sise_reports (
+  id           INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  sheet_id     INT UNSIGNED NOT NULL,
+  slug         VARCHAR(120) NOT NULL,
+  title        VARCHAR(200) NOT NULL,
+  summary      VARCHAR(300) NOT NULL DEFAULT '',
+  -- AI 가 쓴 해설만 담는다. 표는 sise_sheets.rows_json 으로 화면에서 그린다 —
+  -- 숫자를 AI 에게 맡기면 환각으로 가격이 틀어진다.
+  sections     JSON         NOT NULL COMMENT '{lead, highlights[], closing}',
+  -- 직전 시트와의 비교 결과 [{model, storage, carrier, joinType, before, after, delta}]
+  changes      JSON         NULL,
+  compared_to  INT UNSIGNED NULL COMMENT '비교한 직전 시트. 없으면 첫 글',
+  published    TINYINT(1)   NOT NULL DEFAULT 0,
+  published_at DATETIME     NULL,
+  views        INT UNSIGNED NOT NULL DEFAULT 0,
+  created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_sise_reports_slug (slug),
+  KEY idx_sise_reports_live (published, published_at DESC),
+  CONSTRAINT fk_sise_reports_sheet FOREIGN KEY (sheet_id) REFERENCES sise_sheets (id) ON DELETE CASCADE,
+  CONSTRAINT fk_sise_reports_prev FOREIGN KEY (compared_to) REFERENCES sise_sheets (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
 CREATE TABLE IF NOT EXISTS nwork (
   n_idx           INT          NOT NULL AUTO_INCREMENT,
   n_id            VARCHAR(100) NOT NULL,

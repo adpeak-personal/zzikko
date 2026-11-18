@@ -2,7 +2,21 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BadgeCheck, BarChart3, Flag, KeyRound, LayoutDashboard, ListTree, MessageSquare, Newspaper, Scale, Settings, Store, Users } from 'lucide-react';
+import {
+  BadgeCheck,
+  BarChart3,
+  Flag,
+  KeyRound,
+  LayoutDashboard,
+  ListTree,
+  MessageSquare,
+  Newspaper,
+  Scale,
+  Settings,
+  Store,
+  TrendingDown,
+  Users,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // 아이콘 컴포넌트는 서버→클라이언트로 넘길 수 없어서 메뉴 정의를 이 파일에 둔다
@@ -17,6 +31,7 @@ const SECTIONS = [
       { href: '/admin/boards', label: '게시판 관리', icon: ListTree },
       { href: '/admin/news', label: 'IT 소식', icon: Newspaper },
       { href: '/admin/specs', label: '기종 사양', icon: Scale },
+      { href: '/admin/sise', label: '시세 리포트', icon: TrendingDown },
       { href: '/admin/posts', label: '게시글 관리', icon: MessageSquare, soon: true },
       { href: '/admin/reports', label: '신고 처리', icon: Flag, soon: true },
     ],

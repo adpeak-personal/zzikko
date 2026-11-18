@@ -4,6 +4,7 @@ import { notFound, parse } from '../lib/http.js';
 import { requireAdmin } from '../lib/auth.js';
 import * as boards from '../repositories/boards.js';
 import * as shops from '../repositories/shops.js';
+import * as sise from '../repositories/sise.js';
 import * as posts from '../repositories/posts.js';
 import * as users from '../repositories/users.js';
 import authRoutes from './auth.js';
@@ -12,6 +13,7 @@ import contentRoutes from './content.js';
 import uploadRoutes from './uploads.js';
 import nworkRoutes from './nwork.js';
 import sellerRoutes from './seller.js';
+import siseRoutes from './sise.js';
 
 const boardPatchSchema = z.object({
   name: z.string().trim().min(1).max(40).optional(),
@@ -25,11 +27,30 @@ const boardPatchSchema = z.object({
 export default async function routes(app: FastifyInstance) {
   app.get('/health', async () => ({ status: 'ok' }));
 
+  /**
+   * 사이트맵 재료 — 주소를 만들 수 있는 최소 정보만.
+   *
+   * 목록 API(/posts)는 쪽으로 나뉘고 지운 글을 거르느라 전부 훑기엔 맞지 않아 따로 둔다.
+   */
+  app.get('/sitemap', async () => {
+    const [postRows, siseRows, boardGroups] = await Promise.all([
+      posts.listForSitemap(),
+      sise.listPublishedSlugs(),
+      boards.listBoardGroups(),
+    ]);
+    return {
+      posts: postRows,
+      sise: siseRows,
+      boards: boardGroups.flatMap((group) => group.boards.map((board) => board.slug)),
+    };
+  });
+
   await app.register(authRoutes);
   await app.register(postRoutes);
   await app.register(contentRoutes);
   await app.register(uploadRoutes);
   await app.register(sellerRoutes);
+  await app.register(siseRoutes);
   // 운영진 전용 훅을 플러그인 안에 거므로 다른 라우트에는 번지지 않는다
   await app.register(nworkRoutes);
 
