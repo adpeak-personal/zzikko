@@ -3,6 +3,10 @@ import { z } from 'zod';
 import { badRequest, notFound, parse } from '../lib/http.js';
 import { requireAdmin } from '../lib/auth.js';
 import * as content from '../repositories/content.js';
+import * as feed from '../repositories/newsFeed.js';
+import { SOURCES, fetchSource } from '../lib/news/feed.js';
+import { writeArticle } from '../lib/news/write.js';
+import { aiReady, logUsage } from '../lib/anthropic.js';
 
 const idParam = z.object({ id: z.coerce.number().int().positive() });
 
@@ -13,6 +17,9 @@ const newsSchema = z.object({
   body: z.string().max(50_000).default(''),
   thumb: z.string().max(20).default('violet'),
   thumbUrl: z.string().max(500).nullable().optional(),
+  // 출처 표기가 이용 조건이라 퍼온 기사에는 반드시 들어간다 (직접 쓴 글이면 비운다)
+  sourceName: z.string().trim().max(60).nullable().optional(),
+  sourceUrl: z.string().trim().max(500).nullable().optional(),
   author: z.string().trim().max(30).default('찍고 편집팀'),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '날짜 형식은 YYYY-MM-DD 입니다.'),
   featured: z.boolean().default(false),
@@ -86,6 +93,83 @@ export default async function contentRoutes(app: FastifyInstance) {
   app.get('/chipsets', async () => ({ items: await content.listChipsets() }));
 
   /* ── 어드민 ── */
+
+  /* ── 뉴스 수집함 ──
+   *
+   * 흐름: 수집(RSS) → 어드민에서 고르기 → 기사 생성(미발행) → 검수 후 발행.
+   * 자동으로 발행까지 가지 않는다 — 퍼온 기사는 사람이 한 번 읽고 내보내야 한다.
+   */
+
+  app.get('/admin/news/feed', { preHandler: requireAdmin }, async (request) => {
+    const { status } = parse(
+      z.object({ status: z.enum(['수집', '작성됨', '숨김']).optional() }),
+      request.query,
+    );
+    return {
+      items: await feed.listFeed(status),
+      counts: await feed.countByStatus(),
+      sources: SOURCES.map((item) => item.name),
+      aiReady: aiReady(),
+    };
+  });
+
+  app.post('/admin/news/feed/fetch', { preHandler: requireAdmin }, async (request) => {
+    let added = 0;
+    const failed: string[] = [];
+    for (const source of SOURCES) {
+      try {
+        added += await feed.saveItems(await fetchSource(source), source.name);
+      } catch (err) {
+        request.log.warn({ err, source: source.name }, '뉴스 수집 실패');
+        failed.push(source.name);
+      }
+    }
+    // 원문은 기사를 쓸 때만 쓰므로 오래된 건 비워 둔다 (행은 남겨야 또 안 받는다)
+    await feed.trimOldSources();
+    return { added, failed };
+  });
+
+  /** 고른 항목으로 기사 초안을 만든다. 미발행으로 들어간다. */
+  app.post('/admin/news/feed/:id/write', { preHandler: requireAdmin }, async (request, reply) => {
+    const { id } = parse(idParam, request.params);
+    const item = await feed.getWithSource(id);
+    if (!item) throw notFound('수집 항목');
+    if (!item.sourceText.trim()) throw badRequest('원문이 남아 있지 않습니다. 다시 수집해주세요.');
+
+    const written = await writeArticle({
+      title: item.title,
+      sourceText: item.sourceText,
+      sourceName: item.sourceName,
+    });
+    logUsage(request, '뉴스 기사 작성', written.model, written.usage);
+
+    const articleId = await content.createNews({
+      title: written.title,
+      category: written.category,
+      summary: written.summary,
+      body: written.body,
+      thumb: 'violet',
+      thumbUrl: null,
+      // 출처 표기는 선택이 아니다 — 퍼온 기사의 이용 조건이다
+      sourceName: item.sourceName,
+      sourceUrl: item.link,
+      author: '찍고 편집팀',
+      date: item.publishedAt.slice(0, 10),
+      featured: false,
+      published: false,
+    });
+    await feed.markWritten(id, articleId);
+
+    return reply.code(201).send({ article: await content.getNews(articleId), relevance: written.relevance });
+  });
+
+  app.patch('/admin/news/feed/:id', { preHandler: requireAdmin }, async (request) => {
+    const { id } = parse(idParam, request.params);
+    const { status } = parse(z.object({ status: z.enum(['수집', '작성됨', '숨김']) }), request.body);
+    if (!(await feed.getWithSource(id))) throw notFound('수집 항목');
+    await feed.setStatus(id, status);
+    return { ok: true };
+  });
 
   app.get('/admin/news', { preHandler: requireAdmin }, async () => ({ items: await content.listNews({ all: true }) }));
 

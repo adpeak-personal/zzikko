@@ -126,7 +126,9 @@ export interface NewsArticle {
   author: string;
   date: string;
   featured: boolean;
-  published: boolean;
+  published: boolean;  /** 출처 표기가 이용 조건이라 비워두지 않는다 (직접 쓴 글이면 null) */
+  sourceName?: string | null;
+  sourceUrl?: string | null;
 }
 
 export interface Chipset {
@@ -287,4 +289,21 @@ export interface SiseReport {
   sheet: SiseSheet;
   /** 견준 직전 시세표의 기준일. 첫 글이면 null */
   comparedTo: string | null;
+}
+
+/* ── 뉴스 수집함 ─────────────────────────────────────────────────── */
+
+export type NewsFeedStatus = '수집' | '작성됨' | '숨김';
+
+/** RSS 로 받아 둔 원문 항목. 사람이 고른 것만 기사가 된다. */
+export interface NewsFeedItem {
+  id: number;
+  title: string;
+  link: string;
+  publishedAt: string;
+  sourceName: string;
+  /** 원문 앞부분 — 고를 때 보라고 주는 것 */
+  preview: string;
+  status: NewsFeedStatus;
+  articleId: number | null;
 }

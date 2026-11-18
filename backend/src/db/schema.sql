@@ -25,6 +25,7 @@ SET NAMES utf8mb4;
 
 -- 의존성 역순으로 삭제
 DROP TABLE IF EXISTS
+  news_feed,
   sise_reports,
   sise_sheets, seller_applications;
 DROP TABLE IF EXISTS uploads;
@@ -237,6 +238,9 @@ CREATE TABLE news_articles (
   date       DATE         NOT NULL,
   featured   TINYINT(1)   NOT NULL DEFAULT 0,
   published  TINYINT(1)   NOT NULL DEFAULT 1,
+  -- 출처 표기가 이용 조건이라 비워두면 안 된다 (직접 쓴 글이면 NULL)
+  source_name VARCHAR(60)  NULL,
+  source_url  VARCHAR(500) NULL,
   created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
@@ -393,6 +397,30 @@ CREATE TABLE sise_reports (
   KEY idx_sise_reports_live (published, published_at DESC),
   CONSTRAINT fk_sise_reports_sheet FOREIGN KEY (sheet_id) REFERENCES sise_sheets (id) ON DELETE CASCADE,
   CONSTRAINT fk_sise_reports_prev FOREIGN KEY (compared_to) REFERENCES sise_sheets (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- ---------------------------------------------------------------------
+-- 뉴스 수집함 (GSMArena RSS)
+--
+-- 출처(GSMArena)가 license.xml 로 "ai-summarize 허용 / 출처 표기(CC BY 4.0) 조건"
+-- 을 밝혀 두었다. 그래서 원문을 그대로 옮기지 않고 요약·재작성하며,
+-- 기사에는 반드시 출처 이름과 링크를 남긴다.
+-- ---------------------------------------------------------------------
+CREATE TABLE news_feed (
+  id           INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  guid         VARCHAR(500) NOT NULL COMMENT 'RSS guid. 같은 글을 두 번 담지 않으려는 열쇠',
+  title        VARCHAR(300) NOT NULL,
+  link         VARCHAR(500) NOT NULL,
+  published_at DATETIME     NOT NULL,
+  source_text  MEDIUMTEXT   NOT NULL COMMENT 'RSS 가 준 원문. 기사를 쓰고 나면 지워도 된다',
+  source_name  VARCHAR(60)  NOT NULL DEFAULT 'GSMArena',
+  status       ENUM('수집','작성됨','숨김') NOT NULL DEFAULT '수집',
+  article_id   INT UNSIGNED NULL COMMENT '이 항목으로 쓴 기사',
+  created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_news_feed_guid (guid),
+  KEY idx_news_feed_list (status, published_at DESC),
+  CONSTRAINT fk_news_feed_article FOREIGN KEY (article_id) REFERENCES news_articles (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE IF NOT EXISTS nwork (

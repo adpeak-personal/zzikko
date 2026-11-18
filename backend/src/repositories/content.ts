@@ -13,6 +13,8 @@ interface NewsRow extends RowDataPacket {
   body: string;
   thumb: string;
   thumb_url: string | null;
+  source_name: string | null;
+  source_url: string | null;
   author: string;
   date: string;
   featured: number;
@@ -27,6 +29,8 @@ const toNews = (row: NewsRow): NewsArticle => ({
   body: row.body,
   thumb: row.thumb,
   thumbUrl: row.thumb_url ? publicUrl(row.thumb_url) : null,
+  sourceName: row.source_name,
+  sourceUrl: row.source_url,
   author: row.author,
   date: row.date,
   featured: Boolean(row.featured),
@@ -63,8 +67,8 @@ async function clearOtherFeatured(keepId: number) {
 
 export async function createNews(input: NewsInput): Promise<number> {
   const result = await execute(
-    `INSERT INTO news_articles (title, category, summary, body, thumb, thumb_url, author, date, featured, published)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO news_articles (title, category, summary, body, thumb, thumb_url, source_name, source_url, author, date, featured, published)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       input.title,
       input.category,
@@ -72,6 +76,8 @@ export async function createNews(input: NewsInput): Promise<number> {
       input.body,
       input.thumb,
       input.thumbUrl ? toStored(input.thumbUrl) : null,
+      input.sourceName ?? null,
+      input.sourceUrl ?? null,
       input.author,
       input.date,
       input.featured ? 1 : 0,
@@ -86,6 +92,7 @@ export async function updateNews(id: number, input: NewsInput) {
   await execute(
     `UPDATE news_articles
         SET title = ?, category = ?, summary = ?, body = ?, thumb = ?, thumb_url = ?,
+            source_name = ?, source_url = ?,
             author = ?, date = ?, featured = ?, published = ?
       WHERE id = ?`,
     [
@@ -95,6 +102,8 @@ export async function updateNews(id: number, input: NewsInput) {
       input.body,
       input.thumb,
       input.thumbUrl ? toStored(input.thumbUrl) : null,
+      input.sourceName ?? null,
+      input.sourceUrl ?? null,
       input.author,
       input.date,
       input.featured ? 1 : 0,

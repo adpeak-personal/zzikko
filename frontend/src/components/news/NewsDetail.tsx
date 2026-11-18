@@ -29,6 +29,26 @@ export function NewsDetail({ article, others }: { article: NewsArticle; others: 
 
         <div className="mt-8 whitespace-pre-line text-[17px] leading-[1.9] text-gray-800">{article.body}</div>
 
+        {/* 출처 표기는 퍼온 기사의 이용 조건이다. 지우면 안 된다. */}
+        {article.sourceName && (
+          <p className="mt-8 border-t border-gray-100 pt-4 text-sm text-gray-500">
+            출처{' '}
+            {article.sourceUrl ? (
+              <a
+                href={article.sourceUrl}
+                target="_blank"
+                rel="noreferrer nofollow"
+                className="font-semibold text-gray-700 hover:underline"
+              >
+                {article.sourceName}
+              </a>
+            ) : (
+              <span className="font-semibold text-gray-700">{article.sourceName}</span>
+            )}
+            <span className="ml-2 text-xs text-gray-400">· 원문을 요약·재작성한 기사입니다.</span>
+          </p>
+        )}
+
         <div className="mt-10 border-t border-gray-100 pt-6">
           <Link href="/board/news" className="flex w-fit items-center gap-1.5 rounded-xl border border-gray-200 px-5 py-2.5 font-bold text-gray-700 hover:border-gray-300">
             <ArrowLeft size={16} /> 목록

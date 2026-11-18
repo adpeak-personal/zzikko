@@ -123,6 +123,33 @@ const steps = [
     ],
   },
   {
+    // 출처(GSMArena)가 license.xml 로 "ai-summarize 허용 / 출처 표기 조건" 을 밝혀 두었다.
+    // 그래서 원문을 그대로 옮기지 않고 요약·재작성하며, 기사에 출처와 링크를 남긴다.
+    name: 'news_feed + news_articles.source_* — 뉴스 수집함',
+    check: (c) => hasTable(c, 'news_feed'),
+    sql: [
+      `ALTER TABLE news_articles
+         ADD COLUMN source_name VARCHAR(60)  NULL,
+         ADD COLUMN source_url  VARCHAR(500) NULL`,
+      `CREATE TABLE IF NOT EXISTS news_feed (
+         id           INT UNSIGNED NOT NULL AUTO_INCREMENT,
+         guid         VARCHAR(500) NOT NULL,
+         title        VARCHAR(300) NOT NULL,
+         link         VARCHAR(500) NOT NULL,
+         published_at DATETIME     NOT NULL,
+         source_text  MEDIUMTEXT   NOT NULL,
+         source_name  VARCHAR(60)  NOT NULL DEFAULT 'GSMArena',
+         status       ENUM('수집','작성됨','숨김') NOT NULL DEFAULT '수집',
+         article_id   INT UNSIGNED NULL,
+         created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+         PRIMARY KEY (id),
+         UNIQUE KEY uq_news_feed_guid (guid),
+         KEY idx_news_feed_list (status, published_at DESC),
+         CONSTRAINT fk_news_feed_article FOREIGN KEY (article_id) REFERENCES news_articles (id) ON DELETE SET NULL
+       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`,
+    ],
+  },
+  {
     // 시세 리포트는 posts 와 분리해 둔다 — 사이트에 노출되지 않아야 해서,
     // posts 에 섞으면 모든 목록 조회에 필터를 걸어야 하고 하나만 빠뜨려도 새어 나간다.
     name: 'sise_sheets / sise_reports — 시세 리포트 (SEO)',
