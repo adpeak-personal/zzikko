@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
-import { EXTRACT_MODEL, anthropic } from '../anthropic.js';
+import { EXTRACT_MODEL, anthropic, type Usage } from '../anthropic.js';
 import { badRequest } from '../http.js';
 import type { SiseRow, SiseSheetDraft } from '../../types.js';
 
@@ -76,12 +76,18 @@ const PROMPT = `첨부한 이미지는 한국 휴대폰 판매점의 시세표�
 지어내지 마라. 흐려서 못 읽는 칸은 빼라. 있는 것만 정확히 넘기는 쪽이 낫다.`;
 
 /** 이미지(버퍼) → 시세표 초안. 사람이 확인한 뒤에 저장한다. */
-export async function extractSheet(image: Buffer, mimetype: string): Promise<SiseSheetDraft> {
+export async function extractSheet(
+  image: Buffer,
+  mimetype: string,
+  /** 모델을 바꿔 정확도를 견줄 때만 넘긴다. 평소엔 ANTHROPIC_MODEL 을 쓴다. */
+  modelOverride?: string,
+): Promise<SiseSheetDraft & { usage: Usage; model: string }> {
   const client = anthropic();
   if (!client) throw badRequest('ANTHROPIC_API_KEY 가 없어 시세표를 읽을 수 없습니다.');
 
+  const model = modelOverride ?? EXTRACT_MODEL;
   const response = await client.messages.parse({
-    model: EXTRACT_MODEL,
+    model,
     // 칸이 200개를 넘는 표도 있어 넉넉히 둔다 — 중간에 잘리면 행이 통째로 사라진다
     max_tokens: 16000,
     output_config: { format: zodOutputFormat(SheetSchema) },
@@ -108,7 +114,7 @@ export async function extractSheet(image: Buffer, mimetype: string): Promise<Sis
   const rows = parsed.rows.map(normalizeRow).filter((row): row is SiseRow => row !== null);
   if (rows.length === 0) throw badRequest('표에서 읽어낸 행이 없습니다. 시세표 이미지가 맞는지 확인해주세요.');
 
-  return { note: parsed.note.slice(0, 300), rows };
+  return { note: parsed.note.slice(0, 300), rows, usage: response.usage, model };
 }
 
 /** 모델이 준 줄 하나를 우리 형식으로. 말이 안 되면 null 로 버린다. */

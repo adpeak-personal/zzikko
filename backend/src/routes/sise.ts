@@ -3,7 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { badRequest, notFound, parse } from '../lib/http.js';
 import { requireAdmin } from '../lib/auth.js';
-import { aiReady } from '../lib/anthropic.js';
+import { aiReady, logUsage } from '../lib/anthropic.js';
 import { extractSheet } from '../lib/sise/extract.js';
 import { compareSheets } from '../lib/sise/compare.js';
 import { REGION_SLUG, defaultTitle, writeReport } from '../lib/sise/write.js';
@@ -89,12 +89,13 @@ export default async function siseRoutes(app: FastifyInstance) {
 
     // 원본 그대로 읽힌다 — 표의 작은 숫자가 뭉개지면 안 되므로 줄이기 전에 넘긴다
     const draft = await extractSheet(input, file.mimetype);
+    const readCost = logUsage(request, '시세표 읽기', draft.model, draft.usage);
 
     // 보관용은 webp 로 (EXIF 제거 + 용량)
     const processed = await processImage(input);
     const saved = await saveBuffer(`sise/${new Date().toISOString().slice(0, 10)}/${randomUUID()}.webp`, processed.body, 'image/webp');
 
-    return { imageUrl: saved.url, ...draft };
+    return { imageUrl: saved.url, note: draft.note, rows: draft.rows, usd: readCost };
   });
 
   /**
@@ -126,6 +127,8 @@ export default async function siseRoutes(app: FastifyInstance) {
       comparison,
       previousDate: previous?.datedOn ?? null,
     });
+
+    logUsage(request, '시세 글 작성', written.model, written.usage);
 
     const slug = await sise.uniqueSlug(`${REGION_SLUG[input.region as Region]}-${input.datedOn}`);
     const reportId = await sise.createReport({

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
-import { WRITE_MODEL, anthropic } from '../anthropic.js';
+import { WRITE_MODEL, anthropic, type Usage } from '../anthropic.js';
 import { badRequest } from '../http.js';
 import { lowestByModel, type SiseComparison } from './compare.js';
 import type { Region, SiseRow, SiseSections } from '../../types.js';
@@ -48,12 +48,17 @@ export interface WriteInput {
   previousDate: string | null;
 }
 
-export async function writeReport(input: WriteInput): Promise<SiseSections & { title: string; summary: string }> {
+export async function writeReport(
+  input: WriteInput,
+  /** 모델을 바꿔 글맛을 견줄 때만 넘긴다. 평소엔 ANTHROPIC_WRITE_MODEL 을 쓴다. */
+  modelOverride?: string,
+): Promise<SiseSections & { title: string; summary: string; usage: Usage; model: string }> {
   const client = anthropic();
   if (!client) throw badRequest('ANTHROPIC_API_KEY 가 없어 글을 쓸 수 없습니다.');
 
+  const model = modelOverride ?? WRITE_MODEL;
   const response = await client.messages.parse({
-    model: WRITE_MODEL,
+    model,
     max_tokens: 8000,
     output_config: { format: zodOutputFormat(ReportSchema) },
     messages: [{ role: 'user', content: buildPrompt(input) }],
@@ -71,6 +76,8 @@ export async function writeReport(input: WriteInput): Promise<SiseSections & { t
     lead: parsed.lead.trim(),
     highlights: parsed.highlights.map((line) => line.trim()).filter(Boolean).slice(0, 6),
     closing: parsed.closing.trim(),
+    usage: response.usage,
+    model,
   };
 }
 
