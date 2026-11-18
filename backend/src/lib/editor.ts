@@ -71,6 +71,26 @@ export function collectImages(doc: unknown): string[] {
   return found;
 }
 
+/**
+ * 본문의 이미지 주소를 일괄로 바꾼 새 문서를 돌려준다. (원본은 건드리지 않는다)
+ *
+ * 저장할 땐 전체 주소 → 도메인 없는 경로, 읽을 땐 그 반대로 쓴다.
+ * 본문에 도메인이 박혀 있으면 CDN 을 바꿀 때 글을 전부 고쳐야 한다.
+ */
+export function rewriteImages(doc: unknown, convert: (src: string) => string): unknown {
+  const walk = (node: Node): Node => {
+    const next: Node = { ...node };
+    if (node.type === 'image' && typeof node.attrs?.src === 'string') {
+      next.attrs = { ...node.attrs, src: convert(node.attrs.src) };
+    }
+    if (node.content) next.content = node.content.map(walk);
+    return next;
+  };
+
+  if (!doc || typeof doc !== 'object') return doc;
+  return walk(doc as Node);
+}
+
 /** 빈 본문인지 — 글자도 이미지도 없으면 비어 있는 것으로 본다 */
 export function isEmptyDoc(doc: unknown): boolean {
   return toPlainText(doc).length === 0 && findFirstImage(doc) === null;

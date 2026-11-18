@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { badRequest, forbidden, notFound, parse } from '../lib/http.js';
 import { requireAuth } from '../lib/auth.js';
 import { collectImages, isEmptyDoc } from '../lib/editor.js';
+import { toStored } from '../lib/storage.js';
 import { ensureThumbnail } from '../lib/thumbnail.js';
 import * as uploads from '../repositories/uploads.js';
 import * as boards from '../repositories/boards.js';
@@ -254,7 +255,9 @@ export default async function postRoutes(app: FastifyInstance) {
  * 썸네일을 만든 뒤에 글에 저장해야, 저장된 주소가 실제로 있는 파일을 가리킨다.
  */
 async function attachImages(postId: number, contentJson: unknown, mode: 'create' | 'update') {
-  const images = collectImages(contentJson);
+  // uploads.url 과 같은 형식(도메인 없는 경로)으로 맞춘다.
+  // 어긋나면 글에 쓰인 이미지가 "안 쓰인 것"으로 분류돼 청소 때 지워진다.
+  const images = collectImages(contentJson).map(toStored);
 
   if (mode === 'create') await uploads.linkUploadsToPost(postId, images);
   else await uploads.relinkUploadsToPost(postId, images);

@@ -5,7 +5,7 @@
  * 올리는 족족 만들면 사진 여러 장짜리 글에서 나머지는 아무도 안 보는 파일이 된다.
  */
 import { makeThumb } from './images.js';
-import { readFileAt, saveBuffer, toObjectPath } from './storage.js';
+import { readFileAt, saveBuffer, toObjectPath, toStored } from './storage.js';
 import { setThumbUrl } from '../repositories/uploads.js';
 
 /** 본문용 경로 → 썸네일 경로 (`2026-10-12/uuid.webp` → `2026-10-12/uuid_thumb.webp`) */
@@ -42,10 +42,11 @@ export async function ensureThumbnail(url: string): Promise<string> {
 
     const thumb = await makeThumb(source);
     const saved = await saveBuffer(thumbPath, thumb.body, 'image/webp');
+    const storedThumb = toStored(saved.url);
 
     // 청소할 때 썸네일도 같이 지워져야 하므로 기록해 둔다
-    await setThumbUrl(url, saved.url);
-    return saved.url;
+    await setThumbUrl(url, storedThumb);
+    return storedThumb;
   } catch {
     return url;
   }

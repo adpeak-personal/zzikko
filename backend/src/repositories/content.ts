@@ -1,6 +1,7 @@
 import type { RowDataPacket } from 'mysql2';
 import { execute, query, queryOne } from '../db/pool.js';
 import type { Chipset, NewsArticle, PhoneSpec } from '../types.js';
+import { publicUrl, toStored } from '../lib/storage.js';
 
 /* ── IT 소식 ─────────────────────────────────────── */
 
@@ -25,7 +26,7 @@ const toNews = (row: NewsRow): NewsArticle => ({
   summary: row.summary,
   body: row.body,
   thumb: row.thumb,
-  thumbUrl: row.thumb_url,
+  thumbUrl: row.thumb_url ? publicUrl(row.thumb_url) : null,
   author: row.author,
   date: row.date,
   featured: Boolean(row.featured),
@@ -70,7 +71,7 @@ export async function createNews(input: NewsInput): Promise<number> {
       input.summary,
       input.body,
       input.thumb,
-      input.thumbUrl ?? null,
+      input.thumbUrl ? toStored(input.thumbUrl) : null,
       input.author,
       input.date,
       input.featured ? 1 : 0,
@@ -93,7 +94,7 @@ export async function updateNews(id: number, input: NewsInput) {
       input.summary,
       input.body,
       input.thumb,
-      input.thumbUrl ?? null,
+      input.thumbUrl ? toStored(input.thumbUrl) : null,
       input.author,
       input.date,
       input.featured ? 1 : 0,
@@ -209,7 +210,7 @@ const toSpec = (row: SpecRow): PhoneSpec => ({
   cameraMainMp: row.camera_main_mp,
   weightG: row.weight_g,
   thumb: row.thumb,
-  thumbUrl: row.thumb_url,
+  thumbUrl: row.thumb_url ? publicUrl(row.thumb_url) : null,
   published: Boolean(row.published),
 });
 
@@ -248,7 +249,7 @@ const specParams = (input: SpecInput) => [
   input.cameraMainMp,
   input.weightG,
   input.thumb,
-  input.thumbUrl ?? null,
+  input.thumbUrl ? toStored(input.thumbUrl) : null,
   input.published ? 1 : 0,
 ];
 

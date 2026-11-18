@@ -1,6 +1,7 @@
 import type { RowDataPacket } from 'mysql2';
 import { execute, query, queryOne, withTransaction } from '../db/pool.js';
-import { findFirstImage, toPlainText } from '../lib/editor.js';
+import { findFirstImage, rewriteImages, toPlainText } from '../lib/editor.js';
+import { publicUrl, toStored } from '../lib/storage.js';
 import type { Comment, DealInfo, Paged, Post, PublicUser } from '../types.js';
 
 /** 검색 범위 — 기본은 제목+내용 */
@@ -94,9 +95,10 @@ function toPost(row: PostRow): Post {
     category: row.category,
     region: row.region as Post['region'],
     title: row.title,
-    contentJson: row.content_json,
+    // DB 에는 도메인 없는 경로가 들어 있다 — 내보낼 때 전체 주소로 되돌린다
+    contentJson: rewriteImages(row.content_json, publicUrl),
     content: row.content_text,
-    thumbUrl: row.thumb_url,
+    thumbUrl: row.thumb_url ? publicUrl(row.thumb_url) : null,
     authorId: row.author_id,
     author: toAuthor(row),
     isNotice: Boolean(row.is_notice),
@@ -231,8 +233,10 @@ export async function createPost(input: NewPost): Promise<number> {
   const board = await queryOne<RowDataPacket & { id: number }>('SELECT id FROM boards WHERE slug = ?', [input.boardSlug]);
   if (!board) throw new Error(`게시판을 찾을 수 없습니다: ${input.boardSlug}`);
 
-  const text = toPlainText(input.contentJson);
-  const thumb = findFirstImage(input.contentJson);
+  // 본문에 도메인을 박아두면 CDN 을 바꿀 때 글을 전부 고쳐야 한다
+  const content = rewriteImages(input.contentJson, toStored);
+  const text = toPlainText(content);
+  const thumb = findFirstImage(content);
 
   return withTransaction(async (conn) => {
     const [result] = await conn.execute(
@@ -244,7 +248,7 @@ export async function createPost(input: NewPost): Promise<number> {
         input.category ?? null,
         input.region ?? null,
         input.title,
-        JSON.stringify(input.contentJson),
+        JSON.stringify(content),
         text,
         thumb,
       ],
@@ -290,9 +294,10 @@ export async function updatePost(id: number, patch: PostPatch): Promise<void> {
   if (patch.region !== undefined) put('region', patch.region);
   if (patch.contentJson !== undefined) {
     // 평문과 썸네일은 본문에서 다시 뽑는다 — 본문만 바꾸고 둘을 안 고치면 어긋난다
-    put('content_json', JSON.stringify(patch.contentJson));
-    put('content_text', toPlainText(patch.contentJson));
-    put('thumb_url', findFirstImage(patch.contentJson));
+    const content = rewriteImages(patch.contentJson, toStored);
+    put('content_json', JSON.stringify(content));
+    put('content_text', toPlainText(content));
+    put('thumb_url', findFirstImage(content));
   }
 
   if (sets.length === 0) return;

@@ -117,21 +117,52 @@ export async function readFileAt(objectPath: string): Promise<Buffer | null> {
 }
 
 /**
- * 공개 주소 → 저장 경로.
+ * 주소 → 저장 경로(키).
  *
- * DB 에는 공개 주소(`/uploads/...` 또는 `https://cdn/...`)가 들어 있는데,
- * 지우거나 다시 읽으려면 버킷 안 키가 필요하다.
+ * 받는 값은 세 가지다.
+ *   `/2026-11-18/uuid.webp`            DB 에 저장된 형태 (도메인 없음)
+ *   `https://cdn/2026-11-18/uuid.webp` 공개 주소 (지금 것 또는 IMAGE_LEGACY_BASE_URLS 의 옛 것)
+ *   `/uploads/2026-10-01/uuid.webp`    S3 이전에 로컬 디스크로 올라간 파일
  *
- * 예전 주소(IMAGE_LEGACY_BASE_URLS)도 받아준다 — CDN 도메인을 바꿨을 때
- * DB 에 남은 옛 주소의 이미지를 못 지우면 쓰레기가 영구히 쌓인다.
+ * 예전 주소도 받아주는 이유 — CDN 도메인을 바꿨을 때 DB 에 남은 옛 주소의
+ * 이미지를 못 지우면 쓰레기가 영구히 쌓인다.
  */
 export function toObjectPath(url: string): string | null {
   for (const base of knownBases()) {
     if (base && url.startsWith(`${base}/`)) return url.slice(base.length + 1);
   }
   if (url.startsWith(LOCAL_PREFIX)) return url.slice(LOCAL_PREFIX.length);
-  // 우리 주소가 아니면 건드리지 않는다 (본문에 외부 이미지가 들어올 수 있다)
+  // 남의 주소는 건드리지 않는다 (본문에 외부 이미지가 들어올 수 있다)
+  if (/^https?:\/\//i.test(url)) return null;
+  // 도메인 없는 우리 경로 — 앞 슬래시만 떼면 키다
+  if (url.startsWith('/')) return url.slice(1);
   return null;
+}
+
+/* ── DB 에 넣는 값 ↔ 화면에 쓰는 주소 ──────────────────────────────
+ *
+ * DB 에는 도메인 없는 경로(`/2026-11-18/uuid.webp`)만 넣는다.
+ * CDN 도메인이 바뀌어도 글 본문을 건드릴 필요가 없기 때문이다.
+ *
+ * 변환은 repositories / routes 경계에서만 한다 — 프론트는 늘 전체 주소만 본다.
+ */
+
+/** 화면에 쓸 주소 → DB 에 넣을 값 */
+export function toStored(url: string): string {
+  // S3 이전에 올라간 파일은 그대로 둔다. 파일이 아직 서버 디스크에 있어서
+  // 키로 바꾸면 S3 에서 찾게 되고, 그럼 안 뜬다.
+  if (url.startsWith(LOCAL_PREFIX)) return url;
+  const key = toObjectPath(url);
+  return key ? `/${key}` : url; // 우리 게 아니면(외부 이미지) 그대로
+}
+
+/** DB 에 든 값 → 화면에 쓸 주소 */
+export function publicUrl(stored: string): string {
+  if (/^https?:\/\//i.test(stored)) return stored; // 외부 이미지
+  if (stored.startsWith(LOCAL_PREFIX)) return stored; // S3 이전 파일
+  if (!stored.startsWith('/')) return stored; // 우리 형식이 아니면 손대지 않는다
+  const key = stored.slice(1);
+  return usingRemoteStorage ? `${publicBase()}/${key}` : `${LOCAL_PREFIX}${key}`;
 }
 
 /** 여러 공개 주소를 한 번에 지운다 */

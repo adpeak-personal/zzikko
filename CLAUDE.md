@@ -60,10 +60,15 @@
 - `S3_BUCKET` · `AWS_REGION` · `AWS_ACCESS_KEY_ID` · `AWS_SECRET_ACCESS_KEY` 가 **넷 다** 있으면
   S3, 하나라도 없으면 로컬 디스크(`UPLOAD_DIR`)에 저장한다. 라우트는 어느 쪽인지 모른다.
 - 공개 주소는 `IMAGE_BASE_URL`(CloudFront)을 앞에 붙여 만든다. 비면 S3 주소를 직접 쓴다.
-- **DB 에는 전체 주소가 들어간다** (`posts.thumb_url`, `uploads.url`, 본문 ProseMirror JSON 의
-  `image.attrs.src`). 그래서 CDN 도메인을 바꾸면 옛 주소가 DB 에 남는다 — 바꿀 땐 옛 주소를
-  `IMAGE_LEGACY_BASE_URLS` 에 넣어야 이미지 청소가 계속 동작한다.
-  (abyssblue 는 키만 저장하고 읽을 때 조립한다. 찍고도 그 방식이 맞지만 본문 JSON 까지 손대야 해서 아직 안 했다.)
+- **DB 에는 도메인 없는 경로만 넣는다** (`/2026-11-18/uuid.webp`). CDN 도메인이 바뀌어도 글을
+  고칠 필요가 없게. 변환은 `storage.ts` 의 `toStored`(쓸 때) / `publicUrl`(읽을 때) 두 함수로만 한다.
+  - 거는 곳: `repositories/posts.ts`(본문 JSON·thumb_url), `repositories/content.ts`(뉴스·스펙 썸네일),
+    `routes/uploads.ts`(uploads.url), `lib/thumbnail.ts`. **프론트는 늘 전체 주소만 본다.**
+  - S3 이전에 올라간 `/uploads/...` 와 외부 이미지(`https://...`)는 두 함수가 **그대로 통과**시킨다.
+    섞여 있어도 되고, 옛 파일을 옮기지 않아도 계속 뜬다.
+- ⚠️ **`uploads.url` 은 본문 이미지 src 와 문자열로 맞춰보는 조인 키다**
+  (`linkUploadsToPost` / `relinkUploadsToPost`). 양쪽 형식이 어긋나면 글에 쓰인 이미지가 "안 쓰인 것"
+  으로 분류돼 24시간 뒤 청소에 지워진다. 이미지 주소 형식을 건드릴 땐 이 경로를 반드시 같이 확인할 것.
 - 저장 파일 이름은 서버가 만든다(`날짜/UUID.확장자`). 올라온 파일 이름을 그대로 쓰지 말 것 — `../` 가 섞인다.
 - **AWS 키를 커밋하지 말 것.** `.env.local`(로컬) / 서버 `/opt/zzikko/.env.back`(운영)에만 둔다.
 

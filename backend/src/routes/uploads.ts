@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { badRequest } from '../lib/http.js';
 import { requireAuth } from '../lib/auth.js';
-import { saveBuffer } from '../lib/storage.js';
+import { saveBuffer, toStored } from '../lib/storage.js';
 import { UnsupportedImageError, isAnimated, processImage } from '../lib/images.js';
 import { recordUpload } from '../repositories/uploads.js';
 
@@ -59,7 +59,8 @@ export default async function uploadRoutes(app: FastifyInstance) {
     if (await isAnimated(input)) {
       const saved = await saveBuffer(`${folder}/${id}${extension}`, input, file.mimetype);
       await recordUpload({
-        url: saved.url,
+        // DB 에는 도메인 없는 경로만 — 응답은 아래에서 전체 주소로 준다
+        url: toStored(saved.url),
         filename: file.filename,
         mimetype: file.mimetype,
         size: input.byteLength,
@@ -86,7 +87,8 @@ export default async function uploadRoutes(app: FastifyInstance) {
 
     // post_id 없이 기록해 둔다 — 글에 안 쓰이면 나중에 청소 대상이 된다
     await recordUpload({
-      url: saved.url,
+      // DB 에는 도메인 없는 경로만 — 응답은 아래에서 전체 주소로 준다
+      url: toStored(saved.url),
       filename: file.filename,
       mimetype: 'image/webp',
       size: processed.bytes,

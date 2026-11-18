@@ -122,7 +122,60 @@ const steps = [
        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`,
     ],
   },
+  {
+    // DB 에는 도메인 없는 경로(`/2026-11-18/uuid.webp`)만 둔다 — CDN 을 바꿔도 글을 안 고치게.
+    // S3 를 켜고 키 방식 전환 전에 올라간 이미지는 전체 주소로 들어가 있어서 여기서 떼어낸다.
+    // 이게 안 되면 uploads.url 과 본문 이미지 src 형식이 어긋나 "안 쓰인 이미지" 로 잘못 분류된다.
+    name: '이미지 주소에서 CDN 도메인 떼기 (DB 엔 경로만)',
+    check: async (c) => (await countAbsoluteImageUrls(c)) === 0,
+    run: async (c) => {
+      const base = cdnBase();
+      const like = `%${base}%`;
+      await c.query("UPDATE uploads SET url = REPLACE(url, ?, '') WHERE url LIKE ?", [base, like]);
+      await c.query("UPDATE uploads SET thumb_url = REPLACE(thumb_url, ?, '') WHERE thumb_url LIKE ?", [base, like]);
+      await c.query("UPDATE posts SET thumb_url = REPLACE(thumb_url, ?, '') WHERE thumb_url LIKE ?", [base, like]);
+      await c.query("UPDATE news_articles SET thumb_url = REPLACE(thumb_url, ?, '') WHERE thumb_url LIKE ?", [base, like]);
+      await c.query("UPDATE phone_specs SET thumb_url = REPLACE(thumb_url, ?, '') WHERE thumb_url LIKE ?", [base, like]);
+      // 본문은 JSON 이라 문자열로 꺼내 바꾸고 다시 넣는다
+      await c.query(
+        `UPDATE posts
+            SET content_json = CAST(REPLACE(CAST(content_json AS CHAR), ?, '') AS JSON)
+          WHERE CAST(content_json AS CHAR) LIKE ?`,
+        [base, like],
+      );
+    },
+  },
 ];
+
+/** 공개 주소 앞머리. 없으면 바꿀 것도 없다. */
+function cdnBase() {
+  return (process.env.IMAGE_BASE_URL ?? '').replace(/\/+$/, '');
+}
+
+/** DB 에 전체 주소로 남아 있는 이미지가 몇 건인지 */
+async function countAbsoluteImageUrls(conn) {
+  const base = cdnBase();
+  if (!base) return 0; // CDN 설정이 없으면 해당 없음
+  const like = `%${base}%`;
+  const checks = [
+    ['uploads', 'url'],
+    ['uploads', 'thumb_url'],
+    ['posts', 'thumb_url'],
+    ['news_articles', 'thumb_url'],
+    ['phone_specs', 'thumb_url'],
+  ];
+  let total = 0;
+  for (const [table, column] of checks) {
+    if (!(await hasTable(conn, table))) continue;
+    const [rows] = await conn.query(`SELECT COUNT(*) AS n FROM \`${table}\` WHERE \`${column}\` LIKE ?`, [like]);
+    total += Number(rows[0].n);
+  }
+  if (await hasTable(conn, 'posts')) {
+    const [rows] = await conn.query('SELECT COUNT(*) AS n FROM posts WHERE CAST(content_json AS CHAR) LIKE ?', [like]);
+    total += Number(rows[0].n);
+  }
+  return total;
+}
 
 async function hasColumn(conn, table, column) {
   const [rows] = await conn.query(
@@ -172,7 +225,9 @@ async function main() {
 
     console.log('');
     for (const step of pending) {
-      for (const sql of step.sql) await conn.query(sql);
+      // 스키마 변경은 sql 배열로, 데이터 손질은 run() 으로
+      if (step.run) await step.run(conn);
+      else for (const sql of step.sql) await conn.query(sql);
       console.log(`  ✔ ${step.name}`);
     }
     console.log('\n✅ 적용 완료');
