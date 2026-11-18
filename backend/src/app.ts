@@ -9,7 +9,7 @@ import fastifyStatic from '@fastify/static';
 import { sendError } from './lib/http.js';
 import { loadUser } from './lib/auth.js';
 import routes from './routes/index.js';
-import { UPLOAD_DIR, storageDescription, usingGcs } from './lib/storage.js';
+import { UPLOAD_DIR, storageDescription, usingRemoteStorage } from './lib/storage.js';
 import { startMaintenance } from './lib/maintenance.js';
 
 /**
@@ -41,8 +41,8 @@ export async function buildApp({ logger = true } = {}) {
     limits: { fileSize: 10 * 1024 * 1024, files: 1 },
   });
 
-  // GCS 를 쓰면 이미지 주소가 버킷을 가리키므로 여기서 서빙할 필요가 없다
-  if (!usingGcs) {
+  // S3 를 쓰면 이미지 주소가 CDN/버킷을 가리키므로 여기서 서빙할 필요가 없다
+  if (!usingRemoteStorage) {
     await mkdir(UPLOAD_DIR, { recursive: true });
     await app.register(fastifyStatic, {
       root: join(process.cwd(), UPLOAD_DIR),

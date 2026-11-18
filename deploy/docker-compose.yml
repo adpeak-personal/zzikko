@@ -3,7 +3,9 @@
 #
 # 서버에만 있는 것 (git 에 없음):
 #   /opt/zzikko/.env.back   DATABASE_URL · JWT_SECRET · CORS_ORIGIN (600)
-#   /opt/zzikko/uploads/    업로드 이미지 (node 1000:1000 소유)
+#                           + S3_BUCKET · AWS_REGION · AWS_ACCESS_KEY_ID · AWS_SECRET_ACCESS_KEY · IMAGE_BASE_URL
+#   /opt/zzikko/uploads/    S3 를 켜기 전에 올라온 이미지. S3 로 넘어가도 옛 주소(/uploads/...)가
+#                           DB 에 남아 있으므로 이 볼륨을 지우면 그 이미지들이 깨진다.
 #
 # 외부 노출은 호스트 nginx (zzikko.co.kr): /api/ → 3041, 나머지 → 3040.
 # DB 는 공용 DB 서버 158.247.244.167 의 zzikko_cafe.

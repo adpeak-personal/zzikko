@@ -3,47 +3,98 @@ import { mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { Readable } from 'node:stream';
-import { Storage } from '@google-cloud/storage';
+import {
+  DeleteObjectsCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 
 /**
  * 업로드 파일 저장소.
  *
- * GCS 설정이 있으면 Google Cloud Storage 로, 없으면 로컬 디스크로 저장한다.
+ * AWS 설정이 있으면 S3(+CloudFront)로, 없으면 로컬 디스크로 저장한다.
  * 키가 준비되기 전에도 개발이 멈추지 않게 하려는 것이고, 어느 쪽이든
  * 돌려주는 값은 `url` 하나뿐이라 호출부(라우트)는 저장 위치를 모른다.
  *
- * 필요한 환경변수 (셋 다 있으면 GCS 사용):
- *   GCS_BUCKET      버킷 이름
- *   GCS_PROJECT     프로젝트 ID
- *   GCS_KEY_FILE    서비스 계정 키(JSON) 경로
- *   GCS_PUBLIC_HOST (선택) CDN 이나 커스텀 도메인. 없으면 storage.googleapis.com
+ * 필요한 환경변수 (넷 다 있으면 S3 사용):
+ *   S3_BUCKET              버킷 이름   예: zzikko-img-590427064205-ap-northeast-2-an
+ *   AWS_REGION             리전        예: ap-northeast-2
+ *   AWS_ACCESS_KEY_ID      액세스 키   (zzikko-img-uploader IAM 사용자)
+ *   AWS_SECRET_ACCESS_KEY  시크릿 키
+ *
+ *   IMAGE_BASE_URL         (선택) CloudFront 주소. 예: https://dxxxx.cloudfront.net
+ *                          없으면 S3 주소를 직접 쓴다 — CDN 만들기 전에도 동작하게.
+ *   IMAGE_LEGACY_BASE_URLS (선택) 예전 공개 주소들, 쉼표로 구분.
+ *                          CDN 도메인을 바꿨을 때 DB 에 남은 옛 주소를 읽기 위한 것.
  */
 
 export const UPLOAD_DIR = process.env.UPLOAD_DIR ?? 'uploads';
 
-const bucketName = process.env.GCS_BUCKET;
-const projectId = process.env.GCS_PROJECT;
-const keyFilename = process.env.GCS_KEY_FILE;
+/** 로컬 저장소일 때 백엔드가 직접 서빙하는 prefix */
+const LOCAL_PREFIX = '/uploads/';
 
-export const usingGcs = Boolean(bucketName && projectId && keyFilename);
+const bucket = process.env.S3_BUCKET;
+const region = process.env.AWS_REGION;
+const hasCredentials = Boolean(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY);
 
-const storage = usingGcs ? new Storage({ projectId, keyFilename }) : null;
+/** S3 를 쓰는지 — app.ts 가 로컬 정적 서빙을 걸지 말지 판단하는 데 쓴다 */
+export const usingRemoteStorage = Boolean(bucket && region && hasCredentials);
+
+// 자격증명은 SDK 가 환경변수(AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY)에서 알아서 읽는다
+const client = usingRemoteStorage ? new S3Client({ region }) : null;
+
+/** 공개 주소의 앞머리 (뒤 슬래시 없음) */
+function publicBase(): string {
+  const configured = process.env.IMAGE_BASE_URL?.replace(/\/+$/, '');
+  if (configured) return configured;
+  // CloudFront 를 아직 안 만들었을 때 — 버킷을 직접 가리킨다
+  if (bucket && region) return `https://${bucket}.s3.${region}.amazonaws.com`;
+  return LOCAL_PREFIX.replace(/\/+$/, '');
+}
+
+/** 지금 주소 + 예전 주소들 — 읽을 때는 둘 다 받아준다 */
+function knownBases(): string[] {
+  const legacy = (process.env.IMAGE_LEGACY_BASE_URLS ?? '')
+    .split(',')
+    .map((item) => item.trim().replace(/\/+$/, ''))
+    .filter(Boolean);
+  return [publicBase(), ...legacy];
+}
 
 export interface SavedFile {
   /** 본문·썸네일에 넣을 주소 */
   url: string;
-  /** 저장 경로 (버킷 안 경로 또는 로컬 상대경로) */
+  /** 저장 경로 (버킷 안 키 또는 로컬 상대경로) */
   path: string;
 }
 
 /**
  * 버퍼를 저장한다.
  *
- * 이미지는 sharp 로 가공하느라 어차피 전체를 메모리에 올려야 해서 스트림을 쓸 수 없다.
- * (스트림 저장은 아래 saveFile 이 그대로 맡는다 — 가공 없이 넘기는 경우)
+ * 쓰기 경로는 이것 하나다. 이미지는 sharp 로 가공하느라 어차피 전체를 메모리에
+ * 올려야 해서(10MB 제한) 스트림으로 받을 이유가 없다.
  */
 export async function saveBuffer(objectPath: string, body: Buffer, contentType: string): Promise<SavedFile> {
-  return saveFile(objectPath, Readable.from(body), contentType);
+  if (client && bucket) {
+    await client.send(
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: objectPath,
+        Body: body,
+        ContentType: contentType,
+        // 키에 UUID 가 있어 같은 주소의 내용이 바뀌지 않는다 — CDN 에서 길게 캐시해도 안전하다
+        CacheControl: 'public, max-age=31536000, immutable',
+      }),
+    );
+    return { url: `${publicBase()}/${objectPath}`, path: objectPath };
+  }
+
+  // 로컬 디스크 — 백엔드가 /uploads/ 로 그대로 서빙한다
+  const target = join(UPLOAD_DIR, objectPath);
+  await mkdir(join(target, '..'), { recursive: true });
+  await pipeline(Readable.from(body), createWriteStream(target));
+  return { url: `${LOCAL_PREFIX}${objectPath}`, path: target };
 }
 
 /**
@@ -53,13 +104,14 @@ export async function saveBuffer(objectPath: string, body: Buffer, contentType: 
  */
 export async function readFileAt(objectPath: string): Promise<Buffer | null> {
   try {
-    if (storage && bucketName) {
-      const [body] = await storage.bucket(bucketName).file(objectPath).download();
-      return body;
+    if (client && bucket) {
+      const result = await client.send(new GetObjectCommand({ Bucket: bucket, Key: objectPath }));
+      if (!result.Body) return null;
+      return Buffer.from(await result.Body.transformToByteArray());
     }
     return await readFile(join(UPLOAD_DIR, objectPath));
   } catch {
-    // 없는 파일도 예외로 온다 — 부르는 쪽은 "없음" 으로만 알면 된다
+    // 없는 파일(NoSuchKey/ENOENT)도 예외로 온다 — 부르는 쪽은 "없음" 으로만 알면 된다
     return null;
   }
 }
@@ -68,65 +120,56 @@ export async function readFileAt(objectPath: string): Promise<Buffer | null> {
  * 공개 주소 → 저장 경로.
  *
  * DB 에는 공개 주소(`/uploads/...` 또는 `https://cdn/...`)가 들어 있는데,
- * 지우거나 다시 읽으려면 버킷 안 경로가 필요하다.
+ * 지우거나 다시 읽으려면 버킷 안 키가 필요하다.
+ *
+ * 예전 주소(IMAGE_LEGACY_BASE_URLS)도 받아준다 — CDN 도메인을 바꿨을 때
+ * DB 에 남은 옛 주소의 이미지를 못 지우면 쓰레기가 영구히 쌓인다.
  */
 export function toObjectPath(url: string): string | null {
-  const host = process.env.GCS_PUBLIC_HOST ?? (bucketName ? `https://storage.googleapis.com/${bucketName}` : null);
-  if (host && url.startsWith(`${host}/`)) return url.slice(host.length + 1);
-  if (url.startsWith('/uploads/')) return url.slice('/uploads/'.length);
+  for (const base of knownBases()) {
+    if (base && url.startsWith(`${base}/`)) return url.slice(base.length + 1);
+  }
+  if (url.startsWith(LOCAL_PREFIX)) return url.slice(LOCAL_PREFIX.length);
   // 우리 주소가 아니면 건드리지 않는다 (본문에 외부 이미지가 들어올 수 있다)
   return null;
 }
 
 /** 여러 공개 주소를 한 번에 지운다 */
 export async function deleteByUrls(urls: string[]) {
-  for (const url of urls) {
-    const path = toObjectPath(url);
-    if (path) await deleteFile(path);
+  const keys = urls.map(toObjectPath).filter((key): key is string => Boolean(key));
+  if (keys.length === 0) return;
+
+  if (client && bucket) {
+    // DeleteObjects 는 한 번에 1000개까지
+    for (let i = 0; i < keys.length; i += 1000) {
+      await client.send(
+        new DeleteObjectsCommand({
+          Bucket: bucket,
+          Delete: { Objects: keys.slice(i, i + 1000).map((Key) => ({ Key })), Quiet: true },
+        }),
+      );
+    }
+    return;
   }
+
+  for (const key of keys) await deleteFile(key);
 }
 
-/**
- * 파일 하나를 저장한다.
- *
- * 저장 이름은 호출부가 만들어 넘긴다(`objectPath`) — 업로드된 파일 이름을 그대로 쓰면
- * `../` 같은 경로가 섞여 들어올 수 있어서다.
- */
-export async function saveFile(objectPath: string, stream: Readable, contentType: string): Promise<SavedFile> {
-  if (storage && bucketName) {
-    const file = storage.bucket(bucketName).file(objectPath);
-    await pipeline(
-      stream,
-      file.createWriteStream({
-        resumable: false, // 10MB 이하라 한 번에 올린다
-        contentType,
-        metadata: { cacheControl: 'public, max-age=31536000, immutable' },
+/** 글이 지워질 때 등 파일 하나를 정리할 때 쓴다 */
+export async function deleteFile(objectPath: string) {
+  if (client && bucket) {
+    await client.send(
+      new DeleteObjectsCommand({
+        Bucket: bucket,
+        Delete: { Objects: [{ Key: objectPath }], Quiet: true },
       }),
     );
-
-    const host = process.env.GCS_PUBLIC_HOST ?? `https://storage.googleapis.com/${bucketName}`;
-    return { url: `${host}/${objectPath}`, path: objectPath };
-  }
-
-  // 로컬 디스크 — 백엔드가 /uploads/ 로 그대로 서빙한다
-  const target = join(UPLOAD_DIR, objectPath);
-  await mkdir(join(target, '..'), { recursive: true });
-  await pipeline(stream, createWriteStream(target));
-  return { url: `/uploads/${objectPath}`, path: target };
-}
-
-/** 글이 지워질 때 등 파일을 정리할 때 쓴다 */
-export async function deleteFile(objectPath: string) {
-  if (storage && bucketName) {
-    await storage
-      .bucket(bucketName)
-      .file(objectPath)
-      .delete({ ignoreNotFound: true });
   }
   // 로컬은 지우지 않는다 — 개발 중 실수로 지워도 복구가 안 되므로 남겨 둔다
 }
 
 /** 시작할 때 로그에 한 줄 남겨 어디에 저장되는지 헷갈리지 않게 한다 */
 export function storageDescription() {
-  return usingGcs ? `GCS ${bucketName}` : `로컬 디스크 ${UPLOAD_DIR}/ (GCS 설정 없음)`;
+  if (!usingRemoteStorage) return `로컬 디스크 ${UPLOAD_DIR}/ (S3 설정 없음)`;
+  return `S3 ${bucket} (${region}) → ${publicBase()}`;
 }

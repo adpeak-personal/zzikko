@@ -57,15 +57,21 @@
   글의 첫 이미지뿐이라, 올리는 족족 만들면 나머지는 아무도 안 보는 파일이 된다.
 - `uploads.post_id` 가 NULL 이면 어느 글에도 안 쓰인 파일이다. 서버가 주기적으로 지운다
   (`src/lib/maintenance.ts`, 기본 6시간마다 / 24시간 유예). 끄려면 `MAINTENANCE_ENABLED=false`.
-- `GCS_BUCKET` · `GCS_PROJECT` · `GCS_KEY_FILE` 이 **셋 다** 있으면 GCS, 하나라도 없으면 로컬 디스크
-  (`UPLOAD_DIR`)에 저장한다. 라우트는 어느 쪽인지 모른다.
+- `S3_BUCKET` · `AWS_REGION` · `AWS_ACCESS_KEY_ID` · `AWS_SECRET_ACCESS_KEY` 가 **넷 다** 있으면
+  S3, 하나라도 없으면 로컬 디스크(`UPLOAD_DIR`)에 저장한다. 라우트는 어느 쪽인지 모른다.
+- 공개 주소는 `IMAGE_BASE_URL`(CloudFront)을 앞에 붙여 만든다. 비면 S3 주소를 직접 쓴다.
+- **DB 에는 전체 주소가 들어간다** (`posts.thumb_url`, `uploads.url`, 본문 ProseMirror JSON 의
+  `image.attrs.src`). 그래서 CDN 도메인을 바꾸면 옛 주소가 DB 에 남는다 — 바꿀 땐 옛 주소를
+  `IMAGE_LEGACY_BASE_URLS` 에 넣어야 이미지 청소가 계속 동작한다.
+  (abyssblue 는 키만 저장하고 읽을 때 조립한다. 찍고도 그 방식이 맞지만 본문 JSON 까지 손대야 해서 아직 안 했다.)
 - 저장 파일 이름은 서버가 만든다(`날짜/UUID.확장자`). 올라온 파일 이름을 그대로 쓰지 말 것 — `../` 가 섞인다.
-- **서비스 계정 키(`gcs-key.json`)를 커밋하지 말 것.** `.gitignore` 에 이미 들어 있다.
+- **AWS 키를 커밋하지 말 것.** `.env.local`(로컬) / 서버 `/opt/zzikko/.env.back`(운영)에만 둔다.
 
 ## 환경변수
 
 - `.env` = 비밀이 아닌 공용 설정(포트·CORS·업로드 폴더). **git 에 올라간다.**
-- `.env.local` = 비밀값(`DATABASE_URL`, `JWT_SECRET`, `GCS_*`). git 에 안 올라간다. 나중에 읽히므로 이긴다.
+- `.env.local` = 비밀값(`DATABASE_URL`, `JWT_SECRET`, `AWS_*`, `S3_BUCKET`). git 에 안 올라간다.
+  나중에 읽히므로 이긴다.
 - **`.env` 에 비밀값을 적지 말 것.** 새 항목을 추가하면 `.env.example` 에도 설명을 남긴다.
 - 읽는 순서는 `backend/src/env.ts` 와 `backend/scripts/seed.mjs` 두 곳에 있다 — 한쪽만 고치지 말 것.
 - `JWT_SECRET` 은 기본값이 없다. 없으면 서버가 뜨지 않는다(아무나 아는 키로 서명되는 게 더 위험해서).
