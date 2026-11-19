@@ -35,7 +35,7 @@ export function NewsBoard({ articles }: { articles: NewsArticle[] }) {
           href={`/board/news/${lead.id}`}
           className="group mb-6 block overflow-hidden rounded-2xl border border-gray-200 bg-white sm:flex"
         >
-          <Thumb tone={lead.thumb} className="h-48 shrink-0 sm:h-auto sm:w-2/5" label={lead.category} />
+          <Thumb tone={lead.thumb} src={lead.thumbUrl} alt={lead.title} className="h-48 shrink-0 sm:h-auto sm:w-2/5" label={lead.category} />
           <div className="flex flex-col justify-center p-6">
             <span className="text-xs font-bold text-zz-600">{lead.category}</span>
             <h2 className="mt-2 text-2xl font-extrabold leading-snug tracking-tight text-gray-900 group-hover:underline">
@@ -57,7 +57,7 @@ export function NewsBoard({ articles }: { articles: NewsArticle[] }) {
           {rest.map((article) => (
             <li key={article.id}>
               <Link href={`/board/news/${article.id}`} className="group flex h-full flex-col">
-                <Thumb tone={article.thumb} className="aspect-16/9 rounded-xl" />
+                <Thumb tone={article.thumb} src={article.thumbUrl} alt={article.title} className="aspect-16/9 rounded-xl" />
                 <span className="mt-3 text-xs font-bold text-zz-600">{article.category}</span>
                 <h3 className="mt-1 line-clamp-2 text-[17px] font-bold leading-snug text-gray-900 group-hover:underline">
                   {article.title}

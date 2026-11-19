@@ -1,7 +1,49 @@
 import type { RowDataPacket } from 'mysql2';
 import { execute, query, queryOne } from '../db/pool.js';
-import type { Chipset, NewsArticle, PhoneSpec } from '../types.js';
+import type { Chipset, ContentImage, NewsArticle, PhoneSpec } from '../types.js';
 import { publicUrl, toStored } from '../lib/storage.js';
+import { linkUploadsToOwner, unlinkUploadsOfOwner } from './uploads.js';
+
+/* ── 사진 ─────────────────────────────────────────
+ *
+ * DB 에는 도메인 없는 경로만 넣는다 (storage.ts 의 toStored / publicUrl).
+ * thumb_url 은 images[0] 에서 따 두는 값이라 따로 받지 않는다 — 두 군데서 관리하면 어긋난다.
+ *
+ * ⚠️ 저장할 때 uploads 에 주인을 적어 준다. 안 하면 뒷정리가 "아무 데도 안 쓰인 파일"로
+ *    보고 24시간 뒤에 지운다. 그래서 라우트가 아니라 여기서 한다 — 호출하는 쪽이
+ *    한 번만 빠뜨려도 사진이 조용히 사라진다.
+ */
+
+interface RawImage {
+  url?: unknown;
+  caption?: unknown;
+}
+
+/** DB → 화면용 (전체 주소) */
+function toImages(raw: unknown): ContentImage[] {
+  if (!Array.isArray(raw)) return [];
+  const out: ContentImage[] = [];
+  for (const item of raw as RawImage[]) {
+    if (!item || typeof item.url !== 'string' || !item.url) continue;
+    out.push({ url: publicUrl(item.url), caption: typeof item.caption === 'string' ? item.caption : '' });
+  }
+  return out;
+}
+
+/** 화면 → DB (도메인 없는 경로) */
+function fromImages(images: ContentImage[] | undefined) {
+  const list = (images ?? [])
+    .filter((item) => item && typeof item.url === 'string' && item.url)
+    .map((item) => ({ url: toStored(item.url), caption: item.caption ?? '' }));
+
+  return {
+    json: list.length ? JSON.stringify(list) : null,
+    /** 목록 카드가 쓰는 대표 사진 */
+    first: list[0]?.url ?? null,
+    /** uploads 와 맞춰볼 저장형 주소들 */
+    urls: list.map((item) => item.url),
+  };
+}
 
 /* ── IT 소식 ─────────────────────────────────────── */
 
@@ -12,6 +54,7 @@ interface NewsRow extends RowDataPacket {
   summary: string;
   body: string;
   thumb: string;
+  images: unknown;
   thumb_url: string | null;
   source_name: string | null;
   source_url: string | null;
@@ -28,6 +71,7 @@ const toNews = (row: NewsRow): NewsArticle => ({
   summary: row.summary,
   body: row.body,
   thumb: row.thumb,
+  images: toImages(row.images),
   thumbUrl: row.thumb_url ? publicUrl(row.thumb_url) : null,
   sourceName: row.source_name,
   sourceUrl: row.source_url,
@@ -58,7 +102,8 @@ export async function getNews(id: number): Promise<NewsArticle | null> {
   return row ? toNews(row) : null;
 }
 
-export type NewsInput = Omit<NewsArticle, 'id' | 'thumbUrl'> & { thumbUrl?: string | null };
+/** thumbUrl 은 images[0] 에서 만들어지므로 입력으로 받지 않는다 */
+export type NewsInput = Omit<NewsArticle, 'id' | 'thumbUrl'>;
 
 /** 대표 기사는 하나만 — 새로 지정하면 나머지를 내린다 */
 async function clearOtherFeatured(keepId: number) {
@@ -66,16 +111,18 @@ async function clearOtherFeatured(keepId: number) {
 }
 
 export async function createNews(input: NewsInput): Promise<number> {
+  const images = fromImages(input.images);
   const result = await execute(
-    `INSERT INTO news_articles (title, category, summary, body, thumb, thumb_url, source_name, source_url, author, date, featured, published)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO news_articles (title, category, summary, body, thumb, images, thumb_url, source_name, source_url, author, date, featured, published)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       input.title,
       input.category,
       input.summary,
       input.body,
       input.thumb,
-      input.thumbUrl ? toStored(input.thumbUrl) : null,
+      images.json,
+      images.first,
       input.sourceName ?? null,
       input.sourceUrl ?? null,
       input.author,
@@ -85,13 +132,15 @@ export async function createNews(input: NewsInput): Promise<number> {
     ],
   );
   if (input.featured) await clearOtherFeatured(result.insertId);
+  await linkUploadsToOwner(`news:${result.insertId}`, images.urls);
   return result.insertId;
 }
 
 export async function updateNews(id: number, input: NewsInput) {
+  const images = fromImages(input.images);
   await execute(
     `UPDATE news_articles
-        SET title = ?, category = ?, summary = ?, body = ?, thumb = ?, thumb_url = ?,
+        SET title = ?, category = ?, summary = ?, body = ?, thumb = ?, images = ?, thumb_url = ?,
             source_name = ?, source_url = ?,
             author = ?, date = ?, featured = ?, published = ?
       WHERE id = ?`,
@@ -101,7 +150,8 @@ export async function updateNews(id: number, input: NewsInput) {
       input.summary,
       input.body,
       input.thumb,
-      input.thumbUrl ? toStored(input.thumbUrl) : null,
+      images.json,
+      images.first,
       input.sourceName ?? null,
       input.sourceUrl ?? null,
       input.author,
@@ -112,10 +162,14 @@ export async function updateNews(id: number, input: NewsInput) {
     ],
   );
   if (input.featured) await clearOtherFeatured(id);
+  // 빠진 사진은 연결이 끊겨 청소 대상으로 돌아간다
+  await linkUploadsToOwner(`news:${id}`, images.urls);
 }
 
 export async function deleteNews(id: number) {
   await execute('DELETE FROM news_articles WHERE id = ?', [id]);
+  // 쓰던 사진을 청소 대상으로 돌린다 — 안 그러면 주인 없는 파일이 영영 남는다
+  await unlinkUploadsOfOwner(`news:${id}`);
 }
 
 /* ── 칩셋 ────────────────────────────────────────── */
@@ -192,6 +246,7 @@ interface SpecRow extends RowDataPacket {
   camera_main_mp: number;
   weight_g: number;
   thumb: string;
+  images: unknown;
   thumb_url: string | null;
   published: number;
 }
@@ -219,6 +274,7 @@ const toSpec = (row: SpecRow): PhoneSpec => ({
   cameraMainMp: row.camera_main_mp,
   weightG: row.weight_g,
   thumb: row.thumb,
+  images: toImages(row.images),
   thumbUrl: row.thumb_url ? publicUrl(row.thumb_url) : null,
   published: Boolean(row.published),
 });
@@ -235,9 +291,10 @@ export async function getSpec(id: number): Promise<PhoneSpec | null> {
   return row ? toSpec(row) : null;
 }
 
-export type SpecInput = Omit<PhoneSpec, 'id' | 'thumbUrl'> & { thumbUrl?: string | null };
+/** thumbUrl 은 images[0] 에서 만들어지므로 입력으로 받지 않는다 */
+export type SpecInput = Omit<PhoneSpec, 'id' | 'thumbUrl'>;
 
-const specParams = (input: SpecInput) => [
+const specParams = (input: SpecInput, images: ReturnType<typeof fromImages>) => [
   input.name,
   input.brand,
   input.releaseDate,
@@ -258,34 +315,40 @@ const specParams = (input: SpecInput) => [
   input.cameraMainMp,
   input.weightG,
   input.thumb,
-  input.thumbUrl ? toStored(input.thumbUrl) : null,
+  images.json,
+  images.first,
   input.published ? 1 : 0,
 ];
 
 export async function createSpec(input: SpecInput): Promise<number> {
+  const images = fromImages(input.images);
   const result = await execute(
     `INSERT INTO phone_specs
        (name, brand, release_date, retail_price, chipset_id, display, storage, battery, charging,
         camera_main, camera_front, weight, display_inch, refresh_hz, memory_gb, battery_mah,
-        charging_watt, camera_main_mp, weight_g, thumb, thumb_url, published)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    specParams(input),
+        charging_watt, camera_main_mp, weight_g, thumb, images, thumb_url, published)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    specParams(input, images),
   );
+  await linkUploadsToOwner(`spec:${result.insertId}`, images.urls);
   return result.insertId;
 }
 
 export async function updateSpec(id: number, input: SpecInput) {
+  const images = fromImages(input.images);
   await execute(
     `UPDATE phone_specs
         SET name = ?, brand = ?, release_date = ?, retail_price = ?, chipset_id = ?, display = ?, storage = ?,
             battery = ?, charging = ?, camera_main = ?, camera_front = ?, weight = ?, display_inch = ?,
             refresh_hz = ?, memory_gb = ?, battery_mah = ?, charging_watt = ?, camera_main_mp = ?,
-            weight_g = ?, thumb = ?, thumb_url = ?, published = ?
+            weight_g = ?, thumb = ?, images = ?, thumb_url = ?, published = ?
       WHERE id = ?`,
-    [...specParams(input), id],
+    [...specParams(input, images), id],
   );
+  await linkUploadsToOwner(`spec:${id}`, images.urls);
 }
 
 export async function deleteSpec(id: number) {
   await execute('DELETE FROM phone_specs WHERE id = ?', [id]);
+  await unlinkUploadsOfOwner(`spec:${id}`);
 }

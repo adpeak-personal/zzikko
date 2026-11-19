@@ -160,11 +160,37 @@ export function FilterChip({
 }
 
 /** 이미지가 붙기 전까지 쓰는 그라디언트 썸네일 */
-export function Thumb({ tone = 'zz', className, label }: { tone?: string; className?: string; label?: string }) {
+/**
+ * 목록·상세의 네모 이미지 자리.
+ *
+ * `src` 가 있으면 사진을, 없으면 그라디언트 색을 그린다. 호출하는 쪽은 사진이 있는지
+ * 따지지 말고 `src={x.thumbUrl}` 를 그냥 넘기면 된다 — 크기·모서리 클래스는 그대로 먹는다.
+ */
+export function Thumb({
+  tone = 'zz',
+  className,
+  label,
+  src,
+  alt = '',
+}: {
+  tone?: string;
+  className?: string;
+  label?: string;
+  src?: string | null;
+  alt?: string;
+}) {
   return (
-    <div className={cn('relative overflow-hidden', `thumb-${tone}`, className)}>
-      <span className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-white/15" />
-      <span className="absolute -bottom-8 -left-4 h-24 w-24 rounded-full bg-black/10" />
+    <div className={cn('relative overflow-hidden', src ? 'bg-gray-100' : `thumb-${tone}`, className)}>
+      {src ? (
+        // next/image 를 쓰지 않는다 — 주소가 CDN·로컬로 갈리고 크기도 제각각이라 득이 없다
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={src} alt={alt} loading="lazy" className="h-full w-full object-cover" />
+      ) : (
+        <>
+          <span className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-white/15" />
+          <span className="absolute -bottom-8 -left-4 h-24 w-24 rounded-full bg-black/10" />
+        </>
+      )}
       {label && <span className="absolute bottom-2 left-2 rounded bg-black/40 px-1.5 py-0.5 text-[11px] text-white">{label}</span>}
     </div>
   );

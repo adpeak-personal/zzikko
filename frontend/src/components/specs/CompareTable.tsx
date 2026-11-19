@@ -71,7 +71,7 @@ export function CompareTable({
                   {specs.map((spec) => (
                     <th key={spec.id} className="px-4 py-3 text-left">
                       <span className="flex items-center gap-2">
-                        <Thumb tone={spec.thumb} className="h-10 w-8 shrink-0 rounded" />
+                        <Thumb tone={spec.thumb} src={spec.thumbUrl} alt={spec.name} className="h-10 w-8 shrink-0 rounded" />
                         <span className="min-w-0">
                           <Link href={`/board/specs/${spec.id}`} className="block truncate font-bold text-gray-900 hover:underline">
                             {spec.name}

@@ -213,6 +213,23 @@ const steps = [
       );
     },
   },
+  {
+    // 기사·기종에 사진을 여러 장 붙인다(보통 1장, 가끔 2장). 순서가 의미를 가지므로 배열로 둔다.
+    //
+    // uploads.owner 가 같이 들어가는 이유가 중요하다 — 뒷정리(maintenance.ts)는
+    // `post_id IS NULL` 인 업로드를 24시간 뒤에 지운다. 기사 사진은 글(posts)이 아니라
+    // post_id 가 영영 NULL 이고, 그대로 두면 다음 날 사진이 사라진다.
+    // posts 는 FK 가 걸린 post_id 를 그대로 쓰고, 그 밖의 콘텐츠는 owner('news:9')로 잡는다.
+    name: 'news_articles/phone_specs.images + uploads.owner — 기사·기종 사진',
+    check: (c) => hasColumn(c, 'uploads', 'owner'),
+    sql: [
+      `ALTER TABLE news_articles ADD COLUMN images JSON NULL COMMENT '[{url, caption}] — 순서가 곧 노출 순서'`,
+      `ALTER TABLE phone_specs   ADD COLUMN images JSON NULL COMMENT '[{url, caption}] — 순서가 곧 노출 순서'`,
+      `ALTER TABLE uploads
+         ADD COLUMN owner VARCHAR(40) NULL COMMENT '글이 아닌 콘텐츠가 쓰는 중이면 news:9 / spec:3',
+         ADD KEY idx_uploads_owner (owner)`,
+    ],
+  },
 ];
 
 /** 공개 주소 앞머리. 없으면 바꿀 것도 없다. */

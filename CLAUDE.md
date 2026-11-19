@@ -100,6 +100,18 @@
 - `news_feed.guid` 가 UNIQUE 라 수집을 여러 번 돌려도 같은 글이 쌓이지 않는다.
   원문(`source_text`)은 한 달 지나면 비운다(행은 남겨야 또 안 받는다).
 
+### 콘텐츠 사진
+
+- 기사·기종 사진은 `images` (JSON 배열)가 정본이고 **순서가 곧 노출 순서**다.
+  `thumb_url` 은 `images[0]` 에서 따 두는 파생값이라 입력으로 받지 않는다 — 두 군데서 관리하면 어긋난다.
+- 어드민 입력은 `components/photo-uploader` 의 `PhotoUploader` 를 쓴다(끌어서 순서 변경).
+  이 모듈은 독립 모듈이라 우리 타입을 모르므로, 변환은 `ContentAdmin.tsx` 의 `ContentPhotos` 한 곳에서만 한다.
+- 목록·상세의 `Thumb` 는 `src` 를 받으면 사진을, 없으면 그라디언트 색을 그린다.
+  호출하는 쪽에서 사진 유무를 따지지 말 것.
+- **퍼온 기사의 원문 이미지를 가져오지 않는다.** GSMArena 의 `license.xml` 이 허용한 건 요약이지
+  사진 재배포가 아니고, 그 사진 대부분은 제조사·유출자 것이라 애초에 그쪽이 넘겨줄 권리가 없다.
+  사진은 제조사 뉴스룸(보도용)에서 받아 사람이 올린다.
+
 ### 화면
 
 - **색·글자 크기는 `frontend/src/app/globals.css` 의 `@theme` 토큰을 쓴다.** 컴포넌트에 `#fa6038` 같은 값을
@@ -119,8 +131,13 @@
   EXIF(촬영 위치 포함)가 사라지는 게 더 중요하다 — 휴대폰 사진을 그대로 올리는 커뮤니티다.
 - **썸네일은 글을 등록할 때 첫 이미지에만 만든다**(`src/lib/thumbnail.ts`). 목록에 뜨는 건
   글의 첫 이미지뿐이라, 올리는 족족 만들면 나머지는 아무도 안 보는 파일이 된다.
-- `uploads.post_id` 가 NULL 이면 어느 글에도 안 쓰인 파일이다. 서버가 주기적으로 지운다
-  (`src/lib/maintenance.ts`, 기본 6시간마다 / 24시간 유예). 끄려면 `MAINTENANCE_ENABLED=false`.
+- `uploads.post_id` 와 `uploads.owner` 가 **둘 다** NULL 이면 아무 데도 안 쓰인 파일이다.
+  서버가 주기적으로 지운다 (`src/lib/maintenance.ts`, 기본 6시간마다 / 24시간 유예).
+  끄려면 `MAINTENANCE_ENABLED=false`.
+- ⚠️ **글이 아닌 콘텐츠(기사·기종)의 사진은 `owner` 로 잡는다** (`news:9` / `spec:3`).
+  `post_id` 에는 posts FK 가 걸려 있어 쓸 수 없다. 연결을 빠뜨리면 사진이 **다음 날 사라진다** —
+  그래서 라우트가 아니라 `repositories/content.ts` 의 저장 함수 안에서 건다.
+  새로운 종류의 콘텐츠에 사진을 붙일 땐 `linkUploadsToOwner` / `unlinkUploadsOfOwner` 를 같이 걸 것.
 - `S3_BUCKET` · `AWS_REGION` · `AWS_ACCESS_KEY_ID` · `AWS_SECRET_ACCESS_KEY` 가 **넷 다** 있으면
   S3, 하나라도 없으면 로컬 디스크(`UPLOAD_DIR`)에 저장한다. 라우트는 어느 쪽인지 모른다.
 - 공개 주소는 `IMAGE_BASE_URL`(CloudFront)을 앞에 붙여 만든다. 비면 S3 주소를 직접 쓴다.

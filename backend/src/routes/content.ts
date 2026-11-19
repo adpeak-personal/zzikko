@@ -19,7 +19,11 @@ const newsSchema = z.object({
   summary: z.string().trim().max(200).default(''),
   body: z.string().max(50_000).default(''),
   thumb: z.string().max(20).default('violet'),
-  thumbUrl: z.string().max(500).nullable().optional(),
+  // 사진은 순서가 의미를 가진다(첫 장이 목록 카드에 쓰인다). thumbUrl 은 서버가 여기서 만든다.
+  images: z
+    .array(z.object({ url: z.string().trim().min(1).max(500), caption: z.string().trim().max(200).default('') }))
+    .max(8)
+    .default([]),
   // 출처 표기가 이용 조건이라 퍼온 기사에는 반드시 들어간다 (직접 쓴 글이면 비운다)
   sourceName: z.string().trim().max(60).nullable().optional(),
   sourceUrl: z.string().trim().max(500).nullable().optional(),
@@ -61,7 +65,11 @@ const specSchema = z.object({
   weightG: z.number().int().min(0).max(2000).default(0),
 
   thumb: z.string().max(20).default('violet'),
-  thumbUrl: z.string().max(500).nullable().optional(),
+  // 사진은 순서가 의미를 가진다(첫 장이 목록 카드에 쓰인다). thumbUrl 은 서버가 여기서 만든다.
+  images: z
+    .array(z.object({ url: z.string().trim().min(1).max(500), caption: z.string().trim().max(200).default('') }))
+    .max(8)
+    .default([]),
   published: z.boolean().default(true),
 });
 
@@ -174,7 +182,8 @@ export default async function contentRoutes(app: FastifyInstance) {
       summary: written.summary,
       body: written.body,
       thumb: 'violet',
-      thumbUrl: null,
+      // 사진은 사람이 어드민에서 붙인다 — 원문 이미지는 출처 쪽 권리라 가져오지 않는다
+      images: [],
       // 출처 표기는 선택이 아니다 — 퍼온 기사의 이용 조건이다
       sourceName: item.sourceName,
       sourceUrl: item.link,

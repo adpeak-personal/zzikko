@@ -83,6 +83,43 @@ export async function unlinkUploadsOfPost(postId: number) {
   return affectedRows;
 }
 
+/* ── 글이 아닌 콘텐츠(기사·기종) ───────────────────── */
+
+/**
+ * 기사·기종이 쓰는 이미지를 그 콘텐츠에 묶는다. `owner` 는 'news:9' / 'spec:3'.
+ *
+ * **이게 없으면 사진이 24시간 뒤에 지워진다** — 뒷정리는 "아무 데도 안 쓰인 업로드"를
+ * 지우는데, 기사 사진은 글(posts)이 아니라 post_id 가 영영 NULL 이기 때문이다.
+ * post_id 를 쓰지 않는 건 그 칸에 posts FK 가 걸려 있어서다.
+ *
+ * ⚠️ urls 는 **저장형(도메인 없는 경로)** 이어야 한다. uploads.url 과 문자열로 맞춰보는
+ * 조인이라, 전체 주소를 넘기면 하나도 안 맞고 사진이 조용히 지워진다.
+ */
+export async function linkUploadsToOwner(owner: string, urls: string[]) {
+  if (urls.length === 0) {
+    const { affectedRows } = await execute('UPDATE uploads SET owner = NULL WHERE owner = ?', [owner]);
+    return { linked: 0, unlinked: affectedRows };
+  }
+
+  const marks = urls.map(() => '?').join(',');
+  // 빠진 사진은 연결을 끊어 청소 대상으로 돌린다 — 안 그러면 영영 안 지워진다
+  const { affectedRows: unlinked } = await execute(
+    `UPDATE uploads SET owner = NULL WHERE owner = ? AND url NOT IN (${marks})`,
+    [owner, ...urls],
+  );
+  const { affectedRows: linked } = await execute(`UPDATE uploads SET owner = ? WHERE url IN (${marks})`, [
+    owner,
+    ...urls,
+  ]);
+  return { linked, unlinked };
+}
+
+/** 콘텐츠가 지워지면 그 사진도 청소 대상으로 돌린다 */
+export async function unlinkUploadsOfOwner(owner: string) {
+  const { affectedRows } = await execute('UPDATE uploads SET owner = NULL WHERE owner = ?', [owner]);
+  return affectedRows;
+}
+
 interface OrphanRow extends RowDataPacket {
   id: number;
   url: string;
@@ -98,15 +135,16 @@ export interface Orphan {
 }
 
 /**
- * 어느 글에도 안 쓰인 채 일정 시간이 지난 업로드.
+ * 아무 데도 안 쓰인 채 일정 시간이 지난 업로드.
  *
  * 유예를 두는 이유 — 지금 글을 쓰는 중인 사람의 이미지를 지우면 안 된다.
+ * post_id(글)와 owner(기사·기종)를 **둘 다** 봐야 한다. 하나만 보면 다른 쪽 사진이 지워진다.
  */
 export async function findOrphans(olderThanHours: number): Promise<Orphan[]> {
   const rows = await query<OrphanRow>(
     `SELECT id, url, thumb_url, size
        FROM uploads
-      WHERE post_id IS NULL AND created_at < NOW() - INTERVAL ? HOUR
+      WHERE post_id IS NULL AND owner IS NULL AND created_at < NOW() - INTERVAL ? HOUR
       ORDER BY created_at`,
     [olderThanHours],
   );

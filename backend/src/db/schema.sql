@@ -232,7 +232,9 @@ CREATE TABLE news_articles (
   category   VARCHAR(30)  NOT NULL,
   summary    VARCHAR(200) NOT NULL DEFAULT '',
   body       MEDIUMTEXT   NOT NULL,
-  thumb      VARCHAR(20)  NOT NULL DEFAULT 'violet' COMMENT '이미지 전까지 쓰는 그라디언트 키',
+  thumb      VARCHAR(20)  NOT NULL DEFAULT 'violet' COMMENT '사진이 없을 때 쓰는 그라디언트 키',
+  -- 사진은 여기가 정본이다. thumb_url 은 images[0] 에서 따 둔 값(목록 조회용)
+  images     JSON         NULL COMMENT '[{url, caption}] — 순서가 곧 노출 순서',
   thumb_url  VARCHAR(500) NULL,
   author     VARCHAR(30)  NOT NULL DEFAULT '찍고 편집팀',
   date       DATE         NOT NULL,
@@ -288,6 +290,8 @@ CREATE TABLE phone_specs (
   weight_g       SMALLINT UNSIGNED NOT NULL DEFAULT 0,
 
   thumb          VARCHAR(20)  NOT NULL DEFAULT 'violet',
+  -- 사진은 여기가 정본이다. thumb_url 은 images[0] 에서 따 둔 값(목록 조회용)
+  images         JSON         NULL COMMENT '[{url, caption}] — 순서가 곧 노출 순서',
   thumb_url      VARCHAR(500) NULL,
   published      TINYINT(1)   NOT NULL DEFAULT 1,
   created_at     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -309,8 +313,12 @@ CREATE TABLE uploads (
   mimetype   VARCHAR(100) NOT NULL,
   size       INT UNSIGNED NOT NULL,
   uploader_id INT UNSIGNED NULL,
-  -- NULL 이면 아직 어느 글에도 안 쓰인 파일 — 유예 시간이 지나면 청소 대상이다
+  -- post_id 와 owner 가 **둘 다** NULL 이면 아직 아무 데도 안 쓰인 파일 —
+  -- 유예 시간이 지나면 청소 대상이다 (lib/maintenance.ts)
   post_id    INT UNSIGNED NULL,
+  -- 글이 아닌 콘텐츠(기사·기종)가 쓰는 중이면 'news:9' / 'spec:3'.
+  -- posts 는 FK 가 걸린 post_id 를 쓰므로 여기엔 안 들어온다.
+  owner      VARCHAR(40)  NULL,
   thumb_url  VARCHAR(500) NULL COMMENT '목록용 축소본. 글 등록 시 첫 이미지에만 만든다',
   width      SMALLINT UNSIGNED NULL,
   height     SMALLINT UNSIGNED NULL,
@@ -318,6 +326,7 @@ CREATE TABLE uploads (
   PRIMARY KEY (id),
   KEY idx_uploads_created (created_at DESC),
   KEY idx_uploads_orphan (post_id, created_at),
+  KEY idx_uploads_owner (owner),
   CONSTRAINT fk_uploads_user FOREIGN KEY (uploader_id) REFERENCES users (id) ON DELETE SET NULL,
   CONSTRAINT fk_uploads_post FOREIGN KEY (post_id)     REFERENCES posts (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

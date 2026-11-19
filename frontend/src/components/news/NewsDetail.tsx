@@ -25,9 +25,23 @@ export function NewsDetail({ article, others }: { article: NewsArticle; others: 
           {!article.published && <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800">미발행</span>}
         </p>
 
-        <Thumb tone={article.thumb} className="mt-6 h-64 rounded-2xl" />
+        {/* 첫 장이 대표 사진 — 없으면 그라디언트 색이 대신 들어간다 */}
+        <Thumb tone={article.thumb} src={article.images[0]?.url} alt={article.title} className="mt-6 h-64 rounded-2xl" />
 
         <div className="mt-8 whitespace-pre-line text-[17px] leading-[1.9] text-gray-800">{article.body}</div>
+
+        {/* 두 번째 사진부터는 본문 아래에 — 보통 한 장이지만 두 장인 기사도 있다 */}
+        {article.images.length > 1 && (
+          <div className="mt-8 space-y-4">
+            {article.images.slice(1).map((image) => (
+              <figure key={image.url}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={image.url} alt={image.caption || article.title} loading="lazy" className="w-full rounded-2xl" />
+                {image.caption && <figcaption className="mt-2 text-center text-sm text-gray-500">{image.caption}</figcaption>}
+              </figure>
+            ))}
+          </div>
+        )}
 
         {/* 출처 표기는 퍼온 기사의 이용 조건이다. 지우면 안 된다. */}
         {article.sourceName && (
@@ -63,7 +77,7 @@ export function NewsDetail({ article, others }: { article: NewsArticle; others: 
             {others.map((item) => (
               <li key={item.id}>
                 <Link href={`/board/news/${item.id}`} className="group flex gap-3">
-                  <Thumb tone={item.thumb} className="h-16 w-24 shrink-0 rounded-lg" />
+                  <Thumb tone={item.thumb} src={item.thumbUrl} alt={item.title} className="h-16 w-24 shrink-0 rounded-lg" />
                   <span className="min-w-0">
                     <span className="line-clamp-2 block text-sm font-semibold text-gray-900 group-hover:underline">
                       {item.title}

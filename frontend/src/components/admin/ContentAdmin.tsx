@@ -6,7 +6,9 @@ import { ExternalLink, Eye, EyeOff, ImageUp, Pencil, Plus, Sparkles, Star, Trash
 import { ApiError, apiFetch, toApiError } from '@/lib/api';
 import { Thumb } from '@/components/ui';
 import { cn, formatNumber } from '@/lib/utils';
-import type { ChipTier, Chipset, NewsArticle, PhoneSpec } from '@/lib/types';
+import type { ChipTier, Chipset, ContentImage, NewsArticle, PhoneSpec } from '@/lib/types';
+import { PhotoUploader, type PhotoItem } from '@/components/photo-uploader';
+import { uploadImage } from '@/lib/upload';
 
 const THUMB_TONES = ['violet', 'rose', 'teal', 'amber', 'indigo', 'slate', 'zz'];
 
@@ -19,6 +21,7 @@ const emptyNews = (): NewsArticle => ({
   summary: '',
   body: '',
   thumb: 'violet',
+  images: [],
   thumbUrl: null,
   author: '찍고 편집팀',
   date: new Date().toISOString().slice(0, 10),
@@ -48,6 +51,7 @@ const emptySpec = (): PhoneSpec => ({
   cameraMainMp: 0,
   weightG: 0,
   thumb: 'violet',
+  images: [],
   thumbUrl: null,
   published: true,
 });
@@ -79,6 +83,40 @@ function Field({ label, children, hint }: { label: string; children: React.React
       {children}
       {hint && <span className="mt-1 block text-[11px] text-gray-400">{hint}</span>}
     </label>
+  );
+}
+
+/**
+ * 사진 칸 — 끌어서 순서를 바꾼다. 첫 장이 목록 카드에 쓰인다.
+ *
+ * PhotoUploader 는 독립 모듈이라 우리 타입(ContentImage)을 모른다. 여기서만 변환한다.
+ */
+function ContentPhotos({
+  value,
+  onChange,
+  max = 4,
+}: {
+  value: ContentImage[];
+  onChange: (next: ContentImage[]) => void;
+  max?: number;
+}) {
+  // 정렬용 id 가 필요한데 ContentImage 엔 없다. 처음 한 번만 만들어 두고 이후엔 항목과 함께 움직인다.
+  // 같은 사진을 두 번 넣어도 키가 겹치지 않게 번호를 앞에 붙인다.
+  const [photos, setPhotos] = useState<PhotoItem[]>(() =>
+    value.map((image, index) => ({ id: `${index}-${image.url}`, url: image.url, caption: image.caption })),
+  );
+
+  const apply = (next: PhotoItem[]) => {
+    setPhotos(next);
+    onChange(next.map((photo) => ({ url: photo.url, caption: photo.caption })));
+  };
+
+  return (
+    <Field label="사진" hint={`끌어서 순서를 바꿀 수 있습니다. 첫 장이 목록에 보입니다 (최대 ${max}장).`}>
+      <div className="mt-1">
+        <PhotoUploader photos={photos} onChange={apply} uploadImage={uploadImage} maxCount={max} showCaptions={false} />
+      </div>
+    </Field>
   );
 }
 
@@ -225,11 +263,13 @@ function NewsForm({ draft, onDone }: { draft: NewsArticle; onDone: () => void })
         <textarea value={form.body} onChange={(e) => set('body', e.target.value)} rows={6} className={cn(inputClass, 'resize-y leading-relaxed')} />
       </Field>
 
+      <ContentPhotos value={form.images} onChange={(images) => set('images', images)} />
+
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="작성자">
           <input value={form.author} onChange={(e) => set('author', e.target.value)} maxLength={30} className={inputClass} />
         </Field>
-        <Field label="썸네일 색" hint="기사 이미지가 붙기 전까지 쓰는 색입니다.">
+        <Field label="썸네일 색" hint="사진이 없을 때만 쓰는 색입니다.">
           <ThumbPicker value={form.thumb} onChange={(tone) => set('thumb', tone)} />
         </Field>
       </div>
@@ -294,7 +334,7 @@ export function NewsAdmin({ articles }: { articles: NewsArticle[] }) {
         {articles.map((article) => (
           <li key={article.id} className="border-b border-gray-100 last:border-0">
             <div className="flex items-center gap-3 px-5 py-3">
-              <Thumb tone={article.thumb} className="h-10 w-14 shrink-0 rounded" />
+              <Thumb tone={article.thumb} src={article.thumbUrl} className="h-10 w-14 shrink-0 rounded" />
               <div className="min-w-0 flex-1">
                 <p className="flex items-center gap-1.5">
                   <span className="truncate text-sm font-semibold text-gray-900">{article.title}</span>
@@ -599,7 +639,9 @@ function SpecForm({ draft, chipsets, onDone }: { draft: PhoneSpec; chipsets: Chi
         </div>
       </div>
 
-      <Field label="썸네일 색">
+      <ContentPhotos value={form.images} onChange={(images) => set('images', images)} />
+
+      <Field label="썸네일 색" hint="사진이 없을 때만 쓰는 색입니다.">
         <ThumbPicker value={form.thumb} onChange={(tone) => set('thumb', tone)} />
       </Field>
 
@@ -659,7 +701,7 @@ export function SpecAdmin({ specs, chipsets }: { specs: PhoneSpec[]; chipsets: C
         {specs.map((spec) => (
           <li key={spec.id} className="border-b border-gray-100 last:border-0">
             <div className="flex items-center gap-3 px-5 py-3">
-              <Thumb tone={spec.thumb} className="h-12 w-9 shrink-0 rounded" />
+              <Thumb tone={spec.thumb} src={spec.thumbUrl} className="h-12 w-9 shrink-0 rounded" />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold text-gray-900">{spec.name}</p>
                 <p className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-gray-400">

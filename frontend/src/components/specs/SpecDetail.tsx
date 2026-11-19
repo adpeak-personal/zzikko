@@ -27,7 +27,7 @@ export function SpecDetail({
 
       <Card className="p-6">
         <div className="flex flex-wrap items-center gap-5">
-          <Thumb tone={spec.thumb} className="h-32 w-24 shrink-0 rounded-xl" />
+          <Thumb tone={spec.thumb} src={spec.thumbUrl} alt={spec.name} className="h-32 w-24 shrink-0 rounded-xl" />
           <div className="min-w-0 flex-1">
             <p className="text-sm text-gray-400">{spec.brand}</p>
             <h1 className="mt-0.5 text-2xl font-extrabold tracking-tight text-gray-900">{spec.name}</h1>
@@ -70,7 +70,7 @@ export function SpecDetail({
             {others.map((item) => (
               <li key={item.id} className="bg-white">
                 <Link href={`/board/specs/${item.id}`} className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50">
-                  <Thumb tone={item.thumb} className="h-12 w-9 shrink-0 rounded" />
+                  <Thumb tone={item.thumb} src={item.thumbUrl} alt={item.name} className="h-12 w-9 shrink-0 rounded" />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-semibold text-gray-900">{item.name}</span>
                     <span className="block text-xs text-gray-400">{formatNumber(item.retailPrice)}원</span>

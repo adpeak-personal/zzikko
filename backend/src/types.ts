@@ -109,6 +109,12 @@ export interface Shop {
   verified: boolean;
 }
 
+/** 기사·기종에 붙는 사진. **순서가 곧 노출 순서다.** */
+export interface ContentImage {
+  url: string;
+  caption: string;
+}
+
 export interface NewsArticle {
   id: number;
   title: string;
@@ -116,6 +122,8 @@ export interface NewsArticle {
   summary: string;
   body: string;
   thumb: string;
+  images: ContentImage[];
+  /** 읽기 전용 — images[0] 에서 따 둔 값이다. 저장할 땐 images 만 보낸다 */
   thumbUrl: string | null;
   author: string;
   date: string;
@@ -158,6 +166,8 @@ export interface PhoneSpec {
   weightG: number;
 
   thumb: string;
+  images: ContentImage[];
+  /** 읽기 전용 — images[0] 에서 따 둔 값이다. 저장할 땐 images 만 보낸다 */
   thumbUrl: string | null;
   published: boolean;
 }

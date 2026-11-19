@@ -58,7 +58,7 @@ export function SpecBoard({ specs, chipsets }: { specs: PhoneSpec[]; chipsets: C
             return (
               <li key={spec.id} className="flex flex-col rounded-xl border border-gray-200 bg-white p-4">
                 <div className="flex gap-3">
-                  <Thumb tone={spec.thumb} className="h-20 w-16 shrink-0 rounded-lg" />
+                  <Thumb tone={spec.thumb} src={spec.thumbUrl} alt={spec.name} className="h-20 w-16 shrink-0 rounded-lg" />
                   <div className="min-w-0 flex-1">
                     <Link href={`/board/specs/${spec.id}`} className="block truncate font-bold text-gray-900 hover:underline">
                       {spec.name}
