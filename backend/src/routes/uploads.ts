@@ -4,6 +4,7 @@ import { badRequest } from '../lib/http.js';
 import { requireAuth } from '../lib/auth.js';
 import { saveBuffer, toStored } from '../lib/storage.js';
 import { UnsupportedImageError, isAnimated, processImage } from '../lib/images.js';
+import { MAX_UPLOAD_BYTES, readAll } from '../lib/multipart.js';
 import { recordUpload } from '../repositories/uploads.js';
 
 const ALLOWED: Record<string, string> = {
@@ -12,21 +13,6 @@ const ALLOWED: Record<string, string> = {
   'image/gif': '.gif',
   'image/webp': '.webp',
 };
-
-/** @fastify/multipart 의 용량 제한과 맞춘다 */
-const MAX_BYTES = 10 * 1024 * 1024;
-
-/** 스트림을 버퍼로 — sharp 가 전체 바이트를 필요로 한다 */
-async function readAll(stream: AsyncIterable<Buffer>, limit: number) {
-  const chunks: Buffer[] = [];
-  let total = 0;
-  for await (const chunk of stream) {
-    total += chunk.byteLength;
-    if (total > limit) return null; // 초과분은 더 읽지 않는다
-    chunks.push(chunk);
-  }
-  return Buffer.concat(chunks);
-}
 
 /** 날짜 폴더로 나눠 한 폴더에 파일이 수만 개 쌓이지 않게 한다 */
 const todayFolder = () => new Date().toISOString().slice(0, 10);
@@ -49,7 +35,7 @@ export default async function uploadRoutes(app: FastifyInstance) {
     const extension = ALLOWED[file.mimetype];
     if (!extension) throw badRequest('JPG · PNG · GIF · WEBP 만 올릴 수 있습니다.');
 
-    const input = await readAll(file.file, MAX_BYTES);
+    const input = await readAll(file.file, MAX_UPLOAD_BYTES);
     if (!input || file.file.truncated) throw badRequest('이미지는 10MB 까지 올릴 수 있습니다.');
 
     const id = randomUUID();

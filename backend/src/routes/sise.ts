@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { badRequest, notFound, parse } from '../lib/http.js';
+import { notFound, parse } from '../lib/http.js';
 import { requireAdmin } from '../lib/auth.js';
 import { aiReady, logUsage } from '../lib/anthropic.js';
 import { extractSheet } from '../lib/sise/extract.js';
@@ -9,6 +9,7 @@ import { compareSheets } from '../lib/sise/compare.js';
 import { REGION_SLUG, defaultTitle, writeReport } from '../lib/sise/write.js';
 import { saveBuffer } from '../lib/storage.js';
 import { processImage } from '../lib/images.js';
+import { readImage } from '../lib/multipart.js';
 import * as sise from '../repositories/sise.js';
 import type { Region, SiseRow } from '../types.js';
 
@@ -39,19 +40,6 @@ const saveSchema = z.object({
   rows: z.array(rowSchema).min(1, '행이 비어 있습니다.').max(400),
 });
 
-const MAX_BYTES = 10 * 1024 * 1024;
-
-async function readAll(stream: AsyncIterable<Buffer>, limit: number) {
-  const chunks: Buffer[] = [];
-  let total = 0;
-  for await (const chunk of stream) {
-    total += chunk.byteLength;
-    if (total > limit) return null;
-    chunks.push(chunk);
-  }
-  return Buffer.concat(chunks);
-}
-
 export default async function siseRoutes(app: FastifyInstance) {
   /* ── 공개 ── */
 
@@ -80,19 +68,14 @@ export default async function siseRoutes(app: FastifyInstance) {
    * 2단계(POST /admin/sise/sheets)로 저장한다.
    */
   app.post('/admin/sise/extract', { preHandler: requireAdmin }, async (request) => {
-    const file = await request.file();
-    if (!file) throw badRequest('시세표 이미지를 선택해주세요.');
-    if (!file.mimetype.startsWith('image/')) throw badRequest('이미지 파일만 올릴 수 있습니다.');
-
-    const input = await readAll(file.file, MAX_BYTES);
-    if (!input || file.file.truncated) throw badRequest('이미지는 10MB 까지 올릴 수 있습니다.');
+    const image = await readImage(request, '시세표 이미지를 선택해주세요.');
 
     // 원본 그대로 읽힌다 — 표의 작은 숫자가 뭉개지면 안 되므로 줄이기 전에 넘긴다
-    const draft = await extractSheet(input, file.mimetype);
+    const draft = await extractSheet(image.data, image.mimetype);
     const readCost = logUsage(request, '시세표 읽기', draft.model, draft.usage);
 
     // 보관용은 webp 로 (EXIF 제거 + 용량)
-    const processed = await processImage(input);
+    const processed = await processImage(image.data);
     const saved = await saveBuffer(`sise/${new Date().toISOString().slice(0, 10)}/${randomUUID()}.webp`, processed.body, 'image/webp');
 
     return { imageUrl: saved.url, note: draft.note, rows: draft.rows, usd: readCost };

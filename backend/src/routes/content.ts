@@ -7,6 +7,7 @@ import * as feed from '../repositories/newsFeed.js';
 import { SOURCES, fetchSource } from '../lib/news/feed.js';
 import { writeArticle } from '../lib/news/write.js';
 import { extractSpec } from '../lib/specs/extract.js';
+import { readImage } from '../lib/multipart.js';
 import { buildPairs, pairSlug } from '../lib/specs/pairs.js';
 import { aiReady, logUsage } from '../lib/anthropic.js';
 
@@ -200,10 +201,19 @@ export default async function contentRoutes(app: FastifyInstance) {
    * 제조사 사양 페이지는 대부분 JS 로 그려져 서버가 직접 긁으면 안 나온다.
    * 그래서 주소를 받지 않고 붙여넣은 글(또는 캡처)을 받는다.
    */
+  /**
+   * 제조사 사양을 읽어 칸에 맞춰 돌려준다. **저장하지 않는다.**
+   *
+   * 붙여넣은 글(JSON)과 사양 화면 캡처(멀티파트) 둘 다 받는다 —
+   * 제조사 사양 페이지는 JS 로 그려져서 긁어도 안 나오는데, 사람이 보고 있는 화면은
+   * 복사가 되기도 하고 안 되기도 한다.
+   */
   app.post('/admin/specs/extract', { preHandler: requireAdmin }, async (request) => {
-    const { text } = parse(z.object({ text: z.string().min(10, '사양 자료를 넣어주세요.').max(40_000) }), request.body);
-    const out = await extractSpec({ text });
-    logUsage(request, '사양 정리', out.model, out.usage);
+    const out = request.isMultipart()
+      ? await extractSpec({ image: await readImage(request, '사양 캡처 이미지를 선택해주세요.') })
+      : await extractSpec(parse(z.object({ text: z.string().min(10, '사양 자료를 넣어주세요.').max(40_000) }), request.body));
+
+    const usd = logUsage(request, '사양 정리', out.model, out.usage);
 
     // 칩셋 이름이 잡혔으면 이미 등록된 것과 맞춰 본다
     const chipsets = await content.listChipsets();
@@ -236,6 +246,7 @@ export default async function contentRoutes(app: FastifyInstance) {
       missing: out.missing,
       // 칩셋 이름은 읽었는데 등록된 게 없을 때 알려 준다
       unknownChipset: out.chipsetName && !matched ? out.chipsetName : null,
+      usd,
     };
   });
 

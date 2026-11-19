@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Eye, EyeOff, Pencil, Plus, Star, Trash2, X } from 'lucide-react';
-import { ApiError, apiFetch } from '@/lib/api';
+import { Eye, EyeOff, ImageUp, Pencil, Plus, Sparkles, Star, Trash2, X } from 'lucide-react';
+import { ApiError, apiFetch, toApiError } from '@/lib/api';
 import { Thumb } from '@/components/ui';
 import { cn, formatNumber } from '@/lib/utils';
 import type { ChipTier, Chipset, NewsArticle, PhoneSpec } from '@/lib/types';
@@ -335,9 +335,157 @@ const SPEC_NUMBER_FIELDS: { key: keyof PhoneSpec; label: string; unit: string; s
   { key: 'weightG', label: '무게', unit: 'g' },
 ];
 
+/* ── 사양 붙여넣기 ──────────────────────────────── */
+
+interface Extracted {
+  spec: Partial<PhoneSpec>;
+  missing: string[];
+  unknownChipset: string | null;
+  usd: number;
+}
+
+/**
+ * 제조사 사양을 붙여넣거나 캡처를 올려서 아래 칸을 채운다.
+ *
+ * **채우기만 하고 저장하지 않는다** — 사람이 확인하고 '저장'을 눌러야 들어간다.
+ * 자료에 없던 값은 AI 가 비워 두고 아래에 알려 주므로, 빈 칸은 "자료에 없었다"는 뜻이다.
+ * 추측으로 채워 넣으면 그럴듯한 가짜 숫자가 공개되고 아무도 못 잡는다.
+ */
+function SpecPaste({ onFill }: { onFill: (spec: Partial<PhoneSpec>) => void }) {
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<Extracted | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const read = async (send: () => Promise<Response>) => {
+    setError(null);
+    setResult(null);
+    setBusy(true);
+    try {
+      const res = await send();
+      if (!res.ok) throw await toApiError(res);
+      const data = (await res.json()) as Extracted;
+      onFill(data.spec);
+      setResult(data);
+    } catch (err) {
+      setError(message(err, '사양을 읽지 못했어요.'));
+    } finally {
+      setBusy(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  };
+
+  const readText = () =>
+    read(() =>
+      fetch('/api/v1/admin/specs/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      }),
+    );
+
+  const readImage = (file: File) =>
+    read(() => {
+      const form = new FormData();
+      form.append('file', file);
+      // FormData 는 boundary 를 브라우저가 붙이므로 Content-Type 을 직접 넣지 않는다
+      return fetch('/api/v1/admin/specs/extract', { method: 'POST', body: form });
+    });
+
+  return (
+    <div className="rounded-lg border border-zz-200 bg-zz-50/60 p-3">
+      <p className="flex items-center gap-1.5 text-xs font-semibold text-zz-800">
+        <Sparkles size={13} /> 사양 붙여넣기
+      </p>
+      <p className="mt-0.5 text-[11px] leading-relaxed text-gray-500">
+        제조사 사양 페이지의 글을 복사해 넣거나 캡처를 올리면 아래 칸을 채웁니다. 저장은 직접 눌러야 합니다.
+        <br />
+        자료에 없는 값은 비워 둡니다 — 빈 칸은 손으로 채워 주세요.
+      </p>
+
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        rows={4}
+        maxLength={40000}
+        placeholder={'6.9인치 QHD+ Dynamic AMOLED 2X, 120Hz\n5000mAh, 45W 유선 충전\n200MP 광각 + 50MP 망원 …'}
+        className="mt-2 w-full resize-y rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-zz-400"
+      />
+
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={readText}
+          disabled={busy || text.trim().length < 10}
+          className="rounded-lg bg-zz-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-zz-700 disabled:opacity-40"
+        >
+          {busy ? '읽는 중…' : '사양 읽기'}
+        </button>
+
+        <label className="flex cursor-pointer items-center gap-1 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-semibold text-gray-600 hover:border-zz-400">
+          <ImageUp size={14} /> 캡처로 읽기
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            disabled={busy}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void readImage(file);
+            }}
+            className="hidden"
+          />
+        </label>
+
+        {text && (
+          <button type="button" onClick={() => setText('')} className="text-xs text-gray-400 hover:text-gray-600">
+            지우기
+          </button>
+        )}
+      </div>
+
+      {error && <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>}
+
+      {result && (
+        <div className="mt-2 space-y-1.5 text-[11px]">
+          <p className="text-emerald-700">
+            아래 칸을 채웠습니다. 숫자를 한 번 확인하고 저장해 주세요. (${result.usd.toFixed(4)})
+          </p>
+          {result.missing.length > 0 && (
+            <p className="text-amber-700">
+              자료에 없어서 못 채운 항목 — <b>{result.missing.join(', ')}</b>
+            </p>
+          )}
+          {result.unknownChipset && (
+            <p className="text-amber-700">
+              칩셋 <b>{result.unknownChipset}</b> 은 아직 등록되어 있지 않습니다. 아래 &lsquo;칩셋&rsquo;에서 먼저
+              추가한 뒤 선택해 주세요.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SpecForm({ draft, chipsets, onDone }: { draft: PhoneSpec; chipsets: Chipset[]; onDone: () => void }) {
   const [form, setForm] = useState(draft);
   const set = <K extends keyof PhoneSpec>(key: K, value: PhoneSpec[K]) => setForm((prev) => ({ ...prev, [key]: value }));
+
+  /**
+   * 읽어낸 값 중 **채워진 것만** 덮는다.
+   *
+   * AI 는 자료에 없는 값을 빈 문자열·0 으로 돌려주므로, 그대로 덮으면 이미 손으로 넣어 둔
+   * 값이 지워진다. 자료가 반쪽짜리일 때 특히 그렇다.
+   */
+  const fill = (patch: Partial<PhoneSpec>) =>
+    setForm((prev) => {
+      const filled = Object.fromEntries(
+        Object.entries(patch).filter(([, value]) => value !== '' && value !== 0 && value !== null && value !== undefined),
+      ) as Partial<PhoneSpec>;
+      return { ...prev, ...filled };
+    });
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -358,6 +506,8 @@ function SpecForm({ draft, chipsets, onDone }: { draft: PhoneSpec; chipsets: Chi
 
   return (
     <form onSubmit={onSubmit} className="space-y-3 border-t border-gray-100 bg-gray-50/70 px-5 py-4">
+      <SpecPaste onFill={fill} />
+
       <div className="grid gap-3 sm:grid-cols-[1fr_130px_130px_150px]">
         <Field label="기종 이름">
           <input value={form.name} onChange={(e) => set('name', e.target.value)} maxLength={40} className={inputClass} />
