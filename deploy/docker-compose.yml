@@ -19,6 +19,8 @@ services:
     image: ghcr.io/adpeak-personal/zzikko-back:${ZZIKKO_TAG:-latest}
     container_name: zzikko-back
     restart: unless-stopped
+    # 서버에 캐시된 옛 이미지를 띄우지 않는다 — latest 는 맨 처음 배포에 멈춰 있다
+    pull_policy: always
     env_file:
       - ./.env.back
     environment:
@@ -35,6 +37,7 @@ services:
     image: ghcr.io/adpeak-personal/zzikko-front:${ZZIKKO_TAG:-latest}
     container_name: zzikko-front
     restart: unless-stopped
+    pull_policy: always
     environment:
       # 서버 컴포넌트가 백엔드를 직접 부를 때 쓰는 주소 (src/lib/api.server.ts)
       API_URL: http://back:4080
