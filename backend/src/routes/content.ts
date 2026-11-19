@@ -65,6 +65,25 @@ const specSchema = z.object({
   published: z.boolean().default(true),
 });
 
+/**
+ * 칩셋 이름 맞춰보기.
+ *
+ * 삼성은 같은 칩을 늘 "Snapdragon 8 Gen 5 **for Galaxy**" 로 적는다. 글자 그대로 비교하면
+ * 삼성 플래그십은 하나도 안 맞아서 매번 손으로 고르게 된다.
+ *
+ * 그렇다고 부분 일치로 풀면 안 된다 — "A19" 가 "A19 Pro" 에 걸려 다른 칩이 선택된다
+ * (등급이 달라 비교표의 우열이 뒤집힌다). 붙는 수식어만 떼고 나머지는 정확히 맞춘다.
+ */
+const normalizeChipset = (name: string) =>
+  name
+    .toLowerCase()
+    .replace(/\bfor galaxy\b/g, '')
+    .replace(/\bchip\b/g, '')
+    .replace(/[\s-]+/g, ' ')
+    .trim();
+
+const sameChipset = (a: string, b: string) => normalizeChipset(a) === normalizeChipset(b);
+
 export default async function contentRoutes(app: FastifyInstance) {
   /* ── 공개 조회 ── */
 
@@ -217,9 +236,7 @@ export default async function contentRoutes(app: FastifyInstance) {
 
     // 칩셋 이름이 잡혔으면 이미 등록된 것과 맞춰 본다
     const chipsets = await content.listChipsets();
-    const matched = out.chipsetName
-      ? chipsets.find((item) => item.name.toLowerCase() === out.chipsetName.toLowerCase())
-      : undefined;
+    const matched = out.chipsetName ? chipsets.find((item) => sameChipset(item.name, out.chipsetName)) : undefined;
 
     return {
       spec: {

@@ -16,7 +16,9 @@ import { badRequest } from '../http.js';
  */
 
 const SpecSchema = z.object({
-  name: z.string().describe('한국에서 부르는 기종 이름. 예: 갤럭시 S26 울트라, 아이폰 18 Pro'),
+  name: z
+    .string()
+    .describe('한국에서 부르는 기종 이름. 자료가 영어여도 한글로. 예: 갤럭시 S26 울트라, 아이폰 18 Pro'),
   brand: z.enum(['Samsung', 'Apple', '기타']),
   releaseDate: z.string().describe('출시 연월 YYYY-MM. 모르면 빈 문자열.'),
   retailPrice: z.number().describe('국내 출고가(원). 256GB 기준. 모르면 0.'),
@@ -52,7 +54,15 @@ const PROMPT = `아래는 휴대폰 제조사가 공개한 사양 자료다. 이
 - 단위를 바꾸지 마라. mAh 는 mAh 로, W 는 W 로.
 - **카메라 화소만 만 화소 단위로 바꾼다.** 50MP = 5000만 화소 = 5000, 200MP = 2억 화소 = 20000.
 - 가격은 국내 출고가(원)다. 달러만 있으면 환산하지 말고 0 으로 두고 missing 에 적어라.
-- 화면용 문자열은 한국 표기로 다듬어라. "6.9 inch AMOLED 120Hz" → "6.9형 AMOLED · 120Hz".
+- **화면용 문자열은 전부 한국 표기로 적어라.** 자료가 영어여도 마찬가지다.
+  - 기종 이름: iPhone 18 Pro → "아이폰 18 Pro", Galaxy S26 Ultra → "갤럭시 S26 울트라"
+  - 화면: "6.9 inch AMOLED 120Hz" → "6.9형 AMOLED · 120Hz"
+  - 카메라: "48MP Ultra Wide" → "4800만 화소 초광각", "12MP 5x Telephoto" → "1200만 화소 망원(5배)"
+    (Wide=광각, Ultra Wide=초광각, Telephoto=망원)
+  - 단위는 숫자에 붙여 쓴다: "3800 mAh" → "3800mAh", "199 grams" → "199g"
+  - "(typical)", "(rounded corners)" 처럼 사양이 아닌 영어 주석은 떼라.
+    조리개(F1.7)·OIS 같은 규격 표기는 남겨도 된다.
+  제품명 안의 영문 모델명(S26, 18 Pro, Pro Max)은 그대로 둔다 — 번역하지 마라.
 - 용량이 여러 개면 가장 작은 것 기준으로 가격을 적고, storage 에는 전부 나열해라.
 
 **단위 환산은 해도 된다 — 추측이 아니라 계산이다:**
@@ -63,6 +73,37 @@ const PROMPT = `아래는 휴대폰 제조사가 공개한 사양 자료다. 이
 
 그 외에는 자료에 적힌 값을 그대로 둬라. **아는 지식으로 메우는 것과 환산은 다르다.**
 "Octa-Core 4.47GHz" 만 적혀 있으면 칩셋 이름은 모르는 것이다 — 비워라.`;
+
+/**
+ * 못 채운 항목을 화면에 띄울 이름으로 바꾼다.
+ *
+ * 모델은 `missing` 에 스키마의 칸 이름(`retailPrice`)을 적어 준다. 그대로 띄우면
+ * 어드민에서 "못 채운 항목 — retailPrice" 가 되고, 어느 칸인지 알 수 없다.
+ */
+const FIELD_LABELS: Record<string, string> = {
+  name: '기종 이름',
+  brand: '제조사',
+  releaseDate: '출시',
+  retailPrice: '출고가',
+  chipsetName: '칩셋',
+  display: '화면',
+  storage: '저장용량',
+  battery: '배터리',
+  charging: '충전',
+  cameraMain: '후면 카메라',
+  cameraFront: '전면 카메라',
+  weight: '무게',
+  displayInch: '화면 인치',
+  refreshHz: '주사율',
+  memoryGb: 'RAM',
+  batteryMah: '배터리 용량',
+  chargingWatt: '충전 속도',
+  cameraMainMp: '후면 화소',
+  weightG: '무게(g)',
+};
+
+/** 모르는 이름은 모델이 적은 그대로 둔다 — 지우면 사람이 뭘 놓쳤는지 모른다 */
+const label = (field: string) => FIELD_LABELS[field.trim()] ?? field.trim();
 
 export interface ExtractedSpec extends z.infer<typeof SpecSchema> {
   usage: Usage;
@@ -110,5 +151,8 @@ export async function extractSpec(
   const parsed = response.parsed_output;
   if (!parsed) throw badRequest('사양을 읽지 못했습니다. 자료를 확인해주세요.');
 
-  return { ...parsed, usage: response.usage, model };
+  // 같은 항목을 칸 이름과 한글로 두 번 적어 오는 경우가 있어 중복을 지운다
+  const missing = [...new Set(parsed.missing.map(label))];
+
+  return { ...parsed, missing, usage: response.usage, model };
 }
