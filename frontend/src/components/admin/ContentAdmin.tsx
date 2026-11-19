@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Eye, EyeOff, ImageUp, Pencil, Plus, Sparkles, Star, Trash2, X } from 'lucide-react';
+import { ExternalLink, Eye, EyeOff, ImageUp, Pencil, Plus, Sparkles, Star, Trash2, X } from 'lucide-react';
 import { ApiError, apiFetch, toApiError } from '@/lib/api';
 import { Thumb } from '@/components/ui';
 import { cn, formatNumber } from '@/lib/utils';
@@ -123,6 +123,7 @@ function RowActions({
   published,
   editing,
   publishLabels,
+  previewHref,
   onTogglePublish,
   onEdit,
   onDelete,
@@ -130,12 +131,26 @@ function RowActions({
   published: boolean;
   editing: boolean;
   publishLabels: [on: string, off: string];
+  /** 실제 화면을 새 탭에서 연다. 미발행이어도 운영진에게는 보인다(백엔드가 열어 준다). */
+  previewHref?: string;
   onTogglePublish: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }) {
   return (
     <>
+      {previewHref && (
+        <a
+          href={previewHref}
+          target="_blank"
+          rel="noreferrer"
+          aria-label="미리보기"
+          title="실제 화면 보기"
+          className="rounded-lg p-2 text-gray-400 hover:bg-gray-100"
+        >
+          <ExternalLink size={15} />
+        </a>
+      )}
       <button
         type="button"
         onClick={onTogglePublish}
@@ -294,6 +309,7 @@ export function NewsAdmin({ articles }: { articles: NewsArticle[] }) {
                 published={article.published}
                 editing={editing?.id === article.id}
                 publishLabels={['숨기기', '발행하기']}
+                previewHref={`/board/news/${article.id}`}
                 onTogglePublish={() => run(() => saveTo('/admin/news', { ...article, published: !article.published }))}
                 onEdit={() => setEditing(editing?.id === article.id ? null : article)}
                 onDelete={() => {
@@ -655,6 +671,7 @@ export function SpecAdmin({ specs, chipsets }: { specs: PhoneSpec[]; chipsets: C
                 published={spec.published}
                 editing={editing?.id === spec.id}
                 publishLabels={['숨기기', '공개하기']}
+                previewHref={`/board/specs/${spec.id}`}
                 onTogglePublish={() => run(() => saveTo('/admin/specs', { ...spec, published: !spec.published }))}
                 onEdit={() => setEditing(editing?.id === spec.id ? null : spec)}
                 onDelete={() => {

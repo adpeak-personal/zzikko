@@ -66,6 +66,18 @@ export async function requireAuth(request: FastifyRequest) {
 }
 
 /**
+ * 운영진인지 보기만 한다 — 아니어도 막지 않는다.
+ *
+ * 미발행 글 미리보기처럼 "운영진이면 더 보여주는" 공개 라우트에 쓴다.
+ * requireAdmin 과 같은 이유로 role 은 DB 에서 본다 (토큰 속 role 은 2주까지 묵는다).
+ */
+export async function isAdmin(request: FastifyRequest): Promise<boolean> {
+  if (!request.user) return false;
+  const row = await findById(request.user.id);
+  return row?.role === '운영진';
+}
+
+/**
  * 운영진 전용.
  * 토큰 속 role 은 로그인 시점 값이라 권한을 바꿔도 토큰이 살아 있는 2주 동안 그대로다 —
  * 운영진으로 올린 사람은 어드민이 403 으로 깨지고, 내린 사람은 계속 들어온다.

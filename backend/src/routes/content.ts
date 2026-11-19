@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { badRequest, notFound, parse } from '../lib/http.js';
-import { requireAdmin } from '../lib/auth.js';
+import { isAdmin, requireAdmin } from '../lib/auth.js';
 import * as content from '../repositories/content.js';
 import * as feed from '../repositories/newsFeed.js';
 import { SOURCES, fetchSource } from '../lib/news/feed.js';
@@ -95,8 +95,10 @@ export default async function contentRoutes(app: FastifyInstance) {
   app.get('/news/:id', async (request) => {
     const { id } = parse(idParam, request.params);
     const article = await content.getNews(id);
-    // 미발행 기사는 없는 것으로 본다
-    if (!article || !article.published) throw notFound('기사');
+    if (!article) throw notFound('기사');
+    // 미발행 기사는 없는 것으로 본다. 운영진만 발행 전에 실제 화면을 확인할 수 있다 —
+    // 퍼온 기사는 한 번 읽고 내보내는 흐름이라, 날 텍스트만 보고 판단하게 두면 안 된다.
+    if (!article.published && !(await isAdmin(request))) throw notFound('기사');
     return article;
   });
 
@@ -108,7 +110,8 @@ export default async function contentRoutes(app: FastifyInstance) {
   app.get('/specs/:id', async (request) => {
     const { id } = parse(idParam, request.params);
     const spec = await content.getSpec(id);
-    if (!spec || !spec.published) throw notFound('기종');
+    if (!spec) throw notFound('기종');
+    if (!spec.published && !(await isAdmin(request))) throw notFound('기종');
     return spec;
   });
 
