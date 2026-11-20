@@ -157,7 +157,7 @@ export default async function siseRoutes(app: FastifyInstance) {
       slug,
       title: input.title || written.title || defaultTitle({ region: input.region, datedOn: input.datedOn }),
       summary: written.summary,
-      sections: { lead: written.lead, highlights: written.highlights, closing: written.closing },
+      sections: { lead: written.lead, blocks: written.blocks, closing: written.closing },
       changes: comparison?.changes ?? [],
       comparedTo: previous?.id ?? null,
     });
@@ -178,7 +178,9 @@ export default async function siseRoutes(app: FastifyInstance) {
         sections: z
           .object({
             lead: z.string().max(4000),
-            highlights: z.array(z.string().max(500)).max(10),
+            blocks: z
+              .array(z.object({ heading: z.string().max(80), body: z.string().max(6000) }))
+              .max(10),
             closing: z.string().max(4000),
           })
           .optional(),

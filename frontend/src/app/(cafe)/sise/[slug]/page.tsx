@@ -93,19 +93,19 @@ export default async function SiseReportPage({ params }: { params: Promise<{ slu
         <SiseTable rows={sheet.rows} />
       </section>
 
-      {sections.highlights.length > 0 && (
-        <section className="mt-8">
-          <h2 className="mb-3 text-lg font-bold text-gray-900">눈에 띄는 것</h2>
-          <ul className="space-y-2">
-            {sections.highlights.map((line, index) => (
-              <li key={index} className="flex gap-2.5 text-[15px] leading-relaxed text-gray-800">
-                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-zz-500" />
-                <span>{line}</span>
-              </li>
+      {sections.blocks.map((block, index) => (
+        <section key={index} className="mt-8">
+          <h2 className="mb-3 text-lg font-bold text-gray-900">{block.heading}</h2>
+          {/* 글쓴이가 줄바꿈 두 번으로 문단을 나눈다 */}
+          <div className="space-y-4">
+            {block.body.split(/\n{2,}/).map((paragraph, line) => (
+              <p key={line} className="whitespace-pre-line text-[16px] leading-[1.9] text-gray-800">
+                {paragraph}
+              </p>
             ))}
-          </ul>
+          </div>
         </section>
-      )}
+      ))}
 
       {changes.length > 0 && report.comparedTo && (
         <section className="mt-8">
@@ -153,6 +153,32 @@ export default async function SiseReportPage({ params }: { params: Promise<{ slu
           <p className="whitespace-pre-line text-[15px] leading-[1.9] text-gray-700">{sections.closing}</p>
         </section>
       )}
+
+      {/*
+        글 맨 아래 안내. AI 가 쓴 문장이 아니라 코드가 그린다 —
+        주소를 모델에게 맡기면 없는 링크를 지어낸다.
+      */}
+      <section className="mt-10 rounded-2xl border border-zz-200 bg-zz-50 px-5 py-5">
+        <h2 className="text-base font-bold text-gray-900">{sheet.region} 성지는 어디서 보나요?</h2>
+        <p className="mt-2 text-[15px] leading-[1.9] text-gray-700">
+          지역별 매장이 올리는 그날의 가입 조건은 찍고 <b>성지 시세표</b> 게시판에 모여 있습니다. 같은 기종이라도 매장마다
+          조건이 달라서, 여러 곳을 나란히 놓고 보는 편이 빠릅니다.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Link
+            href="/board/deals"
+            className="rounded-lg bg-zz-600 px-4 py-2 text-sm font-semibold text-white hover:bg-zz-700"
+          >
+            성지 시세표 보러가기
+          </Link>
+          <Link
+            href="/"
+            className="rounded-lg border border-zz-300 bg-white px-4 py-2 text-sm font-semibold text-zz-700 hover:bg-white/60"
+          >
+            찍고 홈
+          </Link>
+        </div>
+      </section>
 
       <footer className="mt-8 border-t border-gray-200 pt-5 text-xs leading-relaxed text-gray-400">
         <p>

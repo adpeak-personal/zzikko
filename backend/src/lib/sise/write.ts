@@ -51,11 +51,20 @@ export const regionSlug = (region: string) => SLUGS[region] ?? region;
 const ReportSchema = z.object({
   title: z
     .string()
-    .describe('검색에 걸릴 제목. 지역과 날짜를 반드시 넣는다. 예: "서울 휴대폰 성지 시세 (11월 18일 기준)"'),
+    .describe('검색에 걸릴 제목. 지역과 날짜를 반드시 넣는다. 예: "수원 휴대폰 성지 시세 (11월 20일 기준)"'),
   summary: z.string().describe('검색 결과에 뜰 두 문장 요약. 160자 안쪽.'),
-  lead: z.string().describe('도입 2~3문장. 이번 주 시세가 전체적으로 어떤 분위기인지.'),
-  highlights: z.array(z.string()).describe('눈에 띄는 변화 3~5개. 한 줄씩. 숫자는 주어진 값만 쓴다.'),
-  closing: z.string().describe('마무리 2~3문장. 지금 사는 게 나은지 기다리는 게 나은지, 주의할 점.'),
+  lead: z
+    .string()
+    .describe('도입 3~4문장. 블로그 글 첫 문단처럼 자연스럽게. 이번 시세가 어떤 분위기인지.'),
+  blocks: z
+    .array(
+      z.object({
+        heading: z.string().describe('소제목. 20자 안쪽. "눈에 띄는 것" 같은 뻔한 말 말고 내용이 드러나게.'),
+        body: z.string().describe('문단 2~4개. 줄바꿈 두 번으로 문단을 나눈다. 목록처럼 끊어 쓰지 마라.'),
+      }),
+    )
+    .describe('본문 4~6덩어리. 아래 "글의 뼈대" 순서를 따른다.'),
+  closing: z.string().describe('마무리 2~3문장. 과장 없이, 읽는 사람이 다음에 뭘 하면 되는지.'),
 });
 
 /** 가격을 사람이 읽는 말로. 음수는 페이백이다. */
@@ -99,7 +108,10 @@ export async function writeReport(
     title: parsed.title.trim().slice(0, 200) || defaultTitle(input),
     summary: parsed.summary.trim().slice(0, 300),
     lead: parsed.lead.trim(),
-    highlights: parsed.highlights.map((line) => line.trim()).filter(Boolean).slice(0, 6),
+    blocks: parsed.blocks
+      .map((block) => ({ heading: block.heading.trim(), body: block.body.trim() }))
+      .filter((block) => block.heading && block.body)
+      .slice(0, 8),
     closing: parsed.closing.trim(),
     usage: response.usage,
     model,
@@ -114,26 +126,63 @@ export function defaultTitle({ region, datedOn }: { region: string; datedOn: str
 function buildPrompt(input: WriteInput): string {
   const { region, datedOn, rows, note, comparison, previousDate } = input;
   const lines: string[] = [];
+  const lowest = lowestByModel(rows);
 
   lines.push(
-    `너는 휴대폰 커뮤니티 "찍고"의 편집자다. ${region} 지역 ${datedOn} 기준 시세표를 보고 해설 글을 쓴다.`,
+    `너는 휴대폰 시세를 오래 지켜본 IT 블로거다. 커뮤니티 "찍고"에 ${region} ${datedOn} 기준`,
+    '시세 글을 쓴다. 보고서가 아니라 **사람이 읽는 블로그 글**이다.',
     '',
-    '## 지켜야 할 것',
-    '- **주어진 숫자만 쓴다.** 아래에 없는 가격을 지어내지 마라. 하나 틀리면 글 전체를 못 믿는다.',
-    '- 표는 화면에 따로 그려지니 표를 글로 옮기지 마라. 흐름과 뜻을 설명해라.',
-    '- "최저가", "역대급", "지금이 기회" 같은 과장은 쓰지 마라. 숫자가 말하게 둔다.',
+    '## 문체',
+    '- 문단으로 쓴다. 한 줄짜리 항목을 늘어놓지 마라. 문장이 이어져야 읽힌다.',
+    '- 존댓말. "~합니다", "~인데요" 처럼 말하듯이. 다만 들뜨지는 않게.',
+    '- "표에 따르면", "위 표를 보면" 같은 말을 쓰지 마라. 네가 직접 시세를 본 사람처럼 쓴다.',
+    '- "역대급", "지금이 기회", "최저가" 같은 과장은 쓰지 마라. 숫자가 말하게 둔다.',
+    '- 소제목은 내용이 드러나게 짓는다. "눈에 띄는 것" 같은 빈 제목은 쓰지 마라.',
+    '',
+    '## 절대 지킬 것',
+    '- **아래 주어진 숫자만 쓴다.** 없는 가격을 지어내면 글 전체를 못 믿는다.',
+    '- 어떤 기종이 새 것인지 인기인지는 이름으로 판단해도 된다. 다만 **가격·사양 숫자는 주어진 것만** 쓴다.',
     '- 특정 매장을 광고하지 마라. 매장 이름은 모른다.',
-    '- 음수는 페이백이다. -75 는 "75만원 페이백" 이고, 손님이 돈을 받는 것이다.',
-    '- 존댓말로, 담백하게 쓴다.',
+    '- 음수는 페이백이다. -30 은 "30만원 페이백", 손님이 돈을 받는 것이다.',
+    '- 링크를 글에 쓰지 마라. 화면이 알아서 붙인다.',
     '',
-    `## ${datedOn} ${region} 시세 (기종별 가장 싼 조건)`,
+    `## ${datedOn} ${region} 시세 — 기종별 가장 싼 조건`,
   );
 
-  for (const row of lowestByModel(rows).slice(0, 14)) {
-    lines.push(`- ${row.model} ${row.storage}: ${money(row.price)} (${row.carrier} ${short(row.joinType)}, ${row.plan})`);
+  for (const row of lowest.slice(0, 16)) {
+    lines.push(`- ${row.model} ${row.storage}: ${money(row.price)} (${row.carrier} ${short(row.joinType)}, ${row.plan} 요금제)`);
   }
 
-  if (note) lines.push('', `## 표에 붙은 조건`, note);
+  const payback = lowest.filter((row) => row.price < 0);
+  const paid = lowest.filter((row) => row.price >= 0);
+  if (payback.length) {
+    lines.push('', `페이백으로 나온 기종 ${payback.length}개: ${payback.map((r) => r.model).join(', ')}`);
+  }
+  if (paid.length > 1) {
+    const cheapest = paid[0]!;
+    const dearest = paid[paid.length - 1]!;
+    lines.push(
+      `할부원금이 붙는 기종은 ${cheapest.model}(${cheapest.price}만원)부터 ${dearest.model}(${dearest.price}만원)까지다.`,
+    );
+  }
+
+  const gap = joinTypeGap(rows);
+  const wins = carrierWins(lowest);
+  lines.push('', '## 어떻게 사야 싼지 — 계산해둔 값');
+  if (gap) {
+    lines.push(
+      `- 같은 기종·같은 통신사끼리 견주면 번호이동이 기기변경보다 평균 ${gap.average}만원 싸다 (견준 짝 ${gap.pairs}개).`,
+      `  번호이동이 더 싼 경우가 ${gap.mnpCheaper}개, 기기변경이 더 싼 경우가 ${gap.deviceCheaper}개다.`,
+    );
+  }
+  if (wins.length) {
+    lines.push(`- 기종별 가장 싼 조건을 통신사로 세면 ${wins.map((w) => `${w.carrier} ${w.count}개`).join(' · ')} 다.`);
+  }
+  lines.push(
+    '- 요금제는 기종마다 다르게 붙어 있다(위 목록 괄호 안). 싼 값에는 그만한 요금제 조건이 따라붙는다.',
+  );
+
+  if (note) lines.push('', '## 시세표에 적힌 조건', note);
 
   if (comparison && previousDate) {
     lines.push(
@@ -144,7 +193,7 @@ function buildPrompt(input: WriteInput): string {
       '많이 움직인 것:',
     );
     for (const change of comparison.changes.slice(0, 10)) {
-      const dir = change.delta < 0 ? '좋아짐' : '나빠짐';
+      const dir = change.delta < 0 ? '손님에게 유리해짐' : '불리해짐';
       lines.push(
         `- ${change.model} (${change.carrier} ${short(change.joinType)}): ${money(change.before)} → ${money(change.after)}` +
           ` / ${Math.abs(change.delta)}만원 ${dir}`,
@@ -153,18 +202,78 @@ function buildPrompt(input: WriteInput): string {
     if (comparison.added.length) lines.push('', `새로 들어온 기종: ${comparison.added.join(', ')}`);
     if (comparison.removed.length) lines.push(`빠진 기종: ${comparison.removed.join(', ')}`);
   } else {
-    lines.push('', '## 변화', '이 지역의 첫 기록이라 견줄 지난 시세가 없다. 비교 이야기는 쓰지 말고 현재 상황만 설명해라.');
+    lines.push('', '## 변화', '이 지역의 첫 기록이라 견줄 지난 시세가 없다. 변화 이야기는 쓰지 마라.');
   }
 
   lines.push(
     '',
+    '## 성지가 싼 이유 (설명용 배경 — 숫자를 지어내지 마라)',
+    '휴대폰 값은 출고가에서 **공시지원금**을 빼고, 거기에 판매점이 쓸 수 있는 **추가지원금**을 더 뺀 금액이다.',
+    '일반 대리점은 추가지원금을 거의 안 쓰거나 조금만 쓰는 데 비해, 이른바 성지는 그 폭을 크게 써서',
+    '할부원금을 낮추거나 페이백을 준다. 그래서 같은 기종·같은 요금제라도 어디서 가입하느냐로 값이 갈린다.',
+    '이 차이를 설명하되, **일반 매장이 얼마다 같은 구체적인 숫자는 쓰지 마라** — 우리가 가진 자료가 아니다.',
+    '',
+    '## 글의 뼈대 (blocks 를 이 순서로)',
+    '1. **이번에 특히 싼 기종** — 페이백이나 할부원금이 낮게 잡힌 것들. 왜 눈에 띄는지까지.',
+    '2. **새 기종·많이 찾는 기종 값** — 최신 플래그십과 폴더블이 어느 선에 있는지.',
+    '3. **어떻게 사야 싼가** — 번호이동/기기변경, 통신사 선택, 요금제 조건. 위 계산값을 근거로.',
+    comparison && previousDate
+      ? '4. **지난번과 뭐가 달라졌나** — 움직인 기종과 방향.'
+      : '4. (지난 기록이 없으니 이 덩어리는 건너뛴다)',
+    '5. **왜 성지가 더 싼가** — 위 배경 설명을 블로그 말투로 풀어서.',
+    '',
     '## 쓸 것',
-    '- title: 지역과 날짜가 들어간 제목. 검색해서 들어오는 글이라 "서울 휴대폰 성지 시세" 같은 말이 앞에 와야 한다.',
+    '- title: 지역과 날짜가 앞에 오는 제목.',
     '- summary: 검색 결과에 뜰 두 문장.',
-    '- lead: 이번 시세 분위기 2~3문장.',
-    '- highlights: 눈에 띄는 것 3~5줄.',
-    '- closing: 사는 쪽이 나은지 기다리는 쪽이 나은지, 볼 때 주의할 점 2~3문장.',
+    '- lead: 블로그 첫 문단처럼 3~4문장.',
+    '- blocks: 위 뼈대대로 4~6덩어리. 각 덩어리는 문단 2~4개.',
+    '- closing: 2~3문장. 재고·조건은 바뀔 수 있으니 확인하라는 당부까지.',
   );
 
   return lines.join('\n');
+}
+
+/**
+ * 같은 기종·같은 통신사에서 번호이동과 기기변경이 얼마나 벌어지는지.
+ *
+ * "번이가 유리하다"는 말을 **이 시세표의 숫자로** 뒷받침하기 위한 값이다.
+ * 짝이 맞는 칸만 센다 — 한쪽에만 있는 기종을 섞으면 평균이 엉뚱해진다.
+ */
+function joinTypeGap(rows: SiseRow[]) {
+  const byKey = new Map<string, Partial<Record<'번호이동' | '기기변경', number>>>();
+  for (const row of rows) {
+    if (row.joinType === '신규가입') continue;
+    const key = `${row.model}|${row.storage}|${row.carrier}`;
+    const slot = byKey.get(key) ?? {};
+    // 같은 칸이 여러 번 나오면 싼 쪽을 둔다
+    const kept = slot[row.joinType];
+    if (kept === undefined || row.price < kept) slot[row.joinType] = row.price;
+    byKey.set(key, slot);
+  }
+
+  let total = 0;
+  let pairs = 0;
+  let mnpCheaper = 0;
+  let deviceCheaper = 0;
+  for (const slot of byKey.values()) {
+    const mnp = slot['번호이동'];
+    const device = slot['기기변경'];
+    if (mnp === undefined || device === undefined) continue;
+    total += device - mnp; // 양수면 번이가 싸다
+    pairs += 1;
+    if (mnp < device) mnpCheaper += 1;
+    else if (device < mnp) deviceCheaper += 1;
+  }
+
+  if (pairs === 0) return null;
+  return { average: Math.round((total / pairs) * 10) / 10, pairs, mnpCheaper, deviceCheaper };
+}
+
+/** 기종별 가장 싼 조건을 통신사로 센다 — "어디가 공격적인지" 근거 */
+function carrierWins(lowest: SiseRow[]) {
+  const count = new Map<string, number>();
+  for (const row of lowest) count.set(row.carrier, (count.get(row.carrier) ?? 0) + 1);
+  return [...count.entries()]
+    .map(([carrier, n]) => ({ carrier, count: n }))
+    .sort((a, b) => b.count - a.count);
 }

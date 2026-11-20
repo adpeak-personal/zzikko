@@ -113,12 +113,55 @@ const SELECT_REPORT = `
     LEFT JOIN sise_sheets prev ON prev.id = r.compared_to
 `;
 
+/** 문단 사이 — 화면이 `whitespace-pre-line` 으로 그린다 */
+const PARAGRAPH_GAP = '\n\n';
+
+/** 예전 글의 `highlights: string[]` 모양 */
+interface LegacySections {
+  lead?: unknown;
+  highlights?: unknown;
+  closing?: unknown;
+  blocks?: unknown;
+}
+
+/**
+ * 저장된 본문을 화면용 모양으로.
+ *
+ * 글 구조를 `highlights`(한 줄 목록)에서 `blocks`(소제목+문단)로 바꿨다. 이미 발행된
+ * 글이 있으므로, 옛 모양으로 저장된 건 읽을 때 한 덩어리로 옮겨 준다 — 마이그레이션으로
+ * 본문을 건드리지 않는 이유는, 되돌릴 일이 생겼을 때 원본이 남아 있는 편이 안전해서다.
+ */
+function toSections(raw: unknown): SiseSections {
+  const value = parseJson<LegacySections>(raw, {});
+  const lead = typeof value.lead === 'string' ? value.lead : '';
+  const closing = typeof value.closing === 'string' ? value.closing : '';
+
+  if (Array.isArray(value.blocks)) {
+    const blocks = value.blocks
+      .filter((item): item is { heading: string; body: string } =>
+        Boolean(item) && typeof item === 'object' &&
+        typeof (item as { heading?: unknown }).heading === 'string' &&
+        typeof (item as { body?: unknown }).body === 'string')
+      .map((item) => ({ heading: item.heading, body: item.body }));
+    return { lead, blocks, closing };
+  }
+
+  const highlights = Array.isArray(value.highlights)
+    ? value.highlights.filter((line): line is string => typeof line === 'string' && line.trim() !== '')
+    : [];
+  return {
+    lead,
+    blocks: highlights.length ? [{ heading: '눈에 띄는 것', body: highlights.join(PARAGRAPH_GAP) }] : [],
+    closing,
+  };
+}
+
 const toReport = (row: ReportRow): SiseReport => ({
   id: row.report_id,
   slug: row.slug,
   title: row.title,
   summary: row.summary,
-  sections: parseJson<SiseSections>(row.sections, { lead: '', highlights: [], closing: '' }),
+  sections: toSections(row.sections),
   changes: parseJson<SiseChange[]>(row.changes, []),
   published: Boolean(row.published),
   publishedAt: row.published_at,

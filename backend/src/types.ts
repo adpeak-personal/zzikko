@@ -280,7 +280,13 @@ export interface SiseChange {
 /** AI 가 쓰는 건 해설뿐이다 — 표는 rows 로 화면에서 그린다 */
 export interface SiseSections {
   lead: string;
-  highlights: string[];
+  /**
+   * 소제목이 붙은 본문 덩어리. 소제목은 글쓴이가 직접 정한다.
+   *
+   * 예전에는 `highlights: string[]`(한 줄짜리 목록)이었다. 블로그처럼 읽히는 글이
+   * 목적이라 문단으로 바꿨다 — 옛 글은 `repositories/sise.ts` 가 읽을 때 변환한다.
+   */
+  blocks: { heading: string; body: string }[];
   closing: string;
 }
 
