@@ -151,16 +151,33 @@ export default async function siseRoutes(app: FastifyInstance) {
 
     logUsage(request, '시세 글 작성', written.model, written.usage);
 
-    const slug = await sise.uniqueSlug(`${regionSlug(input.region)}-${input.datedOn}`);
-    const reportId = await sise.createReport({
+    /*
+     * 주소에 날짜를 넣지 않는다 — 지역당 글은 하나다.
+     *
+     * 날짜별로 새 주소를 만들면 "수원 휴대폰 성지" 하나를 두고 우리 페이지끼리 경쟁해서
+     * 신호가 흩어지고, 거의 같은 페이지가 쌓여 구글이 대량 생성으로 본다. 어제 시세표를
+     * 보고 매장 가는 사람도 없다. 날짜별 기록은 판매자들이 올리는 /board/deals 가 맡는다.
+     */
+    const slug = regionSlug(input.region);
+    const body = {
       sheetId,
-      slug,
       title: input.title || written.title || defaultTitle({ region: input.region, datedOn: input.datedOn }),
       summary: written.summary,
       sections: { lead: written.lead, blocks: written.blocks, closing: written.closing },
       changes: comparison?.changes ?? [],
       comparedTo: previous?.id ?? null,
-    });
+    };
+
+    // 이미 그 지역 글이 있으면 갈아끼운다. 발행 상태는 그대로 둔다 — 내렸다 올리면
+    // 그 사이 검색에서 사라진다. 숫자는 저장 전에 사람이 확인했다.
+    const existing = await sise.findReportBySlug(slug);
+    let reportId: number;
+    if (existing) {
+      await sise.replaceReport(existing.id, body);
+      reportId = existing.id;
+    } else {
+      reportId = await sise.createReport({ ...body, slug });
+    }
 
     // 글이 실제로 만들어진 다음에 적는다 — 손으로 체크하면 어긋난다
     if (input.keywordId) await sise.markKeywordWritten(input.keywordId);

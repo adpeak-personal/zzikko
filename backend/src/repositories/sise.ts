@@ -182,6 +182,43 @@ export interface NewReport {
   comparedTo: number | null;
 }
 
+/**
+ * 그 지역 글을 찾는다 (발행 여부 무관).
+ *
+ * 지역당 글은 하나다 — 날짜별로 새 주소를 만들면 "수원 휴대폰 성지" 하나를 두고
+ * 우리 페이지끼리 경쟁하고, 거의 같은 페이지가 쌓여 대량 생성으로 보인다.
+ */
+export async function findReportBySlug(slug: string): Promise<SiseReport | null> {
+  const row = await queryOne<ReportRow>(`${SELECT_REPORT} WHERE r.slug = ?`, [slug]);
+  return row ? toReport(row) : null;
+}
+
+/**
+ * 이미 있는 지역 글을 새 시세표로 갈아끼운다.
+ *
+ * **발행 상태는 건드리지 않는다** — 매일 갱신하는 페이지라 내렸다 올리면 그 사이
+ * 검색에서 사라진다. 숫자는 저장 전에 사람이 확인하므로 사실 검증은 그대로다.
+ */
+export async function replaceReport(
+  id: number,
+  input: Omit<NewReport, 'slug'>,
+): Promise<void> {
+  await execute(
+    `UPDATE sise_reports
+        SET sheet_id = ?, title = ?, summary = ?, sections = ?, changes = ?, compared_to = ?
+      WHERE id = ?`,
+    [
+      input.sheetId,
+      input.title,
+      input.summary,
+      JSON.stringify(input.sections),
+      JSON.stringify(input.changes),
+      input.comparedTo,
+      id,
+    ],
+  );
+}
+
 export async function createReport(input: NewReport): Promise<number> {
   const { insertId } = await execute(
     `INSERT INTO sise_reports (sheet_id, slug, title, summary, sections, changes, compared_to)
@@ -270,15 +307,6 @@ export async function increaseViews(id: number) {
   await execute('UPDATE sise_reports SET views = views + 1 WHERE id = ?', [id]);
 }
 
-/** 주소에 쓸 조각 만들기 — `/sise/seoul-2026-11-18` */
-export async function uniqueSlug(base: string): Promise<string> {
-  for (let n = 0; n < 50; n++) {
-    const slug = n === 0 ? base : `${base}-${n + 1}`;
-    const taken = await queryOne('SELECT id FROM sise_reports WHERE slug = ?', [slug]);
-    if (!taken) return slug;
-  }
-  return `${base}-${Date.now()}`;
-}
 
 /* ── 지역 키워드 ─────────────────────────────────────
  *
