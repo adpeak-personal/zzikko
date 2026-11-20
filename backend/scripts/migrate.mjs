@@ -251,6 +251,18 @@ const steps = [
        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`,
     ],
   },
+  {
+    // 제목 번역 + '삭제' 상태.
+    // 삭제는 행을 지우지 않는다 — guid 가 UNIQUE 라 지우면 다음 수집 때 다시 들어온다.
+    name: 'news_feed.title_ko + 삭제 상태 — 수집함 손질',
+    check: (c) => hasColumn(c, 'news_feed', 'title_ko'),
+    sql: [
+      `ALTER TABLE news_feed
+         ADD COLUMN title_ko VARCHAR(300) NULL COMMENT '한국어로 옮긴 제목. 원문 제목은 title 에 그대로 둔다'`,
+      `ALTER TABLE news_feed
+         MODIFY COLUMN status ENUM('수집','작성됨','숨김','삭제') NOT NULL DEFAULT '수집'`,
+    ],
+  },
 ];
 
 /** 공개 주소 앞머리. 없으면 바꿀 것도 없다. */

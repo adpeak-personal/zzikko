@@ -434,12 +434,14 @@ CREATE TABLE sise_keywords (
 CREATE TABLE news_feed (
   id           INT UNSIGNED NOT NULL AUTO_INCREMENT,
   guid         VARCHAR(500) NOT NULL COMMENT 'RSS guid. 같은 글을 두 번 담지 않으려는 열쇠',
-  title        VARCHAR(300) NOT NULL,
+  title        VARCHAR(300) NOT NULL COMMENT '원문 제목 — 손대지 않는다',
+  title_ko     VARCHAR(300) NULL     COMMENT '한국어로 옮긴 제목. 목록에 이걸 띄운다',
   link         VARCHAR(500) NOT NULL,
   published_at DATETIME     NOT NULL,
   source_text  MEDIUMTEXT   NOT NULL COMMENT 'RSS 가 준 원문. 기사를 쓰고 나면 지워도 된다',
   source_name  VARCHAR(60)  NOT NULL DEFAULT 'GSMArena',
-  status       ENUM('수집','작성됨','숨김') NOT NULL DEFAULT '수집',
+  -- '삭제'는 행을 지우지 않는다. guid 가 UNIQUE 라 지우면 다음 수집 때 다시 들어온다.
+  status       ENUM('수집','작성됨','숨김','삭제') NOT NULL DEFAULT '수집',
   article_id   INT UNSIGNED NULL COMMENT '이 항목으로 쓴 기사',
   created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),

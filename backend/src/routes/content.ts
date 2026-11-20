@@ -5,6 +5,7 @@ import { isAdmin, requireAdmin } from '../lib/auth.js';
 import * as content from '../repositories/content.js';
 import * as feed from '../repositories/newsFeed.js';
 import { SOURCES, fetchSource } from '../lib/news/feed.js';
+import { translateTitles } from '../lib/news/translate.js';
 import { writeArticle } from '../lib/news/write.js';
 import { extractSpec } from '../lib/specs/extract.js';
 import { readImage } from '../lib/multipart.js';
@@ -135,7 +136,7 @@ export default async function contentRoutes(app: FastifyInstance) {
 
   app.get('/admin/news/feed', { preHandler: requireAdmin }, async (request) => {
     const { status } = parse(
-      z.object({ status: z.enum(['수집', '작성됨', '숨김']).optional() }),
+      z.object({ status: z.enum(['수집', '작성됨', '숨김', '삭제']).optional() }),
       request.query,
     );
     return {
@@ -147,19 +148,44 @@ export default async function contentRoutes(app: FastifyInstance) {
   });
 
   app.post('/admin/news/feed/fetch', { preHandler: requireAdmin }, async (request) => {
-    let added = 0;
+    const saved: { id: number; title: string }[] = [];
     const failed: string[] = [];
     for (const source of SOURCES) {
       try {
-        added += await feed.saveItems(await fetchSource(source), source.name);
+        saved.push(...(await feed.saveItems(await fetchSource(source), source.name)));
       } catch (err) {
         request.log.warn({ err, source: source.name }, '뉴스 수집 실패');
         failed.push(source.name);
       }
     }
+
+    /*
+     * 제목을 한국어로 옮긴다.
+     *
+     * 방금 담은 것만이 아니라 **아직 안 옮긴 것까지** 같이 한다 — 그러지 않으면
+     * 이 기능을 넣기 전에 쌓인 항목이 영영 영어로 남는다.
+     *
+     * 목록에서 어떤 소식인지 바로 알아보려는 것이지 기사 본문과는 상관없다 —
+     * 기사는 번역이 아니라 사실만 골라 새로 쓴다(lib/news/write.ts).
+     * 실패하면 원문 제목이 그대로 남을 뿐이라 수집을 막지 않는다.
+     */
+    const pending = await feed.listUntranslated();
+    if (pending.length > 0) {
+      const translated = await translateTitles(
+        pending.map((item) => item.title),
+        (message) => request.log.warn(message),
+      );
+      logUsage(request, '제목 번역', translated.model, translated.usage);
+      for (const [index, item] of pending.entries()) {
+        const title = translated.titles[index];
+        // 못 옮긴 건 적지 않는다 — 적어 두면 다음에 다시 시도하지 못한다
+        if (title && title !== item.title) await feed.setTitleKo(item.id, title);
+      }
+    }
+
     // 원문은 기사를 쓸 때만 쓰므로 오래된 건 비워 둔다 (행은 남겨야 또 안 받는다)
     await feed.trimOldSources();
-    return { added, failed };
+    return { added: saved.length, failed };
   });
 
   /** 고른 항목으로 기사 초안을 만든다. 미발행으로 들어간다. */
@@ -199,7 +225,7 @@ export default async function contentRoutes(app: FastifyInstance) {
 
   app.patch('/admin/news/feed/:id', { preHandler: requireAdmin }, async (request) => {
     const { id } = parse(idParam, request.params);
-    const { status } = parse(z.object({ status: z.enum(['수집', '작성됨', '숨김']) }), request.body);
+    const { status } = parse(z.object({ status: z.enum(['수집', '작성됨', '숨김', '삭제']) }), request.body);
     if (!(await feed.getWithSource(id))) throw notFound('수집 항목');
     await feed.setStatus(id, status);
     return { ok: true };

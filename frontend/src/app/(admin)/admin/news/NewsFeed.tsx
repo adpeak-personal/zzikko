@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ExternalLink, EyeOff, RefreshCw, Sparkles } from 'lucide-react';
+import { ExternalLink, EyeOff, RefreshCw, Sparkles, Trash2 } from 'lucide-react';
 import { ApiError, apiFetch } from '@/lib/api';
 import { cn, formatRelative } from '@/lib/utils';
 import type { NewsFeedItem, NewsFeedStatus } from '@/lib/types';
@@ -13,6 +13,8 @@ const STATUS_STYLE: Record<NewsFeedStatus, string> = {
   수집: 'bg-zz-50 text-zz-700',
   작성됨: 'bg-emerald-50 text-emerald-700',
   숨김: 'bg-gray-100 text-gray-500',
+  // 목록에 안 뜨므로 실제로는 안 쓰이지만, 타입을 채워 둔다
+  삭제: 'bg-gray-100 text-gray-400',
 };
 
 /**
@@ -79,6 +81,28 @@ export function NewsFeed({
       fail(err, '기사를 쓰지 못했어요.');
     } finally {
       setBusy(null);
+    }
+  };
+
+  /**
+   * 안 쓸 소식을 목록에서 치운다.
+   *
+   * 행을 진짜로 지우지는 않는다 — guid 가 UNIQUE 라, 지우면 다음 수집 때 똑같은 게
+   * 다시 들어온다. 상태만 '삭제'로 두면 어느 목록에도 안 뜨고 다시 받지도 않는다.
+   */
+  const remove = async (item: NewsFeedItem) => {
+    if (!confirm(`"${item.title}"
+
+목록에서 치웁니다. 다음 수집 때도 다시 들어오지 않습니다.`)) return;
+    setError(null);
+    try {
+      await apiFetch(`/admin/news/feed/${item.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: '삭제' }),
+      });
+      router.refresh();
+    } catch (err) {
+      fail(err, '치우지 못했어요.');
     }
   };
 
@@ -170,6 +194,10 @@ export function NewsFeed({
                 </div>
 
                 <p className="mt-1.5 font-semibold leading-snug text-gray-900">{item.title}</p>
+                {/* 옮긴 제목이 이상할 때 대조할 수 있게 원문도 둔다 */}
+                {item.titleOriginal && (
+                  <p className="mt-0.5 text-xs leading-snug text-gray-400">{item.titleOriginal}</p>
+                )}
                 <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-gray-500">{item.preview}</p>
 
                 <div className="mt-2.5 flex flex-wrap items-center gap-2">
@@ -192,6 +220,15 @@ export function NewsFeed({
                     <ExternalLink size={12} />
                     원문
                   </a>
+
+                  <button
+                    type="button"
+                    onClick={() => remove(item)}
+                    className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-500 hover:border-red-300 hover:bg-red-50 hover:text-red-600"
+                  >
+                    <Trash2 size={12} />
+                    삭제
+                  </button>
 
                   <button
                     type="button"

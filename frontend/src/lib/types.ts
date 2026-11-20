@@ -313,12 +313,16 @@ export interface SiseReport {
 
 /* ── 뉴스 수집함 ─────────────────────────────────────────────────── */
 
-export type NewsFeedStatus = '수집' | '작성됨' | '숨김';
+/** '삭제'는 행을 지우는 게 아니라 목록에서 빼는 상태다 — guid 가 남아야 다시 안 받는다 */
+export type NewsFeedStatus = '수집' | '작성됨' | '숨김' | '삭제';
 
 /** RSS 로 받아 둔 원문 항목. 사람이 고른 것만 기사가 된다. */
 export interface NewsFeedItem {
   id: number;
+  /** 한국어로 옮긴 제목이 있으면 그것, 없으면 원문 */
   title: string;
+  /** 옮긴 제목을 쓰고 있을 때의 원문. 안 옮겼으면 null */
+  titleOriginal: string | null;
   link: string;
   publishedAt: string;
   sourceName: string;

@@ -46,6 +46,14 @@ export const EXTRACT_MODEL = process.env.ANTHROPIC_MODEL ?? 'claude-haiku-5-5';
 export const WRITE_MODEL = process.env.ANTHROPIC_WRITE_MODEL ?? 'claude-haiku-5-5';
 
 /**
+ * 수집한 소식의 제목을 옮기는 쪽 — **가장 싼 모델로 고정한다.**
+ *
+ * 어떤 소식인지 알아보려는 것뿐이라 품질을 살 이유가 없다. 표 읽기(EXTRACT_MODEL)를
+ * 따라가게 두면 나중에 정확도 때문에 그쪽을 올렸을 때 번역까지 같이 비싸진다.
+ */
+export const TRANSLATE_MODEL = process.env.ANTHROPIC_TRANSLATE_MODEL ?? 'claude-haiku-5-5';
+
+/**
  * 1M 토큰당 달러. 모델을 바꾸면 여기도 고쳐야 로그의 비용이 맞는다.
  * 출처: platform.claude.com 요금표 (2026-11 기준)
  */
