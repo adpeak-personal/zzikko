@@ -5,13 +5,14 @@ import { notFound, parse } from '../lib/http.js';
 import { requireAdmin } from '../lib/auth.js';
 import { aiReady, logUsage } from '../lib/anthropic.js';
 import { extractSheet } from '../lib/sise/extract.js';
+import { fetchKeywordVolumes, keywordsReady } from '../lib/sise/keywords.js';
 import { compareSheets } from '../lib/sise/compare.js';
-import { REGION_SLUG, defaultTitle, writeReport } from '../lib/sise/write.js';
+import { defaultTitle, regionSlug, writeReport } from '../lib/sise/write.js';
 import { saveBuffer } from '../lib/storage.js';
 import { processImage } from '../lib/images.js';
 import { readImage } from '../lib/multipart.js';
 import * as sise from '../repositories/sise.js';
-import type { Region, SiseRow } from '../types.js';
+import type { SiseRow } from '../types.js';
 
 /**
  * 시세 리포트 — SEO·GEO 용 글.
@@ -20,7 +21,12 @@ import type { Region, SiseRow } from '../types.js';
  * 확인 단계를 빼지 않는 이유는, 표에서 숫자 하나를 잘못 읽으면 그대로 공개되기 때문이다.
  */
 
-const REGIONS = ['서울', '경기·인천', '부산', '대구', '대전', '광주', '강원', '제주'] as const;
+/**
+ * 시세 지역은 **자유 문자열**이다 — '수원'·'부천'·'강남'처럼 시·구 단위까지 들어온다.
+ * 검색량이 받쳐주는 지역으로 글을 써야 하기 때문이다("경기 휴대폰성지"는 거의 안 찾는다).
+ * 회원·매장의 `Region`(8개 고정)과는 다른 개념이니 같이 묶지 말 것.
+ */
+const regionField = z.string().trim().min(1, '지역을 입력해주세요.').max(20);
 
 const rowSchema = z.object({
   series: z.string().max(40).default(''),
@@ -33,7 +39,7 @@ const rowSchema = z.object({
 });
 
 const saveSchema = z.object({
-  region: z.enum(REGIONS),
+  region: regionField,
   datedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '날짜 형식이 올바르지 않습니다.'),
   imageUrl: z.string().min(1).max(500),
   note: z.string().max(300).default(''),
@@ -58,7 +64,33 @@ export default async function siseRoutes(app: FastifyInstance) {
   app.get('/admin/sise', { preHandler: requireAdmin }, async () => ({
     items: await sise.listReports({ publishedOnly: false }),
     aiReady: aiReady(),
-    regions: REGIONS,
+    keywords: await sise.listKeywords(),
+    keywordsReady: keywordsReady(),
+  }));
+
+  /* ── 지역 키워드 ──
+   *
+   * 어느 지역 글을 쓸지 고르는 목록. 네이버 검색광고 API 는 무료지만 호출 수 제한이
+   * 있으므로 **버튼을 눌렀을 때만** 부른다 — 검색량은 자주 바뀌지 않는다.
+   */
+
+  app.post('/admin/sise/keywords/fetch', { preHandler: requireAdmin }, async (request) => {
+    const hits = await fetchKeywordVolumes();
+    const saved = await sise.upsertKeywords(hits);
+    request.log.info({ saved }, '지역 키워드 검색량 갱신');
+    return { saved, keywords: await sise.listKeywords() };
+  });
+
+  app.patch('/admin/sise/keywords/:id', { preHandler: requireAdmin }, async (request) => {
+    const { id } = parse(z.object({ id: z.coerce.number().int().positive() }), request.params);
+    const { done } = parse(z.object({ done: z.boolean() }), request.body);
+    if (!(await sise.setKeywordDone(id, done))) throw notFound('키워드');
+    return { ok: true };
+  });
+
+  /** 쌓인 표시를 한 번에 푼다 — 다음 달에 다시 돌 때 */
+  app.post('/admin/sise/keywords/clear', { preHandler: requireAdmin }, async () => ({
+    cleared: await sise.clearKeywordsDone(),
   }));
 
   /**
@@ -91,7 +123,7 @@ export default async function siseRoutes(app: FastifyInstance) {
     const rows = input.rows as SiseRow[];
 
     const sheetId = await sise.createSheet({
-      region: input.region as Region,
+      region: input.region,
       datedOn: input.datedOn,
       imageUrl: input.imageUrl,
       rows,
@@ -103,7 +135,7 @@ export default async function siseRoutes(app: FastifyInstance) {
     const comparison = previous ? compareSheets(rows, previous.rows) : null;
 
     const written = await writeReport({
-      region: input.region as Region,
+      region: input.region,
       datedOn: input.datedOn,
       rows,
       note: input.note,
@@ -113,11 +145,11 @@ export default async function siseRoutes(app: FastifyInstance) {
 
     logUsage(request, '시세 글 작성', written.model, written.usage);
 
-    const slug = await sise.uniqueSlug(`${REGION_SLUG[input.region as Region]}-${input.datedOn}`);
+    const slug = await sise.uniqueSlug(`${regionSlug(input.region)}-${input.datedOn}`);
     const reportId = await sise.createReport({
       sheetId,
       slug,
-      title: written.title || defaultTitle({ region: input.region as Region, datedOn: input.datedOn }),
+      title: written.title || defaultTitle({ region: input.region, datedOn: input.datedOn }),
       summary: written.summary,
       sections: { lead: written.lead, highlights: written.highlights, closing: written.closing },
       changes: comparison?.changes ?? [],

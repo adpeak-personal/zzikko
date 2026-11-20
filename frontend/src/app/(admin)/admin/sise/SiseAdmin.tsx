@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { Trash2, Upload } from 'lucide-react';
 import { ApiError, apiFetch } from '@/lib/api';
 import { cn, formatDate } from '@/lib/utils';
-import type { Carrier, JoinType, Region, SiseReport, SiseRow } from '@/lib/types';
+import type { Carrier, JoinType, SiseKeyword, SiseReport, SiseRow } from '@/lib/types';
+import { SiseKeywords } from './SiseKeywords';
 
 const CARRIERS: Carrier[] = ['SKT', 'KT', 'LG U+'];
 const JOINS: JoinType[] = ['번호이동', '기기변경'];
@@ -37,17 +38,20 @@ function groupRows(rows: SiseRow[]) {
 
 export function SiseAdmin({
   items,
-  regions,
   aiReady,
+  keywords,
+  keywordsReady,
 }: {
   items: SiseReport[];
-  regions: Region[];
   aiReady: boolean;
+  keywords: SiseKeyword[];
+  keywordsReady: boolean;
 }) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const [region, setRegion] = useState<Region>(regions[0]);
+  // 지역은 자유 문자열이다 — 위 키워드에서 고르거나 직접 적는다
+  const [region, setRegion] = useState('');
   const [datedOn, setDatedOn] = useState(() => new Date().toISOString().slice(0, 10));
   const [draft, setDraft] = useState<Draft | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -136,6 +140,9 @@ export function SiseAdmin({
       )}
       {error && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>}
 
+      {/* ── 어느 지역을 쓸지 고르기 ── */}
+      <SiseKeywords keywords={keywords} ready={keywordsReady} selected={region} onPick={setRegion} />
+
       {/* ── 올리기 ── */}
       <section className="rounded-xl border border-gray-200 bg-white p-5">
         <h2 className="font-bold text-gray-900">시세표 올리기</h2>
@@ -146,15 +153,13 @@ export function SiseAdmin({
         <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
           <label className="block text-sm font-semibold text-gray-600">
             지역
-            <select
+            <input
               value={region}
-              onChange={(event) => setRegion(event.target.value as Region)}
+              onChange={(event) => setRegion(event.target.value)}
+              placeholder="수원 · 부천 · 강남"
+              maxLength={20}
               className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-zz-400"
-            >
-              {regions.map((item) => (
-                <option key={item}>{item}</option>
-              ))}
-            </select>
+            />
           </label>
 
           <label className="block text-sm font-semibold text-gray-600">

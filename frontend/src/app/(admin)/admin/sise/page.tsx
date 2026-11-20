@@ -1,15 +1,17 @@
 import { redirect } from 'next/navigation';
 import { apiGet } from '@/lib/api.server';
 import { getCurrentUser } from '@/lib/data';
-import type { Region, SiseReport } from '@/lib/types';
+import type { SiseKeyword, SiseReport } from '@/lib/types';
 import { SiseAdmin } from './SiseAdmin';
 
 export const metadata = { title: '시세 리포트' };
 
 interface Response {
   items: SiseReport[];
-  regions: Region[];
   aiReady: boolean;
+  keywords: SiseKeyword[];
+  /** 네이버 검색광고 API 키가 있는지 */
+  keywordsReady: boolean;
 }
 
 export default async function AdminSisePage() {
@@ -32,7 +34,12 @@ export default async function AdminSisePage() {
         </p>
       </div>
 
-      <SiseAdmin items={data.items} regions={data.regions} aiReady={data.aiReady} />
+      <SiseAdmin
+        items={data.items}
+        aiReady={data.aiReady}
+        keywords={data.keywords}
+        keywordsReady={data.keywordsReady}
+      />
     </div>
   );
 }

@@ -259,7 +259,11 @@ export interface SiseSheetDraft {
 
 export interface SiseSheet extends SiseSheetDraft {
   id: number;
-  region: Region;
+  /**
+   * 시세 지역. **회원·매장의 `Region` 과 다르다** — '수원'·'부천'처럼 시·구 단위까지
+   * 자유롭게 들어온다. 검색량이 받쳐주는 지역으로 글을 쓰기 때문이다.
+   */
+  region: string;
   /** 시세 기준일 (YYYY-MM-DD) */
   datedOn: string;
   imageUrl: string;
@@ -316,4 +320,19 @@ export interface NewsFeedItem {
   preview: string;
   status: NewsFeedStatus;
   articleId: number | null;
+}
+
+/** 어느 지역 시세 글을 쓸지 고르는 목록 (네이버 검색광고 API 에서 받아온다) */
+export interface SiseKeyword {
+  id: number;
+  keyword: string;
+  /** 묶음 지역명. 시세표의 region 으로 그대로 쓴다 */
+  place: string;
+  /** 월간검색수 (PC+모바일) */
+  monthly: number;
+  competition: string;
+  /** 이 지역 글을 썼는지 */
+  done: boolean;
+  doneAt: string | null;
+  fetchedAt: string;
 }

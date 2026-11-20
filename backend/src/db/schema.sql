@@ -408,6 +408,22 @@ CREATE TABLE sise_reports (
   CONSTRAINT fk_sise_reports_prev FOREIGN KEY (compared_to) REFERENCES sise_sheets (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+-- 어느 지역 시세 글을 쓸지 고르는 목록. 네이버 검색광고 API 에서 받아 쌓는다.
+-- 검색량이 받쳐주는 지역만 쓰기 위한 것 — "경기"는 거의 안 찾고 "부천"은 많이 찾는다.
+CREATE TABLE sise_keywords (
+  id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  keyword     VARCHAR(60)  NOT NULL COMMENT '예: 수원휴대폰성지',
+  place       VARCHAR(20)  NOT NULL DEFAULT '' COMMENT '묶음 지역명. 시세표의 region 으로 쓴다',
+  monthly     INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '월간검색수 (PC+모바일)',
+  competition VARCHAR(10)  NOT NULL DEFAULT '' COMMENT '네이버 경쟁정도',
+  done        TINYINT(1)   NOT NULL DEFAULT 0 COMMENT '이 지역 글을 썼는지',
+  done_at     DATETIME     NULL,
+  fetched_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_sise_keywords_keyword (keyword),
+  KEY idx_sise_keywords_rank (done, monthly DESC)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
 -- ---------------------------------------------------------------------
 -- 뉴스 수집함 (GSMArena RSS)
 --

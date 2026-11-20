@@ -3,7 +3,7 @@ import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { WRITE_MODEL, anthropic, type Usage } from '../anthropic.js';
 import { badRequest } from '../http.js';
 import { lowestByModel, type SiseComparison } from './compare.js';
-import type { Region, SiseRow, SiseSections } from '../../types.js';
+import type { SiseRow, SiseSections } from '../../types.js';
 
 /**
  * 시세표를 놓고 해설을 쓴다.
@@ -13,16 +13,40 @@ import type { Region, SiseRow, SiseSections } from '../../types.js';
  * 그래서 문장에 쓸 숫자도 아래 프롬프트에 미리 계산해 넣어 준다.
  */
 
-export const REGION_SLUG: Record<Region, string> = {
-  서울: 'seoul',
-  '경기·인천': 'gyeonggi',
-  부산: 'busan',
-  대구: 'daegu',
-  대전: 'daejeon',
-  광주: 'gwangju',
-  강원: 'gangwon',
-  제주: 'jeju',
+/**
+ * 주소에 쓸 지역 조각.
+ *
+ * 시세 지역은 자유 문자열이라(수원·부천·강남…) 여기 없는 이름이 들어올 수 있다.
+ * 그때는 한글을 그대로 쓴다 — 주소에선 퍼센트 인코딩되지만 동작은 한다.
+ * ⚠️ 한글 slug 는 `params.slug` 가 인코딩된 채로 오므로, 받는 쪽에서 **풀고 다시 걸어야**
+ *    한다. `/compare/[slug]` 가 같은 함정에 빠진 적이 있다.
+ */
+const SLUGS: Record<string, string> = {
+  서울: 'seoul', 부산: 'busan', 대구: 'daegu', 인천: 'incheon', 대전: 'daejeon',
+  광주: 'gwangju', 울산: 'ulsan', 세종: 'sejong', 경기: 'gyeonggi', '경기·인천': 'gyeonggi',
+  강원: 'gangwon', 제주: 'jeju',
+  // 서울 구·상권
+  강남: 'gangnam', 서초: 'seocho', 송파: 'songpa', 강동: 'gangdong', 광진: 'gwangjin',
+  성동: 'seongdong', 중랑: 'jungnang', 동대문: 'dongdaemun', 성북: 'seongbuk', 강북: 'gangbuk',
+  도봉: 'dobong', 노원: 'nowon', 은평: 'eunpyeong', 서대문: 'seodaemun', 마포: 'mapo',
+  양천: 'yangcheon', 강서: 'gangseo', 구로: 'guro', 금천: 'geumcheon', 영등포: 'yeongdeungpo',
+  동작: 'dongjak', 관악: 'gwanak', 용산: 'yongsan', 종로: 'jongno',
+  신도림: 'sindorim', 강변: 'gangbyeon', 테크노마트: 'technomart', 연신내: 'yeonsinnae',
+  // 경기
+  수원: 'suwon', 성남: 'seongnam', 고양: 'goyang', 용인: 'yongin', 부천: 'bucheon',
+  안산: 'ansan', 안양: 'anyang', 남양주: 'namyangju', 화성: 'hwaseong', 평택: 'pyeongtaek',
+  의정부: 'uijeongbu', 시흥: 'siheung', 파주: 'paju', 김포: 'gimpo', 광명: 'gwangmyeong',
+  군포: 'gunpo', 하남: 'hanam', 오산: 'osan', 이천: 'icheon', 구리: 'guri',
+  분당: 'bundang', 일산: 'ilsan', 동탄: 'dongtan', 판교: 'pangyo', 평촌: 'pyeongchon',
+  산본: 'sanbon', 영통: 'yeongtong', 광교: 'gwanggyo',
+  // 그 밖
+  천안: 'cheonan', 아산: 'asan', 청주: 'cheongju', 전주: 'jeonju', 창원: 'changwon',
+  김해: 'gimhae', 진주: 'jinju', 포항: 'pohang', 구미: 'gumi', 경산: 'gyeongsan',
+  원주: 'wonju', 춘천: 'chuncheon', 서면: 'seomyeon', 해운대: 'haeundae', 부평: 'bupyeong',
+  송도: 'songdo', 청라: 'cheongna',
 };
+
+export const regionSlug = (region: string) => SLUGS[region] ?? region;
 
 const ReportSchema = z.object({
   title: z
@@ -40,7 +64,8 @@ const money = (price: number) => (price < 0 ? `${Math.abs(price)}만원 페이�
 const short = (joinType: string) => (joinType === '번호이동' ? '번이' : joinType === '기기변경' ? '기변' : '신규');
 
 export interface WriteInput {
-  region: Region;
+  /** 시 단위까지 들어온다 — '수원', '부천', '강남' */
+  region: string;
   datedOn: string;
   rows: SiseRow[];
   note: string;
@@ -81,7 +106,7 @@ export async function writeReport(
   };
 }
 
-export function defaultTitle({ region, datedOn }: { region: Region; datedOn: string }) {
+export function defaultTitle({ region, datedOn }: { region: string; datedOn: string }) {
   const [, month, day] = datedOn.split('-');
   return `${region} 휴대폰 성지 시세 (${Number(month)}월 ${Number(day)}일 기준)`;
 }

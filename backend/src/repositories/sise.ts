@@ -1,7 +1,7 @@
 import type { RowDataPacket } from 'mysql2';
 import { execute, query, queryOne } from '../db/pool.js';
 import { publicUrl, toStored } from '../lib/storage.js';
-import type { Region, SiseChange, SiseReport, SiseRow, SiseSections, SiseSheet } from '../types.js';
+import type { SiseChange, SiseReport, SiseRow, SiseSections, SiseSheet } from '../types.js';
 
 /**
  * 시세 리포트 저장소.
@@ -35,7 +35,7 @@ function parseJson<T>(value: unknown, fallback: T): T {
 
 const toSheet = (row: SheetRow): SiseSheet => ({
   id: row.id,
-  region: row.region as Region,
+  region: row.region,
   // DATE 칼럼은 dateStrings 로 'YYYY-MM-DD' 문자열로 온다
   datedOn: String(row.dated_on).slice(0, 10),
   imageUrl: publicUrl(row.image_url),
@@ -47,7 +47,7 @@ const toSheet = (row: SheetRow): SiseSheet => ({
 /* ── 시세표 ── */
 
 export interface NewSheet {
-  region: Region;
+  region: string;
   datedOn: string;
   /** 업로드 응답의 전체 주소. 저장할 때 경로로 바꾼다 */
   imageUrl: string;
@@ -235,4 +235,90 @@ export async function uniqueSlug(base: string): Promise<string> {
     if (!taken) return slug;
   }
   return `${base}-${Date.now()}`;
+}
+
+/* ── 지역 키워드 ─────────────────────────────────────
+ *
+ * 어느 지역 글을 쓸지 고르는 목록. 네이버 검색광고 API 에서 받아 쌓고,
+ * 글을 쓴 지역은 done 으로 덮어 둔다.
+ */
+
+interface KeywordRow extends RowDataPacket {
+  id: number;
+  keyword: string;
+  place: string;
+  monthly: number;
+  competition: string;
+  done: number;
+  done_at: string | null;
+  fetched_at: string;
+}
+
+export interface SiseKeyword {
+  id: number;
+  keyword: string;
+  place: string;
+  monthly: number;
+  competition: string;
+  done: boolean;
+  doneAt: string | null;
+  fetchedAt: string;
+}
+
+const toKeyword = (row: KeywordRow): SiseKeyword => ({
+  id: row.id,
+  keyword: row.keyword,
+  place: row.place,
+  monthly: Number(row.monthly),
+  competition: row.competition,
+  done: Boolean(row.done),
+  doneAt: row.done_at,
+  fetchedAt: row.fetched_at,
+});
+
+export async function listKeywords(): Promise<SiseKeyword[]> {
+  const rows = await query<KeywordRow>(
+    'SELECT * FROM sise_keywords ORDER BY done ASC, monthly DESC, keyword',
+  );
+  return rows.map(toKeyword);
+}
+
+/**
+ * 받아온 검색량을 덮어쓴다.
+ *
+ * **done 은 건드리지 않는다** — 검색량을 다시 받았다고 해서 "이미 쓴 글" 표시가
+ * 풀리면 안 된다. 그래서 INSERT ... ON DUPLICATE KEY UPDATE 에서 done 을 뺐다.
+ */
+export async function upsertKeywords(
+  items: { keyword: string; place: string; monthly: number; competition: string }[],
+): Promise<number> {
+  if (items.length === 0) return 0;
+
+  let saved = 0;
+  for (const item of items) {
+    await execute(
+      `INSERT INTO sise_keywords (keyword, place, monthly, competition, fetched_at)
+       VALUES (?, ?, ?, ?, NOW())
+       ON DUPLICATE KEY UPDATE
+         place = VALUES(place), monthly = VALUES(monthly),
+         competition = VALUES(competition), fetched_at = NOW()`,
+      [item.keyword.slice(0, 60), item.place.slice(0, 20), Math.max(0, item.monthly), item.competition.slice(0, 10)],
+    );
+    saved += 1;
+  }
+  return saved;
+}
+
+export async function setKeywordDone(id: number, done: boolean): Promise<boolean> {
+  const { affectedRows } = await execute(
+    'UPDATE sise_keywords SET done = ?, done_at = ? WHERE id = ?',
+    [done ? 1 : 0, done ? new Date() : null, id],
+  );
+  return affectedRows > 0;
+}
+
+/** 쌓인 표시를 한 번에 푼다 — 다음 달에 다시 돌 때 쓴다 */
+export async function clearKeywordsDone(): Promise<number> {
+  const { affectedRows } = await execute('UPDATE sise_keywords SET done = 0, done_at = NULL WHERE done = 1');
+  return affectedRows;
 }

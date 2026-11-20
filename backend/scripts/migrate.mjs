@@ -230,6 +230,27 @@ const steps = [
          ADD KEY idx_uploads_owner (owner)`,
     ],
   },
+  {
+    // 어느 지역 시세 글을 쓸지 고르는 목록. 네이버 검색광고 API 에서 받아 쌓는다.
+    // 글을 쓴 지역은 done 으로 표시해 두고, 다음 달에 다시 쓰려면 풀면 된다.
+    name: 'sise_keywords — 지역 키워드 검색량',
+    check: (c) => hasTable(c, 'sise_keywords'),
+    sql: [
+      `CREATE TABLE sise_keywords (
+         id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+         keyword    VARCHAR(60)  NOT NULL COMMENT '예: 수원휴대폰성지',
+         place      VARCHAR(20)  NOT NULL DEFAULT '' COMMENT '묶음 지역명. 시세표의 region 으로 쓴다',
+         monthly    INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '월간검색수 (PC+모바일)',
+         competition VARCHAR(10) NOT NULL DEFAULT '' COMMENT '네이버 경쟁정도',
+         done       TINYINT(1)   NOT NULL DEFAULT 0 COMMENT '이 지역 글을 썼는지',
+         done_at    DATETIME     NULL,
+         fetched_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+         PRIMARY KEY (id),
+         UNIQUE KEY uq_sise_keywords_keyword (keyword),
+         KEY idx_sise_keywords_rank (done, monthly DESC)
+       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`,
+    ],
+  },
 ];
 
 /** 공개 주소 앞머리. 없으면 바꿀 것도 없다. */
