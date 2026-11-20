@@ -11,6 +11,7 @@ import { loadUser } from './lib/auth.js';
 import routes from './routes/index.js';
 import { UPLOAD_DIR, storageDescription, usingRemoteStorage } from './lib/storage.js';
 import { startMaintenance } from './lib/maintenance.js';
+import { startNewsCollector } from './lib/news/collect.js';
 
 /**
  * 모든 API 는 /api/v1 아래에 있다.
@@ -62,6 +63,8 @@ export async function buildApp({ logger = true } = {}) {
 
   // 글에 안 쓰인 이미지를 주기적으로 지운다
   startMaintenance(app);
+  // RSS 가 하루치만 들고 있어서, 사람이 버튼을 안 누르면 그 사이 기사가 영영 사라진다
+  startNewsCollector(app);
 
   return app;
 }
