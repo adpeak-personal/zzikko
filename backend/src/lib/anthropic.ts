@@ -27,11 +27,23 @@ export function anthropic(): Anthropic | null {
 
 export const aiReady = () => Boolean(process.env.ANTHROPIC_API_KEY);
 
-/** 표를 읽는 쪽 — 숫자 하나 틀리면 그대로 공개되므로 좋은 모델을 쓴다 */
-export const EXTRACT_MODEL = process.env.ANTHROPIC_MODEL ?? 'claude-opus-5-5';
+/**
+ * 표를 읽는 쪽.
+ *
+ * 숫자 하나 틀리면 그대로 공개되는 자리지만, 8개 양식 490칸을 Haiku 로 읽혀
+ * 전부 맞는 걸 확인했다 — Opus·Sonnet 과 동률인데 35배 싸다.
+ */
+export const EXTRACT_MODEL = process.env.ANTHROPIC_MODEL ?? 'claude-haiku-5-5';
 
-/** 글을 쓰는 쪽 */
-export const WRITE_MODEL = process.env.ANTHROPIC_WRITE_MODEL ?? 'claude-opus-5-5';
+/**
+ * 글을 쓰는 쪽.
+ *
+ * 한동안 Sonnet 을 썼다. Haiku 가 "존댓말로 쓴다"는 지시를 어기고 반말로 썼기 때문인데,
+ * 글 구조를 blocks 로 바꾸면서 프롬프트를 다시 쓴 뒤로는 그러지 않는다.
+ * 같은 시세표로 견줘 보니 숫자도 전부 맞고 글맛 차이도 크지 않은데 **14배 싸다**
+ * (건당 55원 → 4원). 글맛을 더 보고 싶으면 ANTHROPIC_WRITE_MODEL 로 올리면 된다.
+ */
+export const WRITE_MODEL = process.env.ANTHROPIC_WRITE_MODEL ?? 'claude-haiku-5-5';
 
 /**
  * 1M 토큰당 달러. 모델을 바꾸면 여기도 고쳐야 로그의 비용이 맞는다.

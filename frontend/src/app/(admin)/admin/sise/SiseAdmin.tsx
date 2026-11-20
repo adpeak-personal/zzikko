@@ -81,6 +81,7 @@ export function SiseAdmin({
   const [draft, setDraft] = useState<Draft | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const fail = (err: unknown, fallback: string) =>
     setError(err instanceof ApiError ? err.message : fallback);
@@ -140,7 +141,7 @@ export function SiseAdmin({
     setError(null);
     setBusy('글 쓰는 중');
     try {
-      await apiFetch('/admin/sise/sheets', {
+      const saved = await apiFetch<{ rewritten: boolean }>('/admin/sise/sheets', {
         method: 'POST',
         body: JSON.stringify({
           region,
@@ -154,6 +155,12 @@ export function SiseAdmin({
       });
       setDraft(null);
       setImageUrl('');
+      // 움직인 칸이 없으면 서버가 글을 다시 쓰지 않는다 — 말해주지 않으면 실패로 오해한다
+      setNotice(
+        saved.rewritten
+          ? null
+          : '직전 시세표와 움직인 칸이 없어서 글은 그대로 두고 시세표만 갱신했습니다.',
+      );
       // 글이 만들어졌으니 작성일이 찍힌다 — 목록을 다시 받아야 보인다
       setPicked(null);
       setTitle('');
@@ -194,6 +201,7 @@ export function SiseAdmin({
         </p>
       )}
       {error && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>}
+      {notice && <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900">{notice}</p>}
 
       {/* ── 어느 지역을 쓸지 고르기 ── */}
       <SiseKeywords

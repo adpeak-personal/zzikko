@@ -140,16 +140,37 @@ export default async function siseRoutes(app: FastifyInstance) {
     const previous = await sise.findPreviousSheet(input.region, input.datedOn, sheetId);
     const comparison = previous ? compareSheets(rows, previous.rows) : null;
 
-    const written = await writeReport({
-      region: input.region,
-      datedOn: input.datedOn,
-      rows,
-      note: input.note,
-      comparison,
-      previousDate: previous?.datedOn ?? null,
-    });
+    const slug = regionSlug(input.region);
+    const existing = await sise.findReportBySlug(slug);
 
-    logUsage(request, '시세 글 작성', written.model, written.usage);
+    /*
+     * 움직인 칸이 하나도 없으면 글을 다시 쓰지 않는다.
+     *
+     * 어제와 같은 내용을 돈 들여 다시 쓸 이유가 없고, 거의 같은 글로 본문만 갈아끼우면
+     * 구글이 보기에도 좋을 게 없다. 시세표와 날짜만 새것으로 바꿔 둔다.
+     * 글이 아직 없을 때(첫 글)는 비교할 것도 없으므로 당연히 쓴다.
+     */
+    const unchanged =
+      existing !== null &&
+      comparison !== null &&
+      comparison.cheaper === 0 &&
+      comparison.pricier === 0 &&
+      comparison.added.length === 0 &&
+      comparison.removed.length === 0;
+
+    const written = unchanged
+      ? null
+      : await writeReport({
+          region: input.region,
+          datedOn: input.datedOn,
+          rows,
+          note: input.note,
+          comparison,
+          previousDate: previous?.datedOn ?? null,
+        });
+
+    if (written) logUsage(request, '시세 글 작성', written.model, written.usage);
+    else request.log.info({ region: input.region }, '변동 없음 — 글은 그대로 두고 시세표만 갱신');
 
     /*
      * 주소에 날짜를 넣지 않는다 — 지역당 글은 하나다.
@@ -158,19 +179,24 @@ export default async function siseRoutes(app: FastifyInstance) {
      * 신호가 흩어지고, 거의 같은 페이지가 쌓여 구글이 대량 생성으로 본다. 어제 시세표를
      * 보고 매장 가는 사람도 없다. 날짜별 기록은 판매자들이 올리는 /board/deals 가 맡는다.
      */
-    const slug = regionSlug(input.region);
     const body = {
       sheetId,
-      title: input.title || written.title || defaultTitle({ region: input.region, datedOn: input.datedOn }),
-      summary: written.summary,
-      sections: { lead: written.lead, blocks: written.blocks, closing: written.closing },
+      // 글을 다시 안 썼으면 본문은 그대로 두고 제목·시세표만 새 날짜로 맞춘다
+      title:
+        input.title ||
+        written?.title ||
+        existing?.title ||
+        defaultTitle({ region: input.region, datedOn: input.datedOn }),
+      summary: written?.summary ?? existing?.summary ?? '',
+      sections: written
+        ? { lead: written.lead, blocks: written.blocks, closing: written.closing }
+        : (existing?.sections ?? { lead: '', blocks: [], closing: '' }),
       changes: comparison?.changes ?? [],
       comparedTo: previous?.id ?? null,
     };
 
     // 이미 그 지역 글이 있으면 갈아끼운다. 발행 상태는 그대로 둔다 — 내렸다 올리면
     // 그 사이 검색에서 사라진다. 숫자는 저장 전에 사람이 확인했다.
-    const existing = await sise.findReportBySlug(slug);
     let reportId: number;
     if (existing) {
       await sise.replaceReport(existing.id, body);
@@ -182,7 +208,8 @@ export default async function siseRoutes(app: FastifyInstance) {
     // 글이 실제로 만들어진 다음에 적는다 — 손으로 체크하면 어긋난다
     if (input.keywordId) await sise.markKeywordWritten(input.keywordId);
 
-    return reply.code(201).send(await sise.getReport(reportId));
+    // rewritten=false 면 변동이 없어 글을 다시 쓰지 않았다는 뜻 — 화면에서 알려준다
+    return reply.code(201).send({ ...(await sise.getReport(reportId)), rewritten: written !== null });
   });
 
   /** 글 다듬기 · 발행 · 내림 */
