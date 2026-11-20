@@ -169,23 +169,36 @@ export default async function contentRoutes(app: FastifyInstance) {
      * 기사는 번역이 아니라 사실만 골라 새로 쓴다(lib/news/write.ts).
      * 실패하면 원문 제목이 그대로 남을 뿐이라 수집을 막지 않는다.
      */
-    const pending = await feed.listUntranslated();
-    if (pending.length > 0) {
+    let translatedCount = 0;
+    // 밀린 게 많으면 한 묶음으로 안 끝난다. 빌 때까지 돌리되, 한 번 누름에
+    // 무한정 돌지 않게 횟수를 막아 둔다 (한 바퀴 60건).
+    for (let round = 0; round < 8; round++) {
+      const pending = await feed.listUntranslated();
+      if (pending.length === 0) break;
+
       const translated = await translateTitles(
         pending.map((item) => item.title),
         (message) => request.log.warn(message),
       );
       logUsage(request, '제목 번역', translated.model, translated.usage);
+
+      let wrote = 0;
       for (const [index, item] of pending.entries()) {
         const title = translated.titles[index];
         // 못 옮긴 건 적지 않는다 — 적어 두면 다음에 다시 시도하지 못한다
-        if (title && title !== item.title) await feed.setTitleKo(item.id, title);
+        if (title && title !== item.title) {
+          await feed.setTitleKo(item.id, title);
+          wrote += 1;
+        }
       }
+      translatedCount += wrote;
+      // 한 건도 못 옮겼으면 다음 바퀴도 같은 결과다 — 돌아봐야 돈만 쓴다
+      if (wrote === 0) break;
     }
 
     // 원문은 기사를 쓸 때만 쓰므로 오래된 건 비워 둔다 (행은 남겨야 또 안 받는다)
     await feed.trimOldSources();
-    return { added: saved.length, failed };
+    return { added: saved.length, translated: translatedCount, failed };
   });
 
   /** 고른 항목으로 기사 초안을 만든다. 미발행으로 들어간다. */

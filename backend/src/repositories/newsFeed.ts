@@ -76,6 +76,9 @@ export async function saveItems(items: FeedItem[], sourceName: string): Promise<
  *
  * 새로 담은 것만 옮기면 그 전에 쌓인 건 영영 영어로 남는다. 수집을 돌릴 때 밀린 것까지
  * 같이 처리한다 — 한 번 옮기면 `title_ko` 가 차서 다시 부르지 않는다.
+ *
+ * ⚠️ 최신순이라, 밀린 양이 limit 을 넘으면 **오래된 쪽이 계속 뒤로 밀린다.**
+ *    부르는 쪽에서 빌 때까지 돌려야 한 번에 끝난다.
  */
 export async function listUntranslated(limit = 60): Promise<SavedItem[]> {
   const rows = await query<RowDataPacket & { id: number; title: string }>(

@@ -51,12 +51,15 @@ export function NewsFeed({
     setNote(null);
     setBusy('fetch');
     try {
-      const result = await apiFetch<{ added: number; failed: string[] }>('/admin/news/feed/fetch', {
+      const result = await apiFetch<{ added: number; translated: number; failed: string[] }>('/admin/news/feed/fetch', {
         method: 'POST',
       });
-      setNote(
+      // 제목 번역은 밀린 것까지 같이 하므로, 새 소식이 0건이어도 한 일이 있을 수 있다
+      const parts = [
         result.added > 0 ? `새 소식 ${result.added}건을 받았습니다.` : '새로 올라온 소식이 없습니다.',
-      );
+        result.translated > 0 ? `제목 ${result.translated}건을 한국어로 옮겼습니다.` : null,
+      ].filter(Boolean);
+      setNote(parts.join(' '));
       if (result.failed.length) setError(`${result.failed.join(', ')} 에서 받지 못했습니다.`);
       router.refresh();
     } catch (err) {
