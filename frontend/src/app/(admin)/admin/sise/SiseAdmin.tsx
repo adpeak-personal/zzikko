@@ -2,11 +2,11 @@
 
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Trash2, Upload } from 'lucide-react';
+import { Link2, Trash2, Upload } from 'lucide-react';
 import { ApiError, apiFetch } from '@/lib/api';
 import { cn, formatDate } from '@/lib/utils';
 import type { Carrier, JoinType, SiseKeyword, SiseReport, SiseRow } from '@/lib/types';
-import { SiseKeywords } from './SiseKeywords';
+import { SiseKeywords, type KeywordPick } from './SiseKeywords';
 
 const CARRIERS: Carrier[] = ['SKT', 'KT', 'LG U+'];
 const JOINS: JoinType[] = ['번호이동', '기기변경'];
@@ -15,6 +15,28 @@ interface Draft {
   imageUrl: string;
   note: string;
   rows: SiseRow[];
+}
+
+/** 붙어 있는 키워드를 읽기 좋게 띄운다 — '수원휴대폰성지' → '수원 휴대폰 성지' */
+function spaceKeyword(keyword: string) {
+  return keyword
+    .replace(/(휴대폰|핸드폰|성지|시세표|시세)/g, ' $1 ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * 고른 키워드로 제목을 만든다.
+ *
+ * 제목에 키워드가 그대로 들어가야 검색에 걸린다. 이미 '시세'가 든 키워드에
+ * 또 붙이지 않는다 — "휴대폰 성지 시세표 시세" 같은 제목이 나온다.
+ */
+function titleFor(pick: KeywordPick | null, region: string, datedOn: string) {
+  const [, month = '', day = ''] = datedOn.split('-');
+  const when = `(${Number(month)}월 ${Number(day)}일 기준)`;
+  if (!pick) return region ? `${region} 휴대폰 성지 시세 ${when}` : '';
+  const spaced = spaceKeyword(pick.keyword);
+  return `${spaced}${spaced.includes('시세') ? '' : ' 시세'} ${when}`;
 }
 
 /** 읽어낸 행을 기종별로 묶는다 — 원본 이미지와 같은 모양이라야 눈으로 대조하기 쉽다 */
@@ -52,6 +74,9 @@ export function SiseAdmin({
 
   // 지역은 자유 문자열이다 — 위 키워드에서 고르거나 직접 적는다
   const [region, setRegion] = useState('');
+  const [picked, setPicked] = useState<KeywordPick | null>(null);
+  const [title, setTitle] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
   const [datedOn, setDatedOn] = useState(() => new Date().toISOString().slice(0, 10));
   const [draft, setDraft] = useState<Draft | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -79,6 +104,24 @@ export function SiseAdmin({
     }
   };
 
+  /* 1단계(b) — 이미지 주소로 읽기 */
+  const onPickUrl = async () => {
+    const url = imageUrl.trim();
+    if (!url) return;
+    setError(null);
+    setBusy('읽는 중');
+    try {
+      setDraft(await apiFetch<Draft>('/admin/sise/extract', {
+        method: 'POST',
+        body: JSON.stringify({ imageUrl: url }),
+      }));
+    } catch (err) {
+      fail(err, '그 주소에서 시세표를 읽지 못했어요.');
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const setPrice = (index: number, value: string) => {
     if (!draft) return;
     const rows = [...draft.rows];
@@ -99,9 +142,21 @@ export function SiseAdmin({
     try {
       await apiFetch('/admin/sise/sheets', {
         method: 'POST',
-        body: JSON.stringify({ region, datedOn, imageUrl: draft.imageUrl, note: draft.note, rows: draft.rows }),
+        body: JSON.stringify({
+          region,
+          title,
+          keywordId: picked?.id ?? null,
+          datedOn,
+          imageUrl: draft.imageUrl,
+          note: draft.note,
+          rows: draft.rows,
+        }),
       });
       setDraft(null);
+      setImageUrl('');
+      // 글이 만들어졌으니 작성일이 찍힌다 — 목록을 다시 받아야 보인다
+      setPicked(null);
+      setTitle('');
       router.refresh();
     } catch (err) {
       fail(err, '글을 만들지 못했어요.');
@@ -141,7 +196,18 @@ export function SiseAdmin({
       {error && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>}
 
       {/* ── 어느 지역을 쓸지 고르기 ── */}
-      <SiseKeywords keywords={keywords} ready={keywordsReady} selected={region} onPick={setRegion} />
+      <SiseKeywords
+        keywords={keywords}
+        ready={keywordsReady}
+        picked={picked}
+        onPick={(pick) => {
+          setPicked(pick);
+          if (pick) {
+            setRegion(pick.place || pick.keyword);
+            setTitle(titleFor(pick, pick.place, datedOn));
+          }
+        }}
+      />
 
       {/* ── 올리기 ── */}
       <section className="rounded-xl border border-gray-200 bg-white p-5">
@@ -191,6 +257,45 @@ export function SiseAdmin({
             >
               <Upload size={15} />
               {busy === '읽는 중' ? '읽는 중…' : '시세표 선택'}
+            </button>
+          </div>
+        </div>
+
+        <label className="mt-3 block text-sm font-semibold text-gray-600">
+          제목
+          <input
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            placeholder="비워두면 AI 가 지은 제목을 씁니다"
+            maxLength={200}
+            className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-zz-400"
+          />
+        </label>
+
+        <div className="mt-3">
+          <span className="text-sm font-semibold text-gray-600">또는 이미지 주소로</span>
+          <div className="mt-1 flex gap-2">
+            <input
+              value={imageUrl}
+              onChange={(event) => setImageUrl(event.target.value)}
+              placeholder="https://… .png"
+              maxLength={1000}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  void onPickUrl();
+                }
+              }}
+              className="min-w-0 flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-zz-400"
+            />
+            <button
+              type="button"
+              disabled={Boolean(busy) || !aiReady || !imageUrl.trim()}
+              onClick={() => void onPickUrl()}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              <Link2 size={15} />
+              주소로 읽기
             </button>
           </div>
         </div>

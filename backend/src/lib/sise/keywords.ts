@@ -25,6 +25,14 @@ const SUFFIX = '휴대폰성지';
 const KEEP = ['성지', '시세'];
 
 /**
+ * 이보다 적게 찾는 키워드는 가져오지 않는다.
+ *
+ * 월 200 이하는 글을 써도 사람이 거의 안 들어오는데, 목록만 수백 줄로 불어나
+ * 쓸 만한 지역을 고르기 어려워진다. 실제로 걸러 보니 572개 → 100개 남짓이 된다.
+ */
+export const MIN_MONTHLY = 200;
+
+/**
  * 조회할 지역. 시·구·주요 상권까지 넣는다.
  *
  * "경기"·"충남" 같은 도 단위는 넣지 않는다 — 검색량이 거의 없다(실측).
@@ -130,7 +138,7 @@ export async function fetchKeywordVolumes(places: string[] = PLACES): Promise<Ke
       if (!keyword || !KEEP.some((word) => keyword.includes(word))) continue;
 
       const monthly = count(raw.monthlyPcQcCnt) + count(raw.monthlyMobileQcCnt);
-      if (monthly <= 0) continue;
+      if (monthly < MIN_MONTHLY) continue;
 
       // 어느 지역 키워드인지 — 들어 있는 지역명 중 가장 긴 것
       const place = places

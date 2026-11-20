@@ -5,12 +5,13 @@ import { notFound, parse } from '../lib/http.js';
 import { requireAdmin } from '../lib/auth.js';
 import { aiReady, logUsage } from '../lib/anthropic.js';
 import { extractSheet } from '../lib/sise/extract.js';
-import { fetchKeywordVolumes, keywordsReady } from '../lib/sise/keywords.js';
+import { MIN_MONTHLY, fetchKeywordVolumes, keywordsReady } from '../lib/sise/keywords.js';
 import { compareSheets } from '../lib/sise/compare.js';
 import { defaultTitle, regionSlug, writeReport } from '../lib/sise/write.js';
 import { saveBuffer } from '../lib/storage.js';
 import { processImage } from '../lib/images.js';
 import { readImage } from '../lib/multipart.js';
+import { fetchImageFromUrl } from '../lib/fetchImage.js';
 import * as sise from '../repositories/sise.js';
 import type { SiseRow } from '../types.js';
 
@@ -40,6 +41,10 @@ const rowSchema = z.object({
 
 const saveSchema = z.object({
   region: regionField,
+  /** 화면에서 손본 제목. 비우면 AI 가 지은 제목을 쓴다 */
+  title: z.string().trim().max(200).default(''),
+  /** 이 글이 겨냥한 키워드. 글이 만들어지면 '작성함'으로 적는다 */
+  keywordId: z.number().int().positive().nullable().default(null),
   datedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '날짜 형식이 올바르지 않습니다.'),
   imageUrl: z.string().min(1).max(500),
   note: z.string().max(300).default(''),
@@ -77,20 +82,15 @@ export default async function siseRoutes(app: FastifyInstance) {
   app.post('/admin/sise/keywords/fetch', { preHandler: requireAdmin }, async (request) => {
     const hits = await fetchKeywordVolumes();
     const saved = await sise.upsertKeywords(hits);
-    request.log.info({ saved }, '지역 키워드 검색량 갱신');
+    // 기준에 못 미치는 옛 키워드도 같이 치운다 — 안 그러면 기준을 올려도 목록에 남는다
+    const pruned = await sise.pruneLowKeywords(MIN_MONTHLY);
+    request.log.info({ saved, pruned }, '지역 키워드 검색량 갱신');
     return { saved, keywords: await sise.listKeywords() };
   });
 
-  app.patch('/admin/sise/keywords/:id', { preHandler: requireAdmin }, async (request) => {
-    const { id } = parse(z.object({ id: z.coerce.number().int().positive() }), request.params);
-    const { done } = parse(z.object({ done: z.boolean() }), request.body);
-    if (!(await sise.setKeywordDone(id, done))) throw notFound('키워드');
-    return { ok: true };
-  });
-
-  /** 쌓인 표시를 한 번에 푼다 — 다음 달에 다시 돌 때 */
+  /** 목록을 통째로 비운다. 다시 받으면 새로 쌓인다 */
   app.post('/admin/sise/keywords/clear', { preHandler: requireAdmin }, async () => ({
-    cleared: await sise.clearKeywordsDone(),
+    cleared: await sise.deleteAllKeywords(),
   }));
 
   /**
@@ -100,7 +100,13 @@ export default async function siseRoutes(app: FastifyInstance) {
    * 2단계(POST /admin/sise/sheets)로 저장한다.
    */
   app.post('/admin/sise/extract', { preHandler: requireAdmin }, async (request) => {
-    const image = await readImage(request, '시세표 이미지를 선택해주세요.');
+    // 파일을 직접 올리거나(멀티파트), 이미지 주소를 넘기거나(JSON) 둘 다 받는다
+    const image = request.isMultipart()
+      ? await readImage(request, '시세표 이미지를 선택해주세요.')
+      : await fetchImageFromUrl(
+          parse(z.object({ imageUrl: z.string().trim().min(1, '이미지 주소를 넣어주세요.').max(1000) }), request.body)
+            .imageUrl,
+        );
 
     // 원본 그대로 읽힌다 — 표의 작은 숫자가 뭉개지면 안 되므로 줄이기 전에 넘긴다
     const draft = await extractSheet(image.data, image.mimetype);
@@ -149,12 +155,15 @@ export default async function siseRoutes(app: FastifyInstance) {
     const reportId = await sise.createReport({
       sheetId,
       slug,
-      title: written.title || defaultTitle({ region: input.region, datedOn: input.datedOn }),
+      title: input.title || written.title || defaultTitle({ region: input.region, datedOn: input.datedOn }),
       summary: written.summary,
       sections: { lead: written.lead, highlights: written.highlights, closing: written.closing },
       changes: comparison?.changes ?? [],
       comparedTo: previous?.id ?? null,
     });
+
+    // 글이 실제로 만들어진 다음에 적는다 — 손으로 체크하면 어긋난다
+    if (input.keywordId) await sise.markKeywordWritten(input.keywordId);
 
     return reply.code(201).send(await sise.getReport(reportId));
   });

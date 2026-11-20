@@ -309,16 +309,33 @@ export async function upsertKeywords(
   return saved;
 }
 
-export async function setKeywordDone(id: number, done: boolean): Promise<boolean> {
+/**
+ * 이 키워드로 글을 썼다고 적는다 — 글이 **실제로 만들어진 뒤에만** 부른다.
+ *
+ * 손으로 체크하지 않는 이유는, 체크해 놓고 글을 안 쓰거나 글만 쓰고 체크를 잊는 일이
+ * 둘 다 생기기 때문이다. 글이 저장되는 자리에서 같이 적으면 어긋날 수가 없다.
+ */
+export async function markKeywordWritten(id: number): Promise<boolean> {
   const { affectedRows } = await execute(
-    'UPDATE sise_keywords SET done = ?, done_at = ? WHERE id = ?',
-    [done ? 1 : 0, done ? new Date() : null, id],
+    'UPDATE sise_keywords SET done = 1, done_at = NOW() WHERE id = ?',
+    [id],
   );
   return affectedRows > 0;
 }
 
-/** 쌓인 표시를 한 번에 푼다 — 다음 달에 다시 돌 때 쓴다 */
-export async function clearKeywordsDone(): Promise<number> {
-  const { affectedRows } = await execute('UPDATE sise_keywords SET done = 0, done_at = NULL WHERE done = 1');
+/**
+ * 기준에 못 미치는 키워드를 치운다 — 검색량을 다시 받은 **뒤에** 부른다.
+ *
+ * 기준을 올려도 예전에 받아둔 낮은 키워드가 목록에 그대로 남기 때문이다.
+ * **글을 쓴 건 남긴다**(`done = 0` 만 지운다) — 작성 기록까지 날리면 안 된다.
+ */
+export async function pruneLowKeywords(min: number): Promise<number> {
+  const { affectedRows } = await execute('DELETE FROM sise_keywords WHERE done = 0 AND monthly < ?', [min]);
+  return affectedRows;
+}
+
+/** 목록을 통째로 비운다 — 다시 받으면 새로 쌓인다 */
+export async function deleteAllKeywords(): Promise<number> {
+  const { affectedRows } = await execute('DELETE FROM sise_keywords');
   return affectedRows;
 }
