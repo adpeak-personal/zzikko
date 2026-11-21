@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ExternalLink, Eye, EyeOff, ImageUp, Pencil, Plus, Sparkles, Star, Trash2, X } from 'lucide-react';
+import { ExternalLink, Eye, EyeOff, ImageUp, Link2, Pencil, Plus, Sparkles, Star, Trash2, X } from 'lucide-react';
 import { ApiError, apiFetch, toApiError } from '@/lib/api';
 import { Thumb } from '@/components/ui';
 import { cn, formatNumber } from '@/lib/utils';
@@ -111,11 +111,71 @@ function ContentPhotos({
     onChange(next.map((photo) => ({ url: photo.url, caption: photo.caption })));
   };
 
+  /*
+   * 주소로 넣는 칸은 업로더 **바깥**에 둔다.
+   *
+   * components/photo-uploader 는 다른 프로젝트로 폴더째 옮길 수 있게 유지하는 독립 모듈이고
+   * `uploadImage(file)` 만 받는다. 거기에 주소 입력을 넣으면 abyssblue 쪽도 같이 봐야 한다.
+   */
+  const [link, setLink] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const addByUrl = async () => {
+    const url = link.trim();
+    if (!url || busy) return;
+    if (photos.length >= max) {
+      setError(`사진은 최대 ${max}장까지 넣을 수 있어요.`);
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      // 서버가 받아와서 webp 로 바꿔 우리 저장소에 넣는다 — 남의 서버를 그대로 링크하지 않는다
+      const saved = await apiFetch<{ url: string }>('/uploads/image', {
+        method: 'POST',
+        body: JSON.stringify({ imageUrl: url }),
+      });
+      apply([...photos, { id: `${Date.now()}-${saved.url}`, url: saved.url, caption: '' }]);
+      setLink('');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : '그 주소에서 이미지를 가져오지 못했어요.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <Field label="사진" hint={`끌어서 순서를 바꿀 수 있습니다. 첫 장이 목록에 보입니다 (최대 ${max}장).`}>
       <div className="mt-1">
         <PhotoUploader photos={photos} onChange={apply} uploadImage={uploadImage} maxCount={max} showCaptions={false} />
       </div>
+
+      <div className="mt-2 flex gap-2">
+        <input
+          value={link}
+          onChange={(event) => setLink(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              void addByUrl();
+            }
+          }}
+          placeholder="또는 이미지 주소 붙여넣기 (https://… .jpg)"
+          maxLength={1000}
+          className="min-w-0 flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-zz-400"
+        />
+        <button
+          type="button"
+          onClick={() => void addByUrl()}
+          disabled={busy || !link.trim()}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+        >
+          <Link2 size={14} />
+          {busy ? '받는 중…' : '주소로 넣기'}
+        </button>
+      </div>
+      {error && <p className="mt-1.5 text-xs text-red-600">{error}</p>}
     </Field>
   );
 }
