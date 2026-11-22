@@ -97,6 +97,19 @@ export async function listNews({ all = false, category }: { all?: boolean; categ
   return rows.map(toNews);
 }
 
+/**
+ * 사이트맵 재료 — 주소를 만들 수 있는 최소 정보만.
+ *
+ * 기사 본문(MEDIUMTEXT)까지 끌고 올 이유가 없어 목록 조회와 따로 둔다.
+ * **발행한 것만** 준다 — 미발행은 운영진에게만 보이는 초안이다.
+ */
+export async function listNewsForSitemap(): Promise<{ id: number; updatedAt: string }[]> {
+  const rows = await query<RowDataPacket & { id: number; updated_at: string }>(
+    'SELECT id, updated_at FROM news_articles WHERE published = 1 ORDER BY date DESC, id DESC',
+  );
+  return rows.map((row) => ({ id: row.id, updatedAt: row.updated_at }));
+}
+
 export async function getNews(id: number): Promise<NewsArticle | null> {
   const row = await queryOne<NewsRow>('SELECT * FROM news_articles WHERE id = ?', [id]);
   return row ? toNews(row) : null;
@@ -284,6 +297,14 @@ export async function listSpecs({ all = false }: { all?: boolean } = {}): Promis
     `SELECT * FROM phone_specs ${all ? '' : 'WHERE published = 1'} ORDER BY release_date DESC, name`,
   );
   return rows.map(toSpec);
+}
+
+/** 사이트맵 재료 — 발행한 기종만 */
+export async function listSpecsForSitemap(): Promise<{ id: number; updatedAt: string }[]> {
+  const rows = await query<RowDataPacket & { id: number; updated_at: string }>(
+    'SELECT id, updated_at FROM phone_specs WHERE published = 1 ORDER BY release_date DESC, id DESC',
+  );
+  return rows.map((row) => ({ id: row.id, updatedAt: row.updated_at }));
 }
 
 export async function getSpec(id: number): Promise<PhoneSpec | null> {

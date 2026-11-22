@@ -35,18 +35,33 @@ export default async function routes(app: FastifyInstance) {
    * 목록 API(/posts)는 쪽으로 나뉘고 지운 글을 거르느라 전부 훑기엔 맞지 않아 따로 둔다.
    */
   app.get('/sitemap', async () => {
-    const [postRows, siseRows, boardGroups, specs] = await Promise.all([
+    const [postRows, siseRows, boardGroups, specs, newsRows, specRows] = await Promise.all([
       posts.listForSitemap(),
       sise.listPublishedSlugs(),
       boards.listBoardGroups(),
       content.listSpecs(),
+      content.listNewsForSitemap(),
+      content.listSpecsForSitemap(),
     ]);
+
+    /*
+     * 기사·기종은 posts 와 **다른 테이블**이라 posts.listForSitemap 에 안 걸린다.
+     * 주소는 게시판을 타므로(/board/news/12) 어느 게시판이 그 종류인지 찾아야 한다 —
+     * slug 는 어드민에서 바꿀 수 있으니 'news' 라고 박지 않는다.
+     */
+    const allBoards = boardGroups.flatMap((group) => group.boards);
+    const slugOf = (type: 'news' | 'spec') => allBoards.find((board) => board.type === type)?.slug ?? null;
+    const newsSlug = slugOf('news');
+    const specSlug = slugOf('spec');
+
     return {
       posts: postRows,
       sise: siseRows,
-      boards: boardGroups.flatMap((group) => group.boards.map((board) => board.slug)),
+      boards: allBoards.map((board) => board.slug),
       // 비교 페이지는 사이트 안에 링크가 적어 사이트맵 비중이 크다
       compare: buildPairs(specs).map((pair) => pairSlug(pair.a, pair.b)),
+      news: newsSlug ? newsRows.map((row) => ({ ...row, boardSlug: newsSlug })) : [],
+      specs: specSlug ? specRows.map((row) => ({ ...row, boardSlug: specSlug })) : [],
     };
   });
 

@@ -38,10 +38,17 @@ export async function apiGetOrNull<T>(path: string): Promise<T | null> {
  *
  * `generateStaticParams` 는 **요청 없이 빌드 때 돌기 때문에** `cookies()` 를 부르면
  * 바로 터진다. 거기서는 이 함수를 쓴다. 공개 목록만 가져오는 용도라 쿠키가 필요 없다.
+ *
+ * ⚠️ `revalidate` 를 주면 그 초만큼 캐시한다. **`cache: 'no-store'` 와 같이 주면
+ * 둘 다 무시되므로**(Next 규칙) 하나만 건다. 사이트맵처럼 매 요청마다 DB 를
+ * 훑을 이유가 없는 곳에서 쓴다.
  */
-export async function apiGetPublic<T>(path: string): Promise<T | null> {
+export async function apiGetPublic<T>(path: string, revalidate?: number): Promise<T | null> {
   try {
-    const res = await fetch(`${SERVER_API}/api/v1${path}`, { cache: 'no-store' });
+    const res = await fetch(
+      `${SERVER_API}/api/v1${path}`,
+      revalidate === undefined ? { cache: 'no-store' } : { next: { revalidate } },
+    );
     if (!res.ok) return null;
     return (await res.json()) as T;
   } catch {

@@ -16,17 +16,92 @@ import { formatDate, formatNumber, formatPrice, formatRelative } from '@/lib/uti
 
 type Params = { params: Promise<{ slug: string; id: string }> };
 
+const SITE = process.env.SITE_URL ?? 'https://zzikko.co.kr';
+
+const url = (slug: string, id: number | string) => `${SITE}/board/${slug}/${id}`;
+
+/**
+ * 기사 구조화 데이터.
+ *
+ * 시세 글에는 진작 넣어 뒀는데 기사만 빠져 있었다. AI 검색이 인용하려면
+ * 누가 언제 쓴 글인지가 기계가 읽을 수 있는 자리에 있어야 한다.
+ *
+ * 출처를 밝히는 건 GSMArena 이용 조건이기도 하다 — 화면 하단뿐 아니라
+ * `citation` 으로도 남긴다.
+ */
+function newsJsonLd(article: NewsArticle, slug: string) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'NewsArticle',
+    headline: article.title,
+    description: article.summary,
+    datePublished: article.date,
+    author: { '@type': 'Organization', name: article.author },
+    publisher: { '@type': 'Organization', name: '찍고', url: SITE },
+    mainEntityOfPage: url(slug, article.id),
+    articleSection: article.category,
+    ...(article.thumbUrl ? { image: [article.thumbUrl] } : {}),
+    ...(article.sourceUrl ? { citation: article.sourceUrl } : {}),
+  };
+}
+
+/**
+ * 기종 구조화 데이터.
+ *
+ * ⚠️ `offers` 를 넣지 않는다 — 우리가 파는 물건이 아니다. 출고가는 제조사 가격이지
+ * 우리 판매가가 아니라서, offers 로 적으면 검색 결과에 없는 판매를 광고하는 셈이 된다.
+ */
+function specJsonLd(spec: PhoneSpec, slug: string) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: spec.name,
+    brand: { '@type': 'Brand', name: spec.brand },
+    description: [spec.display, spec.storage, spec.battery].filter(Boolean).join(' · '),
+    releaseDate: spec.releaseDate,
+    url: url(slug, spec.id),
+    ...(spec.thumbUrl ? { image: [spec.thumbUrl] } : {}),
+  };
+}
+
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { slug, id } = await params;
   const board = await getBoard(slug);
 
   if (board?.type === 'news') {
     const article = await apiGetOrNull<NewsArticle>(`/news/${id}`);
-    return { title: article?.title ?? 'IT 소식' };
+    if (!article) return { title: 'IT 소식' };
+    return {
+      title: article.title,
+      description: article.summary,
+      alternates: { canonical: url(slug, article.id) },
+      openGraph: {
+        title: article.title,
+        description: article.summary,
+        type: 'article',
+        publishedTime: article.date,
+        images: article.thumbUrl ? [article.thumbUrl] : undefined,
+      },
+      // 미발행은 운영진만 보는 초안이다 — 혹시 주소가 새어도 색인되지 않게
+      ...(article.published ? {} : { robots: { index: false, follow: false } }),
+    };
   }
   if (board?.type === 'spec') {
     const spec = await apiGetOrNull<PhoneSpec>(`/specs/${id}`);
-    return { title: spec?.name ?? '스펙 비교' };
+    if (!spec) return { title: '스펙 비교' };
+    const description = `${spec.name} 사양 — ${[spec.display, spec.storage, spec.battery].filter(Boolean).join(' · ')}`;
+    return {
+      title: spec.name,
+      description,
+      alternates: { canonical: url(slug, spec.id) },
+      openGraph: {
+        title: spec.name,
+        description,
+        type: 'article',
+        images: spec.thumbUrl ? [spec.thumbUrl] : undefined,
+      },
+      ...(spec.published ? {} : { robots: { index: false, follow: false } }),
+    };
   }
 
   const post = await getPost(Number(id));
@@ -44,7 +119,15 @@ export default async function PostPage({ params }: Params) {
       apiGet<{ items: NewsArticle[] }>('/news'),
     ]);
     if (!article) notFound();
-    return <NewsDetail article={article} others={all.items.filter((item) => item.id !== article.id).slice(0, 4)} />;
+    return (
+      <>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(newsJsonLd(article, slug)) }}
+        />
+        <NewsDetail article={article} others={all.items.filter((item) => item.id !== article.id).slice(0, 4)} />
+      </>
+    );
   }
 
   if (board?.type === 'spec') {
@@ -53,7 +136,19 @@ export default async function PostPage({ params }: Params) {
       apiGet<{ items: PhoneSpec[]; chipsets: Chipset[] }>('/specs'),
     ]);
     if (!spec) notFound();
-    return <SpecDetail spec={spec} chipsets={all.chipsets} others={all.items.filter((item) => item.id !== spec.id).slice(0, 4)} />;
+    return (
+      <>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(specJsonLd(spec, slug)) }}
+        />
+        <SpecDetail
+          spec={spec}
+          chipsets={all.chipsets}
+          others={all.items.filter((item) => item.id !== spec.id).slice(0, 4)}
+        />
+      </>
+    );
   }
 
   const post = await getPost(Number(id));
