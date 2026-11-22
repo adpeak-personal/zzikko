@@ -263,6 +263,17 @@ const steps = [
          MODIFY COLUMN status ENUM('수집','작성됨','숨김','삭제') NOT NULL DEFAULT '수집'`,
     ],
   },
+  {
+    // 안 쓸 키워드 치우기.
+    // 행을 지우지 않는다 — keyword 가 UNIQUE 이고 조회할 지역(PLACES)이 고정이라,
+    // 지워도 '검색량 가져오기' 를 누르면 같은 키워드가 그대로 다시 들어온다.
+    name: 'sise_keywords.hidden — 안 쓸 지역 키워드 치우기',
+    check: (c) => hasColumn(c, 'sise_keywords', 'hidden'),
+    sql: [
+      `ALTER TABLE sise_keywords
+         ADD COLUMN hidden TINYINT(1) NOT NULL DEFAULT 0 COMMENT '안 쓸 키워드. 목록에서 빼지만 행은 남긴다'`,
+    ],
+  },
 ];
 
 /** 공개 주소 앞머리. 없으면 바꿀 것도 없다. */

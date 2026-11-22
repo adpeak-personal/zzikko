@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, RefreshCw, Search, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, RefreshCw, Search, Trash2, X } from 'lucide-react';
 import { ApiError, apiFetch } from '@/lib/api';
 import { cn, formatDate } from '@/lib/utils';
 import type { SiseKeyword } from '@/lib/types';
@@ -72,6 +72,28 @@ export function SiseKeywords({
       setPage(0);
     } catch (err) {
       fail(err, '검색량을 가져오지 못했어요.');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  /**
+   * 안 쓸 키워드 하나를 치운다.
+   *
+   * 서버는 행을 지우지 않고 숨긴다 — 조회할 지역이 고정이라 진짜로 지우면
+   * 다음 '검색량 가져오기' 에 그대로 다시 들어온다.
+   */
+  const hide = async (item: SiseKeyword) => {
+    if (busy !== null) return;
+    setBusy(`hide:${item.id}`);
+    setError(null);
+    try {
+      await apiFetch(`/admin/sise/keywords/${item.id}`, { method: 'DELETE' });
+      setItems((list) => list.filter((row) => row.id !== item.id));
+      // 고르고 있던 걸 치웠으면 올리기 폼의 지역도 풀어 준다
+      if (picked?.id === item.id) onPick(null);
+    } catch (err) {
+      fail(err, '치우지 못했어요.');
     } finally {
       setBusy(null);
     }
@@ -170,7 +192,8 @@ export function SiseKeywords({
                 <th className="px-2 py-2 font-medium">키워드</th>
                 <th className="w-28 px-2 py-2 text-right font-medium">월간검색수</th>
                 <th className="w-16 px-2 py-2 text-center font-medium">경쟁</th>
-                <th className="w-24 px-5 py-2 text-right font-medium">작성일</th>
+                <th className="w-24 px-2 py-2 text-right font-medium">작성일</th>
+                <th className="w-10 py-2 pl-2 pr-4 font-medium" />
               </tr>
             </thead>
             <tbody>
@@ -202,7 +225,7 @@ export function SiseKeywords({
                       {item.monthly.toLocaleString()}
                     </td>
                     <td className="px-2 py-2 text-center text-xs text-gray-400">{item.competition || '-'}</td>
-                    <td className="px-5 py-2 text-right text-xs">
+                    <td className="px-2 py-2 text-right text-xs">
                       {item.doneAt ? (
                         <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-emerald-700">
                           {formatDate(item.doneAt)}
@@ -211,12 +234,28 @@ export function SiseKeywords({
                         <span className="text-gray-300">—</span>
                       )}
                     </td>
+                    <td className="py-2 pl-2 pr-4 text-right">
+                      <button
+                        type="button"
+                        // 행 클릭(고르기)까지 같이 일어나지 않게
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void hide(item);
+                        }}
+                        disabled={busy !== null}
+                        aria-label={`${item.keyword} 치우기`}
+                        title="안 쓸 키워드 치우기"
+                        className="rounded p-1 text-gray-300 hover:bg-red-50 hover:text-red-500 disabled:opacity-40"
+                      >
+                        <X size={14} className={cn(busy === `hide:${item.id}` && 'animate-pulse')} />
+                      </button>
+                    </td>
                   </tr>
                 );
               })}
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="py-10 text-center text-sm text-gray-400">
+                  <td colSpan={6} className="py-10 text-center text-sm text-gray-400">
                     찾는 키워드가 없습니다.
                   </td>
                 </tr>

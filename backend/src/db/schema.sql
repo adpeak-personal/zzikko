@@ -418,6 +418,7 @@ CREATE TABLE sise_keywords (
   competition VARCHAR(10)  NOT NULL DEFAULT '' COMMENT '네이버 경쟁정도',
   done        TINYINT(1)   NOT NULL DEFAULT 0 COMMENT '이 지역 글을 썼는지',
   done_at     DATETIME     NULL,
+  hidden      TINYINT(1)   NOT NULL DEFAULT 0 COMMENT '안 쓸 키워드. 목록에서 빼지만 행은 남긴다',
   fetched_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uq_sise_keywords_keyword (keyword),

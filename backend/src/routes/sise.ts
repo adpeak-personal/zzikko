@@ -88,6 +88,18 @@ export default async function siseRoutes(app: FastifyInstance) {
     return { saved, keywords: await sise.listKeywords() };
   });
 
+  /**
+   * 안 쓸 키워드 하나를 목록에서 치운다.
+   *
+   * ⚠️ 행을 지우지 않고 `hidden` 만 세운다 — 조회할 지역이 고정이라 진짜로 지우면
+   * 다음 '검색량 가져오기' 에 그대로 다시 들어온다.
+   */
+  app.delete('/admin/sise/keywords/:id', { preHandler: requireAdmin }, async (request) => {
+    const { id } = parse(z.object({ id: z.coerce.number().int().positive() }), request.params);
+    if (!(await sise.hideKeyword(id))) throw notFound('키워드');
+    return { ok: true };
+  });
+
   /** 목록을 통째로 비운다. 다시 받으면 새로 쌓인다 */
   app.post('/admin/sise/keywords/clear', { preHandler: requireAdmin }, async () => ({
     cleared: await sise.deleteAllKeywords(),

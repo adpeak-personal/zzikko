@@ -349,9 +349,21 @@ const toKeyword = (row: KeywordRow): SiseKeyword => ({
 
 export async function listKeywords(): Promise<SiseKeyword[]> {
   const rows = await query<KeywordRow>(
-    'SELECT * FROM sise_keywords ORDER BY done ASC, monthly DESC, keyword',
+    'SELECT * FROM sise_keywords WHERE hidden = 0 ORDER BY done ASC, monthly DESC, keyword',
   );
   return rows.map(toKeyword);
+}
+
+/**
+ * 안 쓸 키워드를 목록에서 치운다.
+ *
+ * ⚠️ **행을 지우지 않는다.** `keyword` 가 UNIQUE 이고 조회할 지역(`PLACES`)이 고정이라,
+ * 진짜로 지우면 '검색량 가져오기' 를 누를 때 같은 키워드가 그대로 다시 들어온다.
+ * 수집함의 '삭제'와 같은 이유다.
+ */
+export async function hideKeyword(id: number): Promise<boolean> {
+  const { affectedRows } = await execute('UPDATE sise_keywords SET hidden = 1 WHERE id = ?', [id]);
+  return affectedRows > 0;
 }
 
 /**
@@ -401,7 +413,10 @@ export async function markKeywordWritten(id: number): Promise<boolean> {
  * **글을 쓴 건 남긴다**(`done = 0` 만 지운다) — 작성 기록까지 날리면 안 된다.
  */
 export async function pruneLowKeywords(min: number): Promise<number> {
-  const { affectedRows } = await execute('DELETE FROM sise_keywords WHERE done = 0 AND monthly < ?', [min]);
+  const { affectedRows } = await execute(
+    'DELETE FROM sise_keywords WHERE done = 0 AND hidden = 0 AND monthly < ?',
+    [min],
+  );
   return affectedRows;
 }
 
