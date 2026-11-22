@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { HttpError, notFound, parse } from '../lib/http.js';
+import { HttpError, badRequest, notFound, parse } from '../lib/http.js';
 import { requireAdmin } from '../lib/auth.js';
 import * as boards from '../repositories/boards.js';
 import * as shops from '../repositories/shops.js';
@@ -120,6 +120,27 @@ export default async function routes(app: FastifyInstance) {
     }
     reply.code(201);
     return result.board;
+  });
+
+  /** 한 대분류 안의 게시판 순서 — slug 를 보일 순서대로 전부 보낸다 */
+  app.put('/admin/board-groups/:id/order', { preHandler: requireAdmin }, async (request) => {
+    const { id } = parse(z.object({ id: z.coerce.number().int().positive() }), request.params);
+    const { slugs } = parse(z.object({ slugs: z.array(z.string().max(40)).min(1).max(100) }), request.body);
+    if (new Set(slugs).size !== slugs.length) throw badRequest('같은 게시판이 두 번 들어 있습니다.');
+    if (!(await boards.reorderBoards(id, slugs))) {
+      throw new HttpError(409, '게시판 목록이 바뀌었습니다. 새로고침한 뒤 다시 해주세요.');
+    }
+    return { ok: true };
+  });
+
+  /** 대분류 순서 — id 를 보일 순서대로 전부 보낸다 */
+  app.put('/admin/board-groups/order', { preHandler: requireAdmin }, async (request) => {
+    const { ids } = parse(z.object({ ids: z.array(z.number().int().positive()).min(1).max(100) }), request.body);
+    if (new Set(ids).size !== ids.length) throw badRequest('같은 대분류가 두 번 들어 있습니다.');
+    if (!(await boards.reorderBoardGroups(ids))) {
+      throw new HttpError(409, '대분류 목록이 바뀌었습니다. 새로고침한 뒤 다시 해주세요.');
+    }
+    return { ok: true };
   });
 
   /** 대분류(공지&안내 · 휴대폰 …) 이름 바꾸기 */

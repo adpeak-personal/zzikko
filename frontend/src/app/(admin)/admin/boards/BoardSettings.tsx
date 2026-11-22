@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ApiError, apiFetch } from '@/lib/api';
-import { Check, ChevronDown, Pencil, Plus, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, ChevronDown, Pencil, Plus, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Board, BoardGroup, BoardType, WriteMode } from '@/lib/types';
 
@@ -68,7 +68,36 @@ function CategoryInput({ value, onChange }: { value: string[]; onChange: (next: 
   );
 }
 
-function BoardCard({ board }: { board: AdminBoard }) {
+/** 위·아래로 한 칸 옮기기. 맨 위·맨 아래면 그쪽 버튼이 꺼진다 */
+interface Move {
+  up?: () => void;
+  down?: () => void;
+  busy: boolean;
+}
+
+const MOVE_BUTTON =
+  'rounded p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-700 disabled:opacity-25 disabled:hover:bg-transparent';
+
+function MoveButtons({ move, label }: { move: Move; label: string }) {
+  return (
+    <span className="flex shrink-0 items-center">
+      <button type="button" onClick={move.up} disabled={!move.up || move.busy} aria-label={`${label} 위로`} className={MOVE_BUTTON}>
+        <ArrowUp size={14} />
+      </button>
+      <button
+        type="button"
+        onClick={move.down}
+        disabled={!move.down || move.busy}
+        aria-label={`${label} 아래로`}
+        className={MOVE_BUTTON}
+      >
+        <ArrowDown size={14} />
+      </button>
+    </span>
+  );
+}
+
+function BoardCard({ board, move }: { board: AdminBoard; move: Move }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(board.name);
@@ -113,25 +142,28 @@ function BoardCard({ board }: { board: AdminBoard }) {
 
   return (
     <li className="border-b border-gray-100 last:border-0">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className="flex w-full items-center gap-3 px-5 py-3 text-left hover:bg-gray-50"
-      >
-        <ChevronDown size={15} className={cn('shrink-0 text-gray-400 transition', open && 'rotate-180')} />
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-semibold text-gray-900">{board.name}</span>
-          <span className="mt-0.5 block truncate text-xs text-gray-400">
-            /{board.slug} · {TYPE_LABEL[board.type]} · {board.writeMode === 'photo' ? '사진 업로더' : '에디터'}
-            {board.categories?.length ? ` · 말머리 ${board.categories.length}개` : ' · 말머리 없음'}
-            {board.sellerOnly ? ' · 판매자 전용' : ''}
-            {board.adminOnly ? ' · 관리자 전용' : ''}
+      <div className="flex items-center pr-3 hover:bg-gray-50">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className="flex min-w-0 flex-1 items-center gap-3 py-3 pl-5 pr-2 text-left"
+        >
+          <ChevronDown size={15} className={cn('shrink-0 text-gray-400 transition', open && 'rotate-180')} />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-semibold text-gray-900">{board.name}</span>
+            <span className="mt-0.5 block truncate text-xs text-gray-400">
+              /{board.slug} · {TYPE_LABEL[board.type]} · {board.writeMode === 'photo' ? '사진 업로더' : '에디터'}
+              {board.categories?.length ? ` · 말머리 ${board.categories.length}개` : ' · 말머리 없음'}
+              {board.sellerOnly ? ' · 판매자 전용' : ''}
+              {board.adminOnly ? ' · 관리자 전용' : ''}
+            </span>
           </span>
-        </span>
-        <span className="shrink-0 text-xs text-gray-500">글 {board.postCount}</span>
-        {dirty && <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[11px] text-amber-800">수정됨</span>}
-      </button>
+          <span className="shrink-0 text-xs text-gray-500">글 {board.postCount}</span>
+          {dirty && <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[11px] text-amber-800">수정됨</span>}
+        </button>
+        <MoveButtons move={move} label={board.name} />
+      </div>
 
       {open && (
         <div className="space-y-3 bg-gray-50/70 px-5 pb-4 pt-1">
@@ -268,7 +300,7 @@ function BoardCard({ board }: { board: AdminBoard }) {
 }
 
 /** 대분류 제목 — 연필을 누르면 그 자리에서 이름을 고친다 */
-function GroupHeader({ group }: { group: AdminBoardGroup }) {
+function GroupHeader({ group, move }: { group: AdminBoardGroup; move: Move }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(group.name);
@@ -312,6 +344,9 @@ function GroupHeader({ group }: { group: AdminBoardGroup }) {
         >
           <Pencil size={13} />
         </button>
+        <span className="ml-auto font-normal">
+          <MoveButtons move={move} label={group.name} />
+        </span>
       </h2>
     );
   }
@@ -498,15 +533,69 @@ function AddBoardForm({ groupId }: { groupId: number }) {
   );
 }
 
+/** 한 칸 옮긴 새 배열 */
+function swap<T>(list: T[], index: number, to: number): T[] {
+  const next = [...list];
+  [next[index], next[to]] = [next[to], next[index]];
+  return next;
+}
+
 export function BoardSettings({ groups }: { groups: AdminBoardGroup[] }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // 누르는 즉시 저장한다 — 순서는 따로 '저장' 을 누를 만한 편집이 아니다
+  const saveOrder = async (path: string, body: object) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await apiFetch(path, { method: 'PUT', body: JSON.stringify(body) });
+      router.refresh(); // 사이드바·메뉴도 새 순서로
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : '순서를 바꾸지 못했어요.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const moveGroup = (index: number, to: number) =>
+    saveOrder('/admin/board-groups/order', { ids: swap(groups, index, to).map((group) => group.id) });
+
+  const moveBoard = (group: AdminBoardGroup, index: number, to: number) =>
+    saveOrder(`/admin/board-groups/${group.id}/order`, {
+      slugs: swap(group.boards, index, to).map((board) => board.slug),
+    });
+
   return (
     <div className="space-y-4">
-      {groups.map((group) => (
+      {error && (
+        <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">
+          {error}
+        </p>
+      )}
+      {groups.map((group, groupIndex) => (
         <section key={group.id} className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-          <GroupHeader key={group.name} group={group} />
+          <GroupHeader
+            key={group.name}
+            group={group}
+            move={{
+              up: groupIndex > 0 ? () => moveGroup(groupIndex, groupIndex - 1) : undefined,
+              down: groupIndex < groups.length - 1 ? () => moveGroup(groupIndex, groupIndex + 1) : undefined,
+              busy,
+            }}
+          />
           <ul>
-            {group.boards.map((board) => (
-              <BoardCard key={board.slug} board={board} />
+            {group.boards.map((board, index) => (
+              <BoardCard
+                key={board.slug}
+                board={board}
+                move={{
+                  up: index > 0 ? () => moveBoard(group, index, index - 1) : undefined,
+                  down: index < group.boards.length - 1 ? () => moveBoard(group, index, index + 1) : undefined,
+                  busy,
+                }}
+              />
             ))}
           </ul>
           <AddBoardForm groupId={group.id} />

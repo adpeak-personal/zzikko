@@ -1,5 +1,5 @@
 import type { RowDataPacket } from 'mysql2';
-import { execute, query, queryOne } from '../db/pool.js';
+import { execute, query, queryOne, withTransaction } from '../db/pool.js';
 import type { Board, BoardGroup } from '../types.js';
 
 interface BoardRow extends RowDataPacket {
@@ -124,6 +124,38 @@ export async function renameBoardGroup(id: number, name: string): Promise<boolea
   const row = await queryOne<RowDataPacket & { id: number }>(`SELECT id FROM board_groups WHERE id = ?`, [id]);
   if (!row) return false;
   await execute(`UPDATE board_groups SET name = ? WHERE id = ?`, [name, id]);
+  return true;
+}
+
+/**
+ * 한 대분류 안의 게시판 순서를 통째로 다시 적는다.
+ * 받은 slug 목록이 그 대분류의 게시판과 **정확히 같은 집합**일 때만 바꾼다 —
+ * 화면이 오래된 상태로 보냈으면(그 사이 게시판이 추가됐으면) 일부만 순서가 잡혀 뒤섞인다.
+ */
+export async function reorderBoards(groupId: number, slugs: string[]): Promise<boolean> {
+  const rows = await query<RowDataPacket & { slug: string }>(`SELECT slug FROM boards WHERE group_id = ?`, [groupId]);
+  const current = rows.map((row) => row.slug).sort();
+  if (current.length === 0 || JSON.stringify(current) !== JSON.stringify([...slugs].sort())) return false;
+
+  await withTransaction(async (conn) => {
+    for (const [index, slug] of slugs.entries()) {
+      await conn.execute(`UPDATE boards SET sort_order = ? WHERE slug = ? AND group_id = ?`, [index + 1, slug, groupId]);
+    }
+  });
+  return true;
+}
+
+/** 대분류 순서. 받은 id 목록이 전체 대분류와 같은 집합일 때만 바꾼다 */
+export async function reorderBoardGroups(ids: number[]): Promise<boolean> {
+  const rows = await query<RowDataPacket & { id: number }>(`SELECT id FROM board_groups`);
+  const current = rows.map((row) => row.id).sort((a, b) => a - b);
+  if (JSON.stringify(current) !== JSON.stringify([...ids].sort((a, b) => a - b))) return false;
+
+  await withTransaction(async (conn) => {
+    for (const [index, id] of ids.entries()) {
+      await conn.execute(`UPDATE board_groups SET sort_order = ? WHERE id = ?`, [index + 1, id]);
+    }
+  });
   return true;
 }
 
