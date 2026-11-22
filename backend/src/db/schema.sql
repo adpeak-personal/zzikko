@@ -28,6 +28,7 @@ DROP TABLE IF EXISTS
   news_feed,
   sise_reports,
   sise_sheets, seller_applications;
+DROP TABLE IF EXISTS phone_verifications;
 DROP TABLE IF EXISTS uploads;
 DROP TABLE IF EXISTS post_scraps;
 DROP TABLE IF EXISTS comment_likes;
@@ -48,8 +49,12 @@ DROP TABLE IF EXISTS users;
 -- ---------------------------------------------------------------------
 CREATE TABLE users (
   id            INT UNSIGNED NOT NULL AUTO_INCREMENT,
-  email         VARCHAR(255) NOT NULL,
-  password_hash VARCHAR(255) NOT NULL COMMENT 'scrypt: salt:hash (node:crypto)',
+  -- 카카오로 가입한 회원은 이메일·비밀번호가 없다
+  email         VARCHAR(255) NULL,
+  password_hash VARCHAR(255) NULL COMMENT 'scrypt: salt:hash (node:crypto)',
+  kakao_id      VARCHAR(32)  NULL COMMENT '카카오 회원번호',
+  -- 이메일 가입 때 인증한 휴대폰. 번호 원본은 두지 않는다 (HMAC — 한 번호 한 계정 확인용)
+  phone_hash    CHAR(64)     NULL,
   nickname      VARCHAR(30)  NOT NULL,
   avatar_color  CHAR(7)      NOT NULL DEFAULT '#fa6038',
   level         ENUM('새싹','눈팅러','단골','고수','성지지기','운영진') NOT NULL DEFAULT '새싹',
@@ -63,7 +68,23 @@ CREATE TABLE users (
   updated_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uq_users_email (email),
-  UNIQUE KEY uq_users_nickname (nickname)
+  UNIQUE KEY uq_users_nickname (nickname),
+  UNIQUE KEY uq_users_kakao (kakao_id),
+  UNIQUE KEY uq_users_phone (phone_hash)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- 휴대폰 인증번호. 번호도 코드도 해시로만 둔다
+CREATE TABLE phone_verifications (
+  id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  phone_hash  CHAR(64)     NOT NULL,
+  code_hash   CHAR(64)     NOT NULL,
+  attempts    TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  expires_at  DATETIME     NOT NULL,
+  verified_at DATETIME     NULL,
+  created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_phone_verifications_phone (phone_hash, created_at),
+  KEY idx_phone_verifications_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- ---------------------------------------------------------------------

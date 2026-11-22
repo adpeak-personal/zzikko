@@ -31,7 +31,7 @@ export default async function MyPage() {
               {me.role === '판매자' ? <SellerBadge /> : <LevelBadge level={me.level} />}
             </div>
             <p className="mt-1 text-sm text-gray-500">
-              {me.email} · {me.region} · {formatDate(me.joinedAt)} 가입
+              {me.email ?? '카카오 로그인'} · {me.region} · {formatDate(me.joinedAt)} 가입
             </p>
             {me.bio && <p className="mt-2 text-gray-600">{me.bio}</p>}
           </div>

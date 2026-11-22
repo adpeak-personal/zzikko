@@ -4,13 +4,21 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ApiError, apiFetch } from '@/lib/api';
+import { KakaoButton, OrDivider } from '@/components/auth/KakaoButton';
 
 const inputClass =
   'mt-1 w-full rounded-xl border border-gray-200 px-4 py-3 text-[15px] outline-none focus:border-zz-400';
 
-export function LoginForm({ next }: { next?: string }) {
+/** 카카오에서 돌아오다 실패했을 때 백엔드가 붙여 보내는 ?error= */
+const KAKAO_ERRORS: Record<string, string> = {
+  kakao_unavailable: '카카오 로그인을 준비하고 있어요. 이메일로 로그인해 주세요.',
+  kakao_state: '로그인 요청이 만료됐어요. 다시 시도해 주세요.',
+  kakao_failed: '카카오 로그인에 실패했어요. 잠시 후 다시 시도해 주세요.',
+};
+
+export function LoginForm({ next, kakao, errorCode }: { next?: string; kakao: boolean; errorCode?: string }) {
   const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>((errorCode && KAKAO_ERRORS[errorCode]) || null);
   const [busy, setBusy] = useState(false);
 
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -35,7 +43,16 @@ export function LoginForm({ next }: { next?: string }) {
       <h1 className="text-xl font-extrabold text-gray-900">로그인</h1>
       <p className="mt-1 text-sm text-gray-500">글쓰기·댓글·좋아요를 쓰려면 로그인해 주세요.</p>
 
-      <label className="mt-5 block text-sm font-semibold text-gray-600">
+      {kakao && (
+        <>
+          <div className="mt-5">
+            <KakaoButton next={next} label="카카오로 로그인" />
+          </div>
+          <OrDivider />
+        </>
+      )}
+
+      <label className={`${kakao ? '' : 'mt-5 '}block text-sm font-semibold text-gray-600`}>
         이메일
         <input name="email" type="email" required autoComplete="email" placeholder="me@zzikko.test" className={inputClass} />
       </label>
@@ -66,11 +83,14 @@ export function LoginForm({ next }: { next?: string }) {
         </Link>
       </p>
 
-      <p className="mt-4 rounded-xl bg-gray-50 px-4 py-3 text-xs leading-relaxed text-gray-500">
-        데모 계정 — <b>me@zzikko.test</b> (회원) · <b>gangnam@zzikko.test</b> (판매자) · <b>admin@zzikko.test</b> (운영진)
-        <br />
-        비밀번호는 모두 <b>zzikko1234</b>
-      </p>
+      {/* 데모 계정은 로컬 시드에만 있다 — 운영 화면에 띄우지 않는다 */}
+      {process.env.NODE_ENV !== 'production' && (
+        <p className="mt-4 rounded-xl bg-gray-50 px-4 py-3 text-xs leading-relaxed text-gray-500">
+          데모 계정 — <b>me@zzikko.test</b> (회원) · <b>gangnam@zzikko.test</b> (판매자) · <b>admin@zzikko.test</b> (운영진)
+          <br />
+          비밀번호는 모두 <b>zzikko1234</b>
+        </p>
+      )}
     </form>
   );
 }

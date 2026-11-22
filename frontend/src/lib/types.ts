@@ -32,7 +32,8 @@ export interface PublicUser {
 }
 
 export interface Me extends PublicUser {
-  email: string;
+  /** 카카오로 가입했으면 null */
+  email: string | null;
 }
 
 export interface Board {

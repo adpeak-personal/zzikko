@@ -4,8 +4,10 @@ import type { Me, PublicUser } from '../types.js';
 
 export interface UserRow extends RowDataPacket {
   id: number;
-  email: string;
-  password_hash: string;
+  /** 카카오 가입자는 없다 */
+  email: string | null;
+  password_hash: string | null;
+  kakao_id: string | null;
   nickname: string;
   avatar_color: string;
   level: PublicUser['level'];
@@ -43,13 +45,24 @@ export async function emailTaken(email: string) {
   return Boolean(await queryOne('SELECT 1 FROM users WHERE email = ?', [email]));
 }
 
+export async function findByKakaoId(kakaoId: string) {
+  return queryOne<UserRow>('SELECT * FROM users WHERE kakao_id = ?', [kakaoId]);
+}
+
+export async function phoneTaken(phoneHash: string) {
+  return Boolean(await queryOne('SELECT 1 FROM users WHERE phone_hash = ?', [phoneHash]));
+}
+
 export async function nicknameTaken(nickname: string) {
   return Boolean(await queryOne('SELECT 1 FROM users WHERE nickname = ?', [nickname]));
 }
 
+/** 이메일 가입은 email·passwordHash·phoneHash, 카카오 가입은 kakaoId 를 채운다 */
 export interface NewUser {
-  email: string;
-  passwordHash: string;
+  email?: string | null;
+  passwordHash?: string | null;
+  kakaoId?: string | null;
+  phoneHash?: string | null;
   nickname: string;
   region: string;
   avatarColor: string;
@@ -57,8 +70,17 @@ export interface NewUser {
 
 export async function createUser(input: NewUser): Promise<number> {
   const result = await execute(
-    'INSERT INTO users (email, password_hash, nickname, region, avatar_color) VALUES (?, ?, ?, ?, ?)',
-    [input.email, input.passwordHash, input.nickname, input.region, input.avatarColor],
+    `INSERT INTO users (email, password_hash, kakao_id, phone_hash, nickname, region, avatar_color)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [
+      input.email ?? null,
+      input.passwordHash ?? null,
+      input.kakaoId ?? null,
+      input.phoneHash ?? null,
+      input.nickname,
+      input.region,
+      input.avatarColor,
+    ],
   );
   return result.insertId;
 }

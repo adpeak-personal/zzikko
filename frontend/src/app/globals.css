@@ -19,6 +19,10 @@
   --color-shop-500: #1f8f68;
   --color-shop-700: #14684b;
 
+  /* 카카오 로그인 버튼 — 카카오 디자인 가이드의 지정색. 다른 데 쓰지 말 것 */
+  --color-kakao: #fee500;
+  --color-kakao-ink: #191919;
+
   /* 바탕 */
   --color-paper: #f4f5f7;
 

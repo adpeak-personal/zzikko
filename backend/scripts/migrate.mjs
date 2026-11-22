@@ -283,6 +283,38 @@ const steps = [
          ADD COLUMN admin_only TINYINT(1) NOT NULL DEFAULT 0 COMMENT '운영진만 글쓰기' AFTER seller_only`,
     ],
   },
+  {
+    // 카카오 가입자는 이메일·비밀번호가 없다. UNIQUE 는 NULL 을 여러 개 허용하므로 그대로 둔다.
+    name: 'users.kakao_id + phone_hash — 카카오 로그인 · 휴대폰 인증',
+    check: (c) => hasColumn(c, 'users', 'kakao_id'),
+    sql: [
+      `ALTER TABLE users
+         MODIFY email VARCHAR(255) NULL,
+         MODIFY password_hash VARCHAR(255) NULL COMMENT 'scrypt: salt:hash (node:crypto)',
+         ADD COLUMN kakao_id VARCHAR(32) NULL COMMENT '카카오 회원번호' AFTER password_hash,
+         ADD COLUMN phone_hash CHAR(64) NULL AFTER kakao_id,
+         ADD UNIQUE KEY uq_users_kakao (kakao_id),
+         ADD UNIQUE KEY uq_users_phone (phone_hash)`,
+    ],
+  },
+  {
+    name: 'phone_verifications — 휴대폰 인증번호',
+    check: (c) => hasTable(c, 'phone_verifications'),
+    sql: [
+      `CREATE TABLE phone_verifications (
+         id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
+         phone_hash  CHAR(64)     NOT NULL,
+         code_hash   CHAR(64)     NOT NULL,
+         attempts    TINYINT UNSIGNED NOT NULL DEFAULT 0,
+         expires_at  DATETIME     NOT NULL,
+         verified_at DATETIME     NULL,
+         created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+         PRIMARY KEY (id),
+         KEY idx_phone_verifications_phone (phone_hash, created_at),
+         KEY idx_phone_verifications_created (created_at)
+       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`,
+    ],
+  },
 ];
 
 /** 공개 주소 앞머리. 없으면 바꿀 것도 없다. */

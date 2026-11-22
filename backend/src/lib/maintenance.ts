@@ -10,6 +10,7 @@
 import type { FastifyInstance } from 'fastify';
 import { deleteByUrls } from './storage.js';
 import { deleteUploadRecords, findOrphans } from '../repositories/uploads.js';
+import { pruneVerifications } from '../repositories/phone.js';
 
 /** 글을 쓰다 만 사람의 이미지를 지우면 안 되므로 유예를 둔다 */
 const GRACE_HOURS = Number(process.env.UPLOADS_GC_GRACE_HOURS ?? 24);
@@ -43,6 +44,8 @@ export function startMaintenance(app: FastifyInstance) {
   const run = async () => {
     try {
       const r = await sweep();
+      // 한 달 지난 휴대폰 인증 기록 — 번호는 해시라도 오래 들고 있을 이유가 없다
+      await pruneVerifications();
       // 할 일이 없었으면 로그를 남기지 않는다 — 몇 시간마다 빈 줄이 쌓일 이유가 없다
       if (r.orphans > 0) {
         app.log.info({ ...r, kb: Math.round(r.bytes / 1024) }, '안 쓰인 이미지 정리');
