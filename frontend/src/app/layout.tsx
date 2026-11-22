@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { SITE } from '@/config/brand';
-import { SITE_URL } from '@/lib/seo';
+import { DEFAULT_OG_IMAGE, SITE_URL } from '@/lib/seo';
 import './globals.css';
 
 /**
@@ -17,6 +17,7 @@ export const metadata: Metadata = {
     locale: 'ko_KR',
     title: `${SITE.name} — ${SITE.tagline}`,
     description: SITE.description,
+    images: [DEFAULT_OG_IMAGE],
   },
 };
 

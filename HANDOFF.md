@@ -22,12 +22,11 @@ c0ba5bd  기사 사진도 이미지 주소로 넣기
 2026-11-22 확인. 13개 전부 `이미 적용됨` 이고 `sise_keywords.hidden` ·
 `news_feed.title_ko + 삭제 상태` 둘 다 들어가 있다. /admin/sise 의 X 버튼이 운영에서 동작한다.
 
-## 2. 운영 환경변수 하나 지우기
+## 2. 운영 환경변수 하나 지우기 — 끝났다 ✅
 
-`/opt/zzikko/.env.back` 에 `ANTHROPIC_WRITE_MODEL=claude-sonnet-5-5` 가 남아 있다.
-시세 글쓰기는 Haiku 로 바꿨으니(`9a15a4b`) 이 줄을 지워야 한다.
-
-지운 뒤 **`bash deploy.sh`** 를 돌린다 — `restart` 만 하면 `env_file` 을 다시 안 읽는다.
+2026-11-22 확인. `.env.back` 의 `ANTHROPIC_WRITE_MODEL` 줄은 주석 처리돼 있고,
+돌고 있는 `back` 컨테이너(`sha-1efc130`) 안에도 그 변수가 없다(`ANTHROPIC_MODEL=claude-haiku-5-5` 만 있음).
+글쓰기는 코드 기본값인 Haiku 로 돈다.
 
 ## 3. 옛 시세 글 세 개 삭제
 
@@ -37,13 +36,10 @@ c0ba5bd  기사 사진도 이미지 주소로 넣기
 - `seoul-2026-11-18`
 - `daegu-2026-11-18`
 
-## 4. 사이트 기본 og 이미지 (남은 SEO 항목)
+## 4. 사이트 기본 og 이미지 — 끝났다 ✅
 
-사진 없는 글·홈이 og 이미지가 비어 있다. 1200×630 한 장을 `frontend/public/` 에
-놓고 `frontend/src/app/layout.tsx` 의 `openGraph.images` 에 넣으면 끝난다.
-**이미지를 만들어야 하는 일이라 사람 손이 필요하다.**
-
-글마다 붙는 og 이미지는 이미 그 글의 첫 사진을 쓴다(`285f555`).
+`frontend/public/og.png`(1200×630, 로고 + 슬로건). 레이아웃과 `articleOg` 둘 다
+`seo.ts` 의 `DEFAULT_OG_IMAGE` 를 쓴다 — 사진 없는 글도 이걸로 채운다.
 
 ## 5. RSS — 미룸
 

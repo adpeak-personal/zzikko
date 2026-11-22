@@ -4,6 +4,17 @@ import { SITE } from '@/config/brand';
 export const SITE_URL = process.env.SITE_URL ?? 'https://zzikko.co.kr';
 
 /**
+ * 사진이 없는 글·홈이 쓰는 사이트 기본 og 이미지(`public/og.png`, 1200×630).
+ * `metadataBase` 가 있어서 상대경로로 적어도 절대주소로 풀린다.
+ */
+export const DEFAULT_OG_IMAGE = {
+  url: '/og.png',
+  width: 1200,
+  height: 630,
+  alt: `${SITE.name} — ${SITE.tagline}`,
+};
+
+/**
  * MySQL DATETIME 을 ISO 8601 로.
  *
  * DB 가 `2026-11-18 16:17:31` 처럼 가운데를 띄어쓰기로 주는데, og 의
@@ -28,7 +39,7 @@ export function articleOg(input: {
   description?: string;
   publishedTime?: string | null;
   modifiedTime?: string | null;
-  /** 글에 붙은 첫 사진. 없으면 넣지 않는다 */
+  /** 글에 붙은 첫 사진. 없으면 사이트 기본 이미지 */
   image?: string | null;
 }) {
   return {
@@ -39,6 +50,7 @@ export function articleOg(input: {
     description: input.description,
     publishedTime: iso(input.publishedTime),
     modifiedTime: iso(input.modifiedTime),
-    images: input.image ? [input.image] : undefined,
+    // 루트 레이아웃의 기본 이미지는 여기까지 안 내려온다(통째로 덮이므로) — 직접 넣는다
+    images: [input.image || DEFAULT_OG_IMAGE],
   };
 }
