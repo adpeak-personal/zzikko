@@ -3,13 +3,12 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowDown, ArrowUp } from 'lucide-react';
 import { apiGetOrNull } from '@/lib/api.server';
+import { SITE_URL, articleOg, iso } from '@/lib/seo';
 import { SiseTable } from '@/components/sise/SiseTable';
 import type { SiseReport } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 export const revalidate = 600;
-
-const SITE = process.env.SITE_URL ?? 'https://zzikko.co.kr';
 
 const get = (slug: string) => apiGetOrNull<SiseReport>(`/sise/${encodeURIComponent(slug)}`);
 
@@ -26,15 +25,14 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   return {
     title: report.title,
     description: report.summary,
-    alternates: { canonical: `${SITE}/sise/${report.slug}` },
-    openGraph: {
+    alternates: { canonical: `${SITE_URL}/sise/${report.slug}` },
+    openGraph: articleOg({
       title: report.title,
       description: report.summary,
-      type: 'article',
-      publishedTime: report.publishedAt ?? undefined,
+      publishedTime: report.publishedAt,
       modifiedTime: report.updatedAt,
-      images: report.sheet.imageUrl ? [report.sheet.imageUrl] : undefined,
-    },
+      image: report.sheet.imageUrl,
+    }),
   };
 }
 
@@ -54,11 +52,11 @@ export default async function SiseReportPage({ params }: { params: Promise<{ slu
     '@type': 'Article',
     headline: report.title,
     description: report.summary,
-    datePublished: report.publishedAt,
-    dateModified: report.updatedAt,
+    datePublished: iso(report.publishedAt),
+    dateModified: iso(report.updatedAt),
     author: { '@type': 'Organization', name: '찍고' },
-    publisher: { '@type': 'Organization', name: '찍고', url: SITE },
-    mainEntityOfPage: `${SITE}/sise/${report.slug}`,
+    publisher: { '@type': 'Organization', name: '찍고', url: SITE_URL },
+    mainEntityOfPage: `${SITE_URL}/sise/${report.slug}`,
     about: `${sheet.region} 휴대폰 성지 시세`,
   };
 

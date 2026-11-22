@@ -1,6 +1,6 @@
 import type { MetadataRoute } from 'next';
+import { SITE_URL } from '@/lib/seo';
 
-const SITE = process.env.SITE_URL ?? 'https://zzikko.co.kr';
 
 /**
  * 크롤러 안내.
@@ -15,6 +15,6 @@ export default function robots(): MetadataRoute.Robots {
       allow: '/',
       disallow: ['/admin', '/admin/', '/write', '/mypage', '/login', '/signup', '/api/'],
     },
-    sitemap: `${SITE}/sitemap.xml`,
+    sitemap: `${SITE_URL}/sitemap.xml`,
   };
 }

@@ -1,5 +1,6 @@
 import type { MetadataRoute } from 'next';
 import { apiGetPublic } from '@/lib/api.server';
+import { SITE_URL } from '@/lib/seo';
 
 /**
  * 사이트맵.
@@ -13,7 +14,6 @@ import { apiGetPublic } from '@/lib/api.server';
  */
 export const revalidate = 3600;
 
-const SITE = process.env.SITE_URL ?? 'https://zzikko.co.kr';
 
 /** 기사·기종은 posts 와 다른 테이블이라 백엔드가 따로 내려준다 */
 interface ContentEntry {
@@ -33,11 +33,11 @@ interface SitemapData {
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const fixed: MetadataRoute.Sitemap = [
-    { url: SITE, lastModified: new Date(), changeFrequency: 'daily', priority: 1 },
-    { url: `${SITE}/sise`, lastModified: new Date(), changeFrequency: 'daily', priority: 0.9 },
-    { url: `${SITE}/compare`, lastModified: new Date(), changeFrequency: 'weekly', priority: 0.8 },
-    { url: `${SITE}/seller`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.7 },
-    { url: `${SITE}/guide`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.4 },
+    { url: SITE_URL, lastModified: new Date(), changeFrequency: 'daily', priority: 1 },
+    { url: `${SITE_URL}/sise`, lastModified: new Date(), changeFrequency: 'daily', priority: 0.9 },
+    { url: `${SITE_URL}/compare`, lastModified: new Date(), changeFrequency: 'weekly', priority: 0.8 },
+    { url: `${SITE_URL}/seller`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.7 },
+    { url: `${SITE_URL}/guide`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.4 },
   ];
 
   // 백엔드가 잠깐 안 되더라도 빈 사이트맵보다는 고정 주소라도 내보낸다
@@ -49,7 +49,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     changeFrequency: 'weekly' | 'monthly',
     priority: number,
   ) => ({
-    url: `${SITE}/board/${item.boardSlug}/${item.id}`,
+    url: `${SITE_URL}/board/${item.boardSlug}/${item.id}`,
     lastModified: new Date(item.updatedAt),
     changeFrequency,
     priority,
@@ -58,21 +58,21 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   return [
     ...fixed,
     ...data.boards.map((slug) => ({
-      url: `${SITE}/board/${slug}`,
+      url: `${SITE_URL}/board/${slug}`,
       lastModified: new Date(),
       changeFrequency: 'daily' as const,
       priority: 0.6,
     })),
     // 시세 리포트 — 사이트 안에 링크가 적어서 사이트맵 비중이 크다
     ...data.sise.map((item) => ({
-      url: `${SITE}/sise/${item.slug}`,
+      url: `${SITE_URL}/sise/${item.slug}`,
       lastModified: new Date(item.updatedAt),
       changeFrequency: 'weekly' as const,
       priority: 0.8,
     })),
     // 비교 페이지 — 사이트 안에 링크가 적어 사이트맵이 중요한 쪽이다
     ...(data.compare ?? []).map((slug) => ({
-      url: `${SITE}/compare/${slug}`,
+      url: `${SITE_URL}/compare/${slug}`,
       lastModified: new Date(),
       changeFrequency: 'monthly' as const,
       priority: 0.7,

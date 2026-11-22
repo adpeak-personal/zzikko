@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ChevronRight, Eye, List, MessageCircle, Store } from 'lucide-react';
 import { apiGet, apiGetOrNull } from '@/lib/api.server';
+import { SITE_URL, articleOg } from '@/lib/seo';
 import { getBoard, getComments, getCurrentUser, getPost, getPosts, getShops } from '@/lib/data';
 import type { Chipset, DealInfo, NewsArticle, PhoneSpec } from '@/lib/types';
 import { PostBody } from '@/components/board/PostBody';
@@ -16,9 +17,7 @@ import { formatDate, formatNumber, formatPrice, formatRelative } from '@/lib/uti
 
 type Params = { params: Promise<{ slug: string; id: string }> };
 
-const SITE = process.env.SITE_URL ?? 'https://zzikko.co.kr';
-
-const url = (slug: string, id: number | string) => `${SITE}/board/${slug}/${id}`;
+const url = (slug: string, id: number | string) => `${SITE_URL}/board/${slug}/${id}`;
 
 /**
  * 기사 구조화 데이터.
@@ -37,7 +36,7 @@ function newsJsonLd(article: NewsArticle, slug: string) {
     description: article.summary,
     datePublished: article.date,
     author: { '@type': 'Organization', name: article.author },
-    publisher: { '@type': 'Organization', name: '찍고', url: SITE },
+    publisher: { '@type': 'Organization', name: '찍고', url: SITE_URL },
     mainEntityOfPage: url(slug, article.id),
     articleSection: article.category,
     ...(article.thumbUrl ? { image: [article.thumbUrl] } : {}),
@@ -75,13 +74,12 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
       title: article.title,
       description: article.summary,
       alternates: { canonical: url(slug, article.id) },
-      openGraph: {
+      openGraph: articleOg({
         title: article.title,
         description: article.summary,
-        type: 'article',
         publishedTime: article.date,
-        images: article.thumbUrl ? [article.thumbUrl] : undefined,
-      },
+        image: article.thumbUrl,
+      }),
       // 미발행은 운영진만 보는 초안이다 — 혹시 주소가 새어도 색인되지 않게
       ...(article.published ? {} : { robots: { index: false, follow: false } }),
     };
@@ -94,18 +92,27 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
       title: spec.name,
       description,
       alternates: { canonical: url(slug, spec.id) },
-      openGraph: {
-        title: spec.name,
-        description,
-        type: 'article',
-        images: spec.thumbUrl ? [spec.thumbUrl] : undefined,
-      },
+      openGraph: articleOg({ title: spec.name, description, image: spec.thumbUrl }),
       ...(spec.published ? {} : { robots: { index: false, follow: false } }),
     };
   }
 
   const post = await getPost(Number(id));
-  return post ? { title: post.title, description: post.content.slice(0, 120) } : { title: '글을 찾을 수 없습니다' };
+  if (!post) return { title: '글을 찾을 수 없습니다' };
+
+  const description = post.content.slice(0, 120);
+  return {
+    title: post.title,
+    description,
+    alternates: { canonical: url(slug, post.id) },
+    // 사진은 글에 붙은 첫 장 — 목록 썸네일과 같은 것이다
+    openGraph: articleOg({
+      title: post.title,
+      description,
+      publishedTime: post.createdAt,
+      image: post.thumbUrl,
+    }),
+  };
 }
 
 export default async function PostPage({ params }: Params) {

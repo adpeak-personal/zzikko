@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { apiGetPublic } from '@/lib/api.server';
+import { SITE_URL, articleOg } from '@/lib/seo';
 import { CompareTable } from '@/components/specs/CompareTable';
 import { SPEC_ROWS, findChipset } from '@/components/specs/spec-rows';
 import type { Chipset, PhoneSpec } from '@/lib/types';
@@ -14,7 +15,6 @@ import type { Chipset, PhoneSpec } from '@/lib/types';
  */
 export const revalidate = 3600;
 
-const SITE = process.env.SITE_URL ?? 'https://zzikko.co.kr';
 
 interface ComparePair {
   a: PhoneSpec;
@@ -68,8 +68,8 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   return {
     title,
     description,
-    alternates: { canonical: `${SITE}/compare/${encodeURIComponent(normalize(slug))}` },
-    openGraph: { title, description, type: 'article' },
+    alternates: { canonical: `${SITE_URL}/compare/${encodeURIComponent(normalize(slug))}` },
+    openGraph: articleOg({ title, description }),
   };
 }
 

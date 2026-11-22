@@ -1,10 +1,23 @@
 import type { Metadata } from 'next';
 import { SITE } from '@/config/brand';
+import { SITE_URL } from '@/lib/seo';
 import './globals.css';
 
+/**
+ * `metadataBase` 가 있어야 og:image 에 상대경로를 쓸 수 있고, 카톡·트위터가
+ * 주소를 제대로 푼다. 없으면 Next 가 빌드마다 경고를 띄우고 localhost 로 찍는다.
+ */
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: { default: `${SITE.name} — ${SITE.tagline}`, template: `%s | ${SITE.name}` },
   description: SITE.description,
+  openGraph: {
+    type: 'website',
+    siteName: SITE.name,
+    locale: 'ko_KR',
+    title: `${SITE.name} — ${SITE.tagline}`,
+    description: SITE.description,
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
