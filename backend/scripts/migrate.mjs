@@ -274,6 +274,15 @@ const steps = [
          ADD COLUMN hidden TINYINT(1) NOT NULL DEFAULT 0 COMMENT '안 쓸 키워드. 목록에서 빼지만 행은 남긴다'`,
     ],
   },
+  {
+    // 공지사항처럼 운영진만 쓰는 회원 글 게시판. 기본값 0 이라 기존 게시판은 그대로다.
+    name: 'boards.admin_only — 관리자 전용 게시판',
+    check: (c) => hasColumn(c, 'boards', 'admin_only'),
+    sql: [
+      `ALTER TABLE boards
+         ADD COLUMN admin_only TINYINT(1) NOT NULL DEFAULT 0 COMMENT '운영진만 글쓰기' AFTER seller_only`,
+    ],
+  },
 ];
 
 /** 공개 주소 앞머리. 없으면 바꿀 것도 없다. */

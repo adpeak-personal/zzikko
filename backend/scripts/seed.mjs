@@ -23,7 +23,7 @@ const BOARD_GROUPS = [
   {
     name: '📢 공지 & 안내',
     boards: [
-      { slug: 'notice', name: '공지사항', description: '찍고 운영 소식', type: 'list' },
+      { slug: 'notice', name: '공지사항', description: '찍고 운영 소식', type: 'list', adminOnly: 1 },
       { slug: 'greeting', name: '가입인사', description: '반갑습니다! 인사 남겨주세요', type: 'list' },
     ],
   },
@@ -204,8 +204,8 @@ const main = async () => {
       let boardOrder = 0;
       for (const board of group.boards) {
         const [b] = await conn.execute(
-          'INSERT INTO boards (group_id, slug, name, description, type, write_mode, categories, seller_only, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          [g.insertId, board.slug, board.name, board.description, board.type, board.writeMode ?? 'editor', board.categories ? JSON.stringify(board.categories) : null, board.sellerOnly ?? 0, boardOrder++],
+          'INSERT INTO boards (group_id, slug, name, description, type, write_mode, categories, seller_only, admin_only, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [g.insertId, board.slug, board.name, board.description, board.type, board.writeMode ?? 'editor', board.categories ? JSON.stringify(board.categories) : null, board.sellerOnly ?? 0, board.adminOnly ?? 0, boardOrder++],
         );
         boardId[board.slug] = b.insertId;
       }

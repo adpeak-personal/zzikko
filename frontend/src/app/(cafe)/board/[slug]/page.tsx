@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { PenSquare, Search } from 'lucide-react';
 import { apiGet } from '@/lib/api.server';
-import { getBoard, getBoards, getPosts, getShops, type PostQuery } from '@/lib/data';
+import { getBoard, getBoards, getCurrentUser, getPosts, getShops, type PostQuery } from '@/lib/data';
 import type { Board, Chipset, NewsArticle, PhoneSpec } from '@/lib/types';
 import { PostTable } from '@/components/board/PostTable';
 import { DealTable } from '@/components/board/DealTable';
@@ -45,6 +45,8 @@ export default async function BoardPage({ params, searchParams }: Params) {
 
   // 기사·기종은 게시글이 아니라서 글쓰기·말머리 칩·페이지 번호·검색을 쓰지 않는다
   const isContentBoard = board.type === 'news' || board.type === 'spec';
+  // 관리자 전용 게시판은 운영진에게만 글쓰기 버튼을 보인다(막는 건 백엔드가 한다)
+  const canWrite = !isContentBoard && (!board.adminOnly || (await getCurrentUser())?.role === '운영진');
 
   const hrefWith = (next: Record<string, string | undefined>) => {
     const search = new URLSearchParams();
@@ -83,7 +85,7 @@ export default async function BoardPage({ params, searchParams }: Params) {
           <h1 className="text-xl font-bold text-gray-900">{board.name}</h1>
           <p className="mt-1 text-sm text-gray-500">{board.description}</p>
         </div>
-        {!isContentBoard && (
+        {canWrite && (
           <Link
             href={`/write?board=${slug === 'all' ? 'free' : slug}`}
             className="flex items-center gap-1 rounded-lg bg-zz-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-zz-700"

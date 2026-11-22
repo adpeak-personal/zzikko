@@ -76,6 +76,7 @@ function BoardCard({ board }: { board: AdminBoard }) {
   const [type, setType] = useState<BoardType>(board.type);
   const [writeMode, setWriteMode] = useState<WriteMode>(board.writeMode ?? 'editor');
   const [sellerOnly, setSellerOnly] = useState(board.sellerOnly ?? false);
+  const [adminOnly, setAdminOnly] = useState(board.adminOnly ?? false);
   const [categories, setCategories] = useState<string[]>(board.categories ?? []);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -87,6 +88,7 @@ function BoardCard({ board }: { board: AdminBoard }) {
     type !== board.type ||
     writeMode !== (board.writeMode ?? 'editor') ||
     sellerOnly !== (board.sellerOnly ?? false) ||
+    adminOnly !== (board.adminOnly ?? false) ||
     JSON.stringify(categories) !== JSON.stringify(board.categories ?? []);
 
   const save = async () => {
@@ -97,7 +99,7 @@ function BoardCard({ board }: { board: AdminBoard }) {
     try {
       await apiFetch(`/admin/boards/${board.slug}`, {
         method: 'PATCH',
-        body: JSON.stringify({ name: name.trim(), description: description.trim(), type, writeMode, categories, sellerOnly }),
+        body: JSON.stringify({ name: name.trim(), description: description.trim(), type, writeMode, categories, sellerOnly, adminOnly }),
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -123,6 +125,8 @@ function BoardCard({ board }: { board: AdminBoard }) {
           <span className="mt-0.5 block truncate text-xs text-gray-400">
             /{board.slug} · {TYPE_LABEL[board.type]} · {board.writeMode === 'photo' ? '사진 업로더' : '에디터'}
             {board.categories?.length ? ` · 말머리 ${board.categories.length}개` : ' · 말머리 없음'}
+            {board.sellerOnly ? ' · 판매자 전용' : ''}
+            {board.adminOnly ? ' · 관리자 전용' : ''}
           </span>
         </span>
         <span className="shrink-0 text-xs text-gray-500">글 {board.postCount}</span>
@@ -197,6 +201,21 @@ function BoardCard({ board }: { board: AdminBoard }) {
               <span className="block text-xs font-medium text-gray-700">판매자 전용</span>
               <span className="block text-[11px] text-gray-400">
                 인증된 판매자만 글을 쓸 수 있습니다. 성지 시세표처럼 조건을 올리는 게시판에 켜세요.
+              </span>
+            </span>
+          </label>
+
+          <label className="flex items-start gap-2 rounded-lg bg-white px-3 py-2.5">
+            <input
+              type="checkbox"
+              checked={adminOnly}
+              onChange={(e) => setAdminOnly(e.target.checked)}
+              className="mt-0.5 accent-zz-600"
+            />
+            <span>
+              <span className="block text-xs font-medium text-gray-700">관리자 전용</span>
+              <span className="block text-[11px] text-gray-400">
+                운영진만 글을 쓸 수 있습니다. 회원에게는 글쓰기 버튼이 안 보입니다. 공지사항처럼 운영진이 올리는 게시판에 켜세요.
               </span>
             </span>
           </label>

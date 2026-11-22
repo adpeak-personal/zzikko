@@ -44,6 +44,8 @@ export interface Board {
   writeMode: WriteMode;
   categories?: string[];
   sellerOnly?: boolean;
+  /** 운영진만 글을 쓸 수 있다 (공지사항 등) */
+  adminOnly?: boolean;
 }
 
 export interface BoardGroup {

@@ -114,6 +114,8 @@ CREATE TABLE boards (
   -- 말머리 (JSON 문자열 배열)
   categories  JSON         NULL,
   seller_only TINYINT(1)   NOT NULL DEFAULT 0,
+  -- 운영진만 글을 쓸 수 있는 게시판 (공지사항 등)
+  admin_only  TINYINT(1)   NOT NULL DEFAULT 0,
   sort_order  INT          NOT NULL DEFAULT 0,
   PRIMARY KEY (id),
   UNIQUE KEY uq_boards_slug (slug),

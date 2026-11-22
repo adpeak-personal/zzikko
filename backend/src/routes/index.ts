@@ -24,6 +24,7 @@ const boardPatchSchema = z.object({
   writeMode: z.enum(['editor', 'photo']).optional(),
   categories: z.array(z.string().trim().min(1).max(40)).max(30).optional(),
   sellerOnly: z.boolean().optional(),
+  adminOnly: z.boolean().optional(),
 });
 
 export default async function routes(app: FastifyInstance) {

@@ -13,6 +13,7 @@ interface BoardRow extends RowDataPacket {
   write_mode: Board['writeMode'];
   categories: string[] | null;
   seller_only: number;
+  admin_only: number;
 }
 
 const toBoard = (row: BoardRow): Board => ({
@@ -24,6 +25,7 @@ const toBoard = (row: BoardRow): Board => ({
   writeMode: row.write_mode,
   ...(row.categories?.length ? { categories: row.categories } : {}),
   ...(row.seller_only ? { sellerOnly: true } : {}),
+  ...(row.admin_only ? { adminOnly: true } : {}),
 });
 
 /** 대분류 → 소분류 구조 그대로 */
@@ -58,6 +60,7 @@ export interface BoardPatch {
   writeMode?: Board['writeMode'];
   categories?: string[];
   sellerOnly?: boolean;
+  adminOnly?: boolean;
 }
 
 /** 어드민 게시판 설정 수정 — 넘어온 항목만 바꾼다 */
@@ -71,6 +74,7 @@ export async function updateBoard(slug: string, patch: BoardPatch) {
   if (patch.writeMode !== undefined) (sets.push('write_mode = ?'), params.push(patch.writeMode));
   if (patch.categories !== undefined) (sets.push('categories = ?'), params.push(JSON.stringify(patch.categories)));
   if (patch.sellerOnly !== undefined) (sets.push('seller_only = ?'), params.push(patch.sellerOnly ? 1 : 0));
+  if (patch.adminOnly !== undefined) (sets.push('admin_only = ?'), params.push(patch.adminOnly ? 1 : 0));
 
   if (sets.length === 0) return;
   await execute(`UPDATE boards SET ${sets.join(', ')} WHERE slug = ?`, [...params, slug]);

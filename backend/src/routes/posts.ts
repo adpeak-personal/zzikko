@@ -101,6 +101,9 @@ export default async function postRoutes(app: FastifyInstance) {
     if (board.sellerOnly && user.role !== '판매자' && user.role !== '운영진') {
       throw forbidden('인증된 판매자만 글을 쓸 수 있는 게시판입니다.');
     }
+    if (board.adminOnly && user.role !== '운영진') {
+      throw forbidden('운영진만 글을 쓸 수 있는 게시판입니다.');
+    }
     if (isEmptyDoc(input.contentJson)) throw badRequest('내용을 입력해주세요.');
 
     // 시세 글은 글쓴이의 매장으로 자동 연결한다 — 남의 매장 이름으로 올리지 못하게
