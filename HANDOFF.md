@@ -17,23 +17,10 @@ c0ba5bd  기사 사진도 이미지 주소로 넣기
 
 작업 트리는 깨끗하다. `main` 에 푸시하면 운영(141.164.60.58)으로 자동 배포된다.
 
-## 1. 운영 마이그레이션 — 아직 안 돌렸다 ⚠️
+## 1. 운영 마이그레이션 — 끝났다 ✅
 
-`26004e1` 에 `sise_keywords.hidden` 컬럼이 들어 있다. **이걸 돌리지 않으면
-/admin/sise 의 X 버튼이 운영에서 500 을 낸다.**
-
-```
-ssh root@141.164.60.58 "cd /opt/zzikko && docker compose exec -T back node scripts/migrate.mjs --yes"
-```
-
-`migrate.mjs` 는 도커 이미지 안에 들어가므로 **배포가 끝난 뒤에** 돌린다.
-멱등이라 여러 번 돌려도 된다. 마지막 두 개가 이렇게 찍히면 된 것:
-
-- `news_feed.title_ko + 삭제 상태 — 수집함 손질`
-- `sise_keywords.hidden — 안 쓸 지역 키워드 치우기`
-
-앞의 것(`title_ko`)도 운영에 들어갔는지 같이 확인한다. 뉴스 자동 수집이
-운영에서 실제로 도는지도 한 번 보고.
+2026-11-22 확인. 13개 전부 `이미 적용됨` 이고 `sise_keywords.hidden` ·
+`news_feed.title_ko + 삭제 상태` 둘 다 들어가 있다. /admin/sise 의 X 버튼이 운영에서 동작한다.
 
 ## 2. 운영 환경변수 하나 지우기
 
