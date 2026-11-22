@@ -27,7 +27,8 @@ export default async function AdminBoardsPage() {
       <div>
         <h1 className="text-xl font-bold text-gray-900">게시판 관리</h1>
         <p className="mt-1 text-sm text-gray-500">
-          게시판 이름 · 설명 · 목록 형식 · 글 작성 방식 · 말머리를 바꿉니다. 글은 그대로 유지됩니다.
+          대분류 이름(연필 아이콘)과 게시판 이름 · 설명 · 목록 형식 · 글 작성 방식 · 말머리를 바꿉니다.
+          글은 그대로 유지됩니다. 새 게시판은 각 대분류 맨 아래 &apos;게시판 추가&apos;로 만듭니다.
         </p>
       </div>
 

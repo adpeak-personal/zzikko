@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { notFound, parse } from '../lib/http.js';
+import { HttpError, notFound, parse } from '../lib/http.js';
 import { requireAdmin } from '../lib/auth.js';
 import * as boards from '../repositories/boards.js';
 import * as shops from '../repositories/shops.js';
@@ -90,6 +90,43 @@ export default async function routes(app: FastifyInstance) {
     if (!(await boards.getBoard(slug))) throw notFound('게시판');
     await boards.updateBoard(slug, parse(boardPatchSchema, request.body));
     return boards.getBoard(slug);
+  });
+
+  /**
+   * 게시판 추가. 형식은 회원 글 게시판(list/deal/gallery)만 고를 수 있다 —
+   * news·spec 은 사이트맵·기사 주소가 "그 형식 게시판은 하나"라고 보고 찾기 때문이다.
+   */
+  app.post('/admin/boards', { preHandler: requireAdmin }, async (request, reply) => {
+    const input = parse(
+      z.object({
+        groupId: z.number().int().positive(),
+        slug: z
+          .string()
+          .trim()
+          .toLowerCase()
+          .regex(/^[a-z0-9][a-z0-9-]{1,39}$/, '주소는 영문 소문자·숫자·하이픈 2~40자로 적어주세요.'),
+        name: z.string().trim().min(1).max(40),
+        description: z.string().trim().max(200).default(''),
+        type: z.enum(['list', 'deal', 'gallery']).default('list'),
+        writeMode: z.enum(['editor', 'photo']).default('editor'),
+      }),
+      request.body,
+    );
+    const result = await boards.createBoard(input);
+    if (!result.ok) {
+      if (result.reason === 'no-group') throw notFound('대분류');
+      throw new HttpError(409, `이미 쓰고 있는 주소입니다: /board/${input.slug}`);
+    }
+    reply.code(201);
+    return result.board;
+  });
+
+  /** 대분류(공지&안내 · 휴대폰 …) 이름 바꾸기 */
+  app.patch('/admin/board-groups/:id', { preHandler: requireAdmin }, async (request) => {
+    const { id } = parse(z.object({ id: z.coerce.number().int().positive() }), request.params);
+    const { name } = parse(z.object({ name: z.string().trim().min(1).max(30) }), request.body);
+    if (!(await boards.renameBoardGroup(id, name))) throw notFound('대분류');
+    return { id, name };
   });
 
   /* ── 판매자 매장 ── */

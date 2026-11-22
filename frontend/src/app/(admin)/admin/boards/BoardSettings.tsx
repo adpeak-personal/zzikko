@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ApiError, apiFetch } from '@/lib/api';
-import { Check, ChevronDown, X } from 'lucide-react';
+import { Check, ChevronDown, Pencil, Plus, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Board, BoardGroup, BoardType, WriteMode } from '@/lib/types';
 
@@ -248,20 +248,249 @@ function BoardCard({ board }: { board: AdminBoard }) {
   );
 }
 
+/** 대분류 제목 — 연필을 누르면 그 자리에서 이름을 고친다 */
+function GroupHeader({ group }: { group: AdminBoardGroup }) {
+  const router = useRouter();
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(group.name);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const cancel = () => {
+    setName(group.name);
+    setError(null);
+    setEditing(false);
+  };
+
+  const save = async () => {
+    const next = name.trim();
+    if (!next) return setError('대분류 이름을 입력해 주세요.');
+    if (next === group.name) return cancel();
+
+    setSaving(true);
+    setError(null);
+    try {
+      await apiFetch(`/admin/board-groups/${group.id}`, { method: 'PATCH', body: JSON.stringify({ name: next }) });
+      setEditing(false);
+      router.refresh(); // 사이드바·메뉴가 새 이름으로 다시 그려지도록
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : '저장하지 못했어요.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!editing) {
+    return (
+      <h2 className="flex items-center gap-1.5 border-b border-gray-200 bg-gray-50 px-5 py-2.5 text-sm font-bold text-gray-700">
+        {group.name}
+        <span className="font-normal text-gray-400">{group.boards.length}개</span>
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          aria-label={`${group.name} 이름 바꾸기`}
+          className="ml-1 rounded p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-700"
+        >
+          <Pencil size={13} />
+        </button>
+      </h2>
+    );
+  }
+
+  return (
+    <div className="border-b border-gray-200 bg-gray-50 px-5 py-2">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          save();
+        }}
+        className="flex items-center gap-2"
+      >
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => e.key === 'Escape' && cancel()}
+          maxLength={30}
+          autoFocus
+          aria-label="대분류 이름"
+          className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-bold outline-none focus:border-zz-400"
+        />
+        <button
+          type="submit"
+          disabled={saving}
+          className="shrink-0 rounded-lg bg-zz-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-zz-700 disabled:opacity-50"
+        >
+          저장
+        </button>
+        <button
+          type="button"
+          onClick={cancel}
+          className="shrink-0 rounded-lg px-2 py-1.5 text-xs text-gray-500 hover:bg-gray-200"
+        >
+          취소
+        </button>
+      </form>
+      {error && (
+        <p role="alert" className="mt-1.5 text-xs text-red-600">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** 새로 만들 때 고를 수 있는 형식 — 기사·기종 형식은 사이트에 하나씩만 둔다 */
+const NEW_BOARD_TYPES: BoardType[] = ['list', 'deal', 'gallery'];
+
+/** 대분류 맨 아래 '게시판 추가' — 만들면 그 대분류의 끝에 붙는다 */
+function AddBoardForm({ groupId }: { groupId: number }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState('');
+  const [slug, setSlug] = useState('');
+  const [type, setType] = useState<BoardType>('list');
+  const [writeMode, setWriteMode] = useState<WriteMode>('editor');
+  const [description, setDescription] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const reset = () => {
+    setName('');
+    setSlug('');
+    setType('list');
+    setWriteMode('editor');
+    setDescription('');
+    setError(null);
+    setOpen(false);
+  };
+
+  const create = async () => {
+    setError(null);
+    if (!name.trim()) return setError('게시판 이름을 입력해 주세요.');
+    if (!/^[a-z0-9][a-z0-9-]{1,39}$/.test(slug.trim())) {
+      return setError('주소는 영문 소문자·숫자·하이픈 2~40자로 적어주세요. (예: usim)');
+    }
+
+    setSaving(true);
+    try {
+      await apiFetch('/admin/boards', {
+        method: 'POST',
+        body: JSON.stringify({ groupId, name: name.trim(), slug: slug.trim(), type, writeMode, description: description.trim() }),
+      });
+      reset();
+      router.refresh(); // 목록·사이드바에 새 게시판이 나오도록
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : '만들지 못했어요.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="flex w-full items-center gap-1.5 border-t border-gray-100 px-5 py-2.5 text-left text-xs font-medium text-gray-500 hover:bg-gray-50 hover:text-zz-700"
+      >
+        <Plus size={14} /> 게시판 추가
+      </button>
+    );
+  }
+
+  const field = 'mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-zz-400';
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        create();
+      }}
+      className="space-y-3 border-t border-gray-200 bg-zz-50/40 px-5 py-4"
+    >
+      <p className="text-xs font-bold text-gray-700">새 게시판</p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="block">
+          <span className="text-xs font-medium text-gray-600">이름</span>
+          <input value={name} onChange={(e) => setName(e.target.value)} maxLength={40} autoFocus className={field} />
+        </label>
+        <label className="block">
+          <span className="text-xs font-medium text-gray-600">주소</span>
+          <div className="mt-1 flex items-center rounded-lg border border-gray-200 bg-white focus-within:border-zz-400">
+            <span className="pl-3 text-sm text-gray-400">/board/</span>
+            <input
+              value={slug}
+              onChange={(e) => setSlug(e.target.value.toLowerCase())}
+              maxLength={40}
+              placeholder="usim"
+              className="min-w-0 flex-1 bg-transparent py-2 pr-3 text-sm outline-none"
+            />
+          </div>
+          <span className="mt-1 block text-[11px] text-gray-400">
+            영문 소문자·숫자·하이픈. 글 주소에 들어가므로 만든 뒤에는 바꿀 수 없습니다.
+          </span>
+        </label>
+        <label className="block">
+          <span className="text-xs font-medium text-gray-600">목록 형식</span>
+          <select value={type} onChange={(e) => setType(e.target.value as BoardType)} className={field}>
+            {NEW_BOARD_TYPES.map((value) => (
+              <option key={value} value={value}>
+                {TYPE_LABEL[value]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block">
+          <span className="text-xs font-medium text-gray-600">글 작성 방식</span>
+          <select value={writeMode} onChange={(e) => setWriteMode(e.target.value as WriteMode)} className={field}>
+            {Object.entries(WRITE_MODE_LABEL).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <label className="block">
+        <span className="text-xs font-medium text-gray-600">설명</span>
+        <input value={description} onChange={(e) => setDescription(e.target.value)} maxLength={200} className={field} />
+      </label>
+      <p className="text-[11px] text-gray-400">말머리·판매자 전용은 만든 뒤 게시판을 펼쳐서 정합니다.</p>
+
+      {error && (
+        <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">
+          {error}
+        </p>
+      )}
+
+      <div className="flex justify-end gap-2">
+        <button type="button" onClick={reset} className="rounded-lg px-3 py-2 text-sm text-gray-500 hover:bg-gray-100">
+          취소
+        </button>
+        <button
+          type="submit"
+          disabled={saving}
+          className="rounded-lg bg-zz-600 px-4 py-2 text-sm font-semibold text-white hover:bg-zz-700 disabled:opacity-50"
+        >
+          만들기
+        </button>
+      </div>
+    </form>
+  );
+}
+
 export function BoardSettings({ groups }: { groups: AdminBoardGroup[] }) {
   return (
     <div className="space-y-4">
       {groups.map((group) => (
         <section key={group.id} className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-          <h2 className="border-b border-gray-200 bg-gray-50 px-5 py-2.5 text-sm font-bold text-gray-700">
-            {group.name}
-            <span className="ml-1.5 font-normal text-gray-400">{group.boards.length}개</span>
-          </h2>
+          <GroupHeader key={group.name} group={group} />
           <ul>
             {group.boards.map((board) => (
               <BoardCard key={board.slug} board={board} />
             ))}
           </ul>
+          <AddBoardForm groupId={group.id} />
         </section>
       ))}
     </div>

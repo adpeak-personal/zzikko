@@ -76,6 +76,53 @@ export async function updateBoard(slug: string, patch: BoardPatch) {
   await execute(`UPDATE boards SET ${sets.join(', ')} WHERE slug = ?`, [...params, slug]);
 }
 
+export interface NewBoard {
+  groupId: number;
+  slug: string;
+  name: string;
+  description: string;
+  type: Board['type'];
+  writeMode: Board['writeMode'];
+}
+
+export type CreateBoardResult = { ok: true; board: Board } | { ok: false; reason: 'no-group' | 'slug-taken' };
+
+/**
+ * 게시판 추가 — 그 대분류의 맨 끝에 붙는다.
+ * slug 는 주소(`/board/<slug>`)라 한번 정하면 바꾸지 않는다(어드민 수정 항목에도 없다).
+ */
+export async function createBoard(input: NewBoard): Promise<CreateBoardResult> {
+  const group = await queryOne<RowDataPacket & { id: number }>(`SELECT id FROM board_groups WHERE id = ?`, [
+    input.groupId,
+  ]);
+  if (!group) return { ok: false, reason: 'no-group' };
+  if (await getBoard(input.slug)) return { ok: false, reason: 'slug-taken' };
+
+  try {
+    await execute(
+      `INSERT INTO boards (group_id, slug, name, description, type, write_mode, sort_order)
+       SELECT ?, ?, ?, ?, ?, ?, COALESCE(MAX(sort_order), 0) + 1 FROM boards WHERE group_id = ?`,
+      [input.groupId, input.slug, input.name, input.description, input.type, input.writeMode, input.groupId],
+    );
+  } catch (error) {
+    // 위에서 확인했어도 동시에 두 번 누르면 UNIQUE 에 걸린다
+    if ((error as { code?: string }).code === 'ER_DUP_ENTRY') return { ok: false, reason: 'slug-taken' };
+    throw error;
+  }
+  return { ok: true, board: (await getBoard(input.slug))! };
+}
+
+/**
+ * 대분류 이름 바꾸기. 없는 id 면 false.
+ * 사이드바·모바일 메뉴가 전부 `listBoardGroups` 에서 이름을 읽으므로 여기만 고치면 된다.
+ */
+export async function renameBoardGroup(id: number, name: string): Promise<boolean> {
+  const row = await queryOne<RowDataPacket & { id: number }>(`SELECT id FROM board_groups WHERE id = ?`, [id]);
+  if (!row) return false;
+  await execute(`UPDATE board_groups SET name = ? WHERE id = ?`, [name, id]);
+  return true;
+}
+
 /** 게시판별 글 수 — 어드민 통계용 */
 export async function countPostsByBoard() {
   return query<RowDataPacket & { slug: string; name: string; type: string; post_count: number }>(
