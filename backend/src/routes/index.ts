@@ -143,6 +143,18 @@ export default async function routes(app: FastifyInstance) {
     return { ok: true };
   });
 
+  /** 어드민용 — 게시판이 없는 대분류까지 전부 */
+  app.get('/admin/board-groups', { preHandler: requireAdmin }, async () => ({
+    items: await boards.listBoardGroups({ includeEmpty: true }),
+  }));
+
+  /** 대분류 추가 */
+  app.post('/admin/board-groups', { preHandler: requireAdmin }, async (request, reply) => {
+    const { name } = parse(z.object({ name: z.string().trim().min(1).max(30) }), request.body);
+    reply.code(201);
+    return boards.createBoardGroup(name);
+  });
+
   /** 대분류(공지&안내 · 휴대폰 …) 이름 바꾸기 */
   app.patch('/admin/board-groups/:id', { preHandler: requireAdmin }, async (request) => {
     const { id } = parse(z.object({ id: z.coerce.number().int().positive() }), request.params);

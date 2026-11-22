@@ -533,6 +533,89 @@ function AddBoardForm({ groupId }: { groupId: number }) {
   );
 }
 
+/** 맨 위 '대분류 추가' — 만들면 맨 아래에 붙는다. 게시판을 하나 넣어야 사이드바에 보인다 */
+function AddGroupForm() {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const close = () => {
+    setName('');
+    setError(null);
+    setOpen(false);
+  };
+
+  const create = async () => {
+    if (!name.trim()) return setError('대분류 이름을 입력해 주세요.');
+    setSaving(true);
+    setError(null);
+    try {
+      await apiFetch('/admin/board-groups', { method: 'POST', body: JSON.stringify({ name: name.trim() }) });
+      close();
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : '만들지 못했어요.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-gray-300 bg-white px-5 py-3 text-sm font-medium text-gray-500 hover:border-zz-400 hover:text-zz-700"
+      >
+        <Plus size={15} /> 대분류 추가
+      </button>
+    );
+  }
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        create();
+      }}
+      className="rounded-xl border border-zz-200 bg-white px-5 py-4"
+    >
+      <div className="flex items-center gap-2">
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => e.key === 'Escape' && close()}
+          maxLength={30}
+          autoFocus
+          placeholder="예: 📶 통신"
+          aria-label="대분류 이름"
+          className="min-w-0 flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-zz-400"
+        />
+        <button
+          type="submit"
+          disabled={saving}
+          className="shrink-0 rounded-lg bg-zz-600 px-4 py-2 text-sm font-semibold text-white hover:bg-zz-700 disabled:opacity-50"
+        >
+          만들기
+        </button>
+        <button type="button" onClick={close} className="shrink-0 rounded-lg px-3 py-2 text-sm text-gray-500 hover:bg-gray-100">
+          취소
+        </button>
+      </div>
+      <p className="mt-2 text-[11px] text-gray-400">
+        맨 아래에 붙습니다. 게시판을 하나 이상 넣어야 사이드바·메뉴에 나타납니다.
+      </p>
+      {error && (
+        <p role="alert" className="mt-2 text-xs text-red-600">
+          {error}
+        </p>
+      )}
+    </form>
+  );
+}
+
 /** 한 칸 옮긴 새 배열 */
 function swap<T>(list: T[], index: number, to: number): T[] {
   const next = [...list];
@@ -569,6 +652,7 @@ export function BoardSettings({ groups }: { groups: AdminBoardGroup[] }) {
 
   return (
     <div className="space-y-4">
+      <AddGroupForm />
       {error && (
         <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">
           {error}
@@ -585,6 +669,11 @@ export function BoardSettings({ groups }: { groups: AdminBoardGroup[] }) {
               busy,
             }}
           />
+          {group.boards.length === 0 && (
+            <p className="px-5 py-3 text-xs text-gray-400">
+              게시판이 없어 사이드바에 안 보입니다. 아래에서 게시판을 추가하세요.
+            </p>
+          )}
           <ul>
             {group.boards.map((board, index) => (
               <BoardCard

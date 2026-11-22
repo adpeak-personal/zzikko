@@ -28,21 +28,34 @@ const toBoard = (row: BoardRow): Board => ({
   ...(row.admin_only ? { adminOnly: true } : {}),
 });
 
-/** 대분류 → 소분류 구조 그대로 */
-export async function listBoardGroups(): Promise<BoardGroup[]> {
-  const rows = await query<BoardRow>(
-    `SELECT b.*, g.name AS group_name
-       FROM boards b
-       JOIN board_groups g ON g.id = b.group_id
-      ORDER BY g.sort_order, b.sort_order`,
-  );
+/**
+ * 대분류 → 소분류 구조 그대로.
+ *
+ * 게시판이 없는 대분류는 기본으로 빠진다 — 사이드바에 제목만 덩그러니 뜨면 안 되므로.
+ * 어드민은 `includeEmpty` 로 전부 받는다(막 만든 대분류에 게시판을 붙여야 하고,
+ * 순서 API 가 전체 id 를 요구한다).
+ */
+export async function listBoardGroups({ includeEmpty = false } = {}): Promise<BoardGroup[]> {
+  const [groupRows, rows] = await Promise.all([
+    query<RowDataPacket & { id: number; name: string }>(`SELECT id, name FROM board_groups ORDER BY sort_order, id`),
+    query<BoardRow>(`SELECT * FROM boards ORDER BY sort_order, id`),
+  ]);
 
-  const groups = new Map<number, BoardGroup>();
-  for (const row of rows) {
-    if (!groups.has(row.group_id)) groups.set(row.group_id, { id: row.group_id, name: row.group_name, boards: [] });
-    groups.get(row.group_id)!.boards.push(toBoard(row));
-  }
-  return [...groups.values()];
+  const groups = groupRows.map((group): BoardGroup => ({
+    id: group.id,
+    name: group.name,
+    boards: rows.filter((row) => row.group_id === group.id).map(toBoard),
+  }));
+  return includeEmpty ? groups : groups.filter((group) => group.boards.length > 0);
+}
+
+/** 대분류 추가 — 맨 아래에 붙는다 */
+export async function createBoardGroup(name: string): Promise<BoardGroup> {
+  const result = await execute(
+    `INSERT INTO board_groups (name, sort_order) SELECT ?, COALESCE(MAX(sort_order), 0) + 1 FROM board_groups`,
+    [name],
+  );
+  return { id: result.insertId, name, boards: [] };
 }
 
 export async function getBoard(slug: string): Promise<Board | null> {

@@ -34,6 +34,7 @@ export default async function HomePage() {
     })),
   );
 
+  const hasMarket = boards.some((board) => board.slug === 'market');
   const shopName = (id: number) => shops.find((shop) => shop.id === id)?.name;
 
   return (
@@ -199,34 +200,36 @@ export default async function HomePage() {
         )}
       </section>
 
-      {/* 중고장터 */}
-      <Card>
-        <SectionHeader
-          title={
-            <span className="flex items-center gap-1.5">
-              <ShoppingBag size={17} className="text-zz-500" /> 중고장터
-            </span>
-          }
-          sub="공기계 · 액세서리 직거래"
-          href="/board/market"
-        />
-        <ul className="grid grid-cols-2 gap-4 px-5 py-4 sm:grid-cols-4">
-          {market.map((post) => (
-            <li key={post.id}>
-              <Link href={`/board/market/${post.id}`} className="group block">
-                {post.thumbUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element -- 업로드 경로는 rewrite/GCS 라 next/image 미적용
-                  <img src={post.thumbUrl} alt="" className="aspect-square w-full rounded-xl object-cover" />
-                ) : (
-                  <Thumb tone={thumbTone(post) ?? 'zz'} className="aspect-square rounded-xl" />
-                )}
-                <p className="mt-2 line-clamp-1 text-sm font-semibold text-gray-800 group-hover:underline">{post.title}</p>
-                <p className="mt-0.5 truncate text-xs text-gray-400">{post.author?.nickname}</p>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </Card>
+      {/* 중고장터 — 어드민에서 게시판을 지우면 섹션도 빠진다 */}
+      {hasMarket && (
+        <Card>
+          <SectionHeader
+            title={
+              <span className="flex items-center gap-1.5">
+                <ShoppingBag size={17} className="text-zz-500" /> 중고장터
+              </span>
+            }
+            sub="공기계 · 액세서리 직거래"
+            href="/board/market"
+          />
+          <ul className="grid grid-cols-2 gap-4 px-5 py-4 sm:grid-cols-4">
+            {market.map((post) => (
+              <li key={post.id}>
+                <Link href={`/board/market/${post.id}`} className="group block">
+                  {post.thumbUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- 업로드 경로는 rewrite/GCS 라 next/image 미적용
+                    <img src={post.thumbUrl} alt="" className="aspect-square w-full rounded-xl object-cover" />
+                  ) : (
+                    <Thumb tone={thumbTone(post) ?? 'zz'} className="aspect-square rounded-xl" />
+                  )}
+                  <p className="mt-2 line-clamp-1 text-sm font-semibold text-gray-800 group-hover:underline">{post.title}</p>
+                  <p className="mt-0.5 truncate text-xs text-gray-400">{post.author?.nickname}</p>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
 
       {/* 판매자 참여 */}
       <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-gray-900 px-7 py-6 text-white">
