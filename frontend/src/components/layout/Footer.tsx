@@ -13,6 +13,9 @@ export function Footer() {
             <Link href="/board/notice" className="hover:text-gray-900">공지사항</Link>
             <Link href="/guide" className="hover:text-gray-900">이용 안내</Link>
             <Link href="/seller" className="hover:text-gray-900">판매자 입점</Link>
+            <Link href="/terms" className="hover:text-gray-900">이용약관</Link>
+            {/* 개인정보처리방침은 다른 링크보다 눈에 띄게 두는 게 원칙이다 */}
+            <Link href="/privacy" className="font-bold text-gray-700 hover:text-gray-900">개인정보처리방침</Link>
           </nav>
         </div>
         <p className="mt-5 border-t border-gray-100 pt-5 text-xs leading-relaxed text-gray-400">

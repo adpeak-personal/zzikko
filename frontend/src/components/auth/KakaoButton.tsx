@@ -40,8 +40,15 @@ export function AgreeCheckbox({ phone }: { phone?: boolean }) {
     <label className="mt-4 flex items-start gap-2 text-xs leading-relaxed text-gray-600">
       <input type="checkbox" name="agree" required className="mt-0.5 accent-zz-600" />
       <span>
-        만 14세 이상이며, 서비스 이용약관과 개인정보 수집·이용(
-        {phone ? '이메일, 닉네임, 지역, 휴대폰 번호 확인값' : '카카오 회원번호, 닉네임, 지역'})에 동의합니다.
+        만 14세 이상이며,{' '}
+        <a href="/terms" target="_blank" className="font-semibold text-gray-800 underline">
+          이용약관
+        </a>
+        과{' '}
+        <a href="/privacy" target="_blank" className="font-semibold text-gray-800 underline">
+          개인정보 수집·이용
+        </a>
+        ({phone ? '이메일, 닉네임, 지역, 휴대폰 번호 확인값' : '카카오 회원번호, 닉네임, 지역'})에 동의합니다.
       </span>
     </label>
   );
