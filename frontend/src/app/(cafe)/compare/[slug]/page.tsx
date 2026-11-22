@@ -91,6 +91,13 @@ export default async function ComparePage({ params }: { params: Promise<{ slug: 
     })
     .filter((item): item is NonNullable<typeof item> => item !== null);
 
+  /*
+   * ⚠️ `offers` 를 넣지 않는다 — 우리가 파는 물건이 아니다.
+   *
+   * 출고가는 제조사 가격이지 우리 판매가가 아닌데, Offer 로 적으면 구글은
+   * "이 페이지에서 155만원에 판다"로 읽는다. 기종 페이지도 같은 이유로 안 넣는다.
+   * 출고가 자체는 화면의 비교표에 그대로 있다.
+   */
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'ItemList',
@@ -102,7 +109,9 @@ export default async function ComparePage({ params }: { params: Promise<{ slug: 
         '@type': 'Product',
         name: spec.name,
         brand: { '@type': 'Brand', name: spec.brand },
-        offers: { '@type': 'Offer', price: spec.retailPrice, priceCurrency: 'KRW' },
+        description: [spec.display, spec.storage, spec.battery].filter(Boolean).join(' · '),
+        releaseDate: spec.releaseDate,
+        ...(spec.thumbUrl ? { image: [spec.thumbUrl] } : {}),
       },
     })),
   };
