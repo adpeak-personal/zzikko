@@ -53,7 +53,11 @@ developers.kakao.com → 내 애플리케이션 → 앱 추가(아이콘은 `ass
 `SOLAPI_API_KEY` · `SOLAPI_API_SECRET` · `SMS_FROM`(솔라피에 등록한 발신번호).
 셋이 다 있어야 이메일 가입이 열린다. 개발 환경에서는 키 없이도 서버 로그에 인증번호가 찍힌다.
 
-## 0-3. 약관 페이지
+## 0-3. 약관 페이지 · 동의 기록
+
+동의 기록을 남기지 않는다 — `agree` 는 받기만 하고 버린다. "언제 어느 버전에 동의했는지"
+증명할 자료가 가입 시각뿐이다. 회원이 늘기 전에 동의 시각·약관 버전을 저장해 둘 것.
+
 
 `/terms`, `/privacy` 는 **초안**이다. `frontend/src/components/legal/LegalDoc.tsx` 의
 `OPERATOR.email` 이 비어 있어 연락처가 '준비 중' 으로 나온다. 정식 서비스 전에 법률 검토.

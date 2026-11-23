@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ApiError, apiFetch } from '@/lib/api';
+import { safeNext } from '@/lib/utils';
 import { AgreeCheckbox } from '@/components/auth/KakaoButton';
 
 const REGIONS = ['서울', '경기·인천', '부산', '대구', '대전', '광주', '강원', '제주'];
@@ -44,7 +45,7 @@ export function KakaoSignupForm() {
         method: 'POST',
         body: JSON.stringify({ nickname, region: form.region, agree: form.agree === 'on' }),
       });
-      router.replace(res.next && res.next.startsWith('/') ? res.next : '/');
+      router.replace(safeNext(res.next));
       router.refresh();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : '가입하지 못했어요.');

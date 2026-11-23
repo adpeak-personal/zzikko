@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ApiError, apiFetch } from '@/lib/api';
+import { safeNext } from '@/lib/utils';
 import { KakaoButton, OrDivider } from '@/components/auth/KakaoButton';
 
 const inputClass =
@@ -30,7 +31,7 @@ export function LoginForm({ next, kakao, errorCode }: { next?: string; kakao: bo
     try {
       await apiFetch('/auth/login', { method: 'POST', body: JSON.stringify(form) });
       // 서버 컴포넌트가 로그인 상태를 다시 읽도록 새로고침한다
-      router.replace(next && next.startsWith('/') ? next : '/');
+      router.replace(safeNext(next));
       router.refresh();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : '로그인하지 못했어요.');

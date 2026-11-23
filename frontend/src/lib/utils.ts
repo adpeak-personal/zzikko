@@ -40,3 +40,23 @@ export function thumbTone(post: { id: number; thumb?: string; hasImage?: boolean
   if (!post.hasImage) return undefined;
   return THUMB_TONES[post.id % THUMB_TONES.length];
 }
+
+/**
+ * 로그인·가입을 마치고 돌아갈 곳. **우리 사이트 안의 경로만** 받는다.
+ *
+ * ⚠️ `startsWith('/')` 만 보면 안 된다 — `//evil.com` 도 `/` 로 시작하는데
+ * 브라우저는 그걸 "같은 프로토콜의 다른 사이트" 로 읽는다. 실측으로
+ * `/login?next=//example.com` 으로 로그인하면 example.com 으로 나갔다.
+ * **로그인이 성공한 뒤**라 사람은 눈치채지 못하고, 그 페이지가 "세션이 만료됐습니다" 를
+ * 띄우면 비밀번호를 그대로 넘겨준다.
+ *
+ * 백엔드 `routes/auth.ts` 의 `safeNext` 와 같은 규칙이다 — 한쪽만 고치지 말 것.
+ */
+export function safeNext(value: unknown): string {
+  if (typeof value !== 'string' || !value.startsWith('/')) return '/';
+  // `//evil.com` 과 `/\evil.com` 은 둘 다 사이트 밖으로 나가는 주소다
+  if (value.startsWith('//') || value.includes('\\')) return '/';
+  // 제어문자가 섞인 주소는 받지 않는다
+  if ([...value].some((c) => c.charCodeAt(0) < 32 || c.charCodeAt(0) === 127)) return '/';
+  return value;
+}

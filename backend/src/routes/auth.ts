@@ -57,11 +57,20 @@ interface KakaoPending {
   next: string;
 }
 
-/** 로그인 뒤 돌아갈 곳 — 우리 사이트 안의 경로만 (`//evil.com` 같은 건 막는다) */
-const safeNext = (value: unknown) =>
-  typeof value === 'string' && value.startsWith('/') && !value.startsWith('//') && !value.startsWith('/\\')
-    ? value
-    : '/';
+/**
+ * 로그인 뒤 돌아갈 곳 — 우리 사이트 안의 경로만.
+ *
+ * 프론트 `lib/utils.ts` 의 `safeNext` 와 같은 규칙이다 — 한쪽만 고치지 말 것.
+ * 제어문자까지 거르는 이유: 그대로 Location 헤더에 들어가면 Node 가 거부해 500 이 된다
+ * (주입은 안 되지만 로그인이 그 자리에서 끝난다).
+ */
+const safeNext = (value: unknown): string => {
+  if (typeof value !== 'string' || !value.startsWith('/')) return '/';
+  // `//evil.com` 과 `/\evil.com` 은 둘 다 사이트 밖으로 나가는 주소다
+  if (value.startsWith('//') || value.includes('\\')) return '/';
+  if ([...value].some((c) => c.charCodeAt(0) < 32 || c.charCodeAt(0) === 127)) return '/';
+  return value;
+};
 
 const shortCookie = (maxAge: number) => ({
   httpOnly: true,
