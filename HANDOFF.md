@@ -48,9 +48,10 @@ developers.kakao.com → 내 애플리케이션 → 앱 추가(아이콘은 `ass
 키는 채팅에 붙이지 말고 로컬은 `backend/.env.local`, 운영은 `/opt/zzikko/.env.back` 에 넣는다.
 운영은 넣은 뒤 **`bash deploy.sh`**(태그 없이 — 마지막 배포를 다시 올림). `restart` 는 env 를 다시 안 읽는다.
 
-## 0-2. 문자 인증 (솔라피) — 나중
+## 0-2. 문자 인증 (알리고)
 
-`SOLAPI_API_KEY` · `SOLAPI_API_SECRET` · `SMS_FROM`(솔라피에 등록한 발신번호).
+`ALIGO_API_KEY` · `ALIGO_USER_ID` · `ALIGO_SENDER`(알리고에 등록한 발신번호).
+**abyssblue 가 쓰는 알리고 계정과 같은 값**이다 — 거기 `.env` 에서 그대로 가져오면 된다.
 셋이 다 있어야 이메일 가입이 열린다. 개발 환경에서는 키 없이도 서버 로그에 인증번호가 찍힌다.
 
 ## 0-3. 약관 페이지 · 동의 기록
