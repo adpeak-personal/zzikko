@@ -112,8 +112,11 @@ export function SignupForm({ kakao, phoneReady }: { kakao: boolean; phoneReady: 
       )}
 
       {!phoneReady ? (
+        /* 둘 다 꺼져 있으면 "카카오로 가입해 주세요" 라고 할 수 없다 — 버튼이 없다 */
         <p className="mt-5 rounded-xl bg-gray-50 px-4 py-3 text-sm leading-relaxed text-gray-500">
-          이메일 가입(휴대폰 인증)은 준비하고 있어요. 지금은 카카오로 가입해 주세요.
+          {kakao
+            ? '이메일 가입(휴대폰 인증)은 준비하고 있어요. 지금은 카카오로 가입해 주세요.'
+            : '가입을 잠시 닫아 두었어요. 준비가 끝나면 바로 열립니다. 조금 뒤에 다시 와 주세요.'}
         </p>
       ) : (
         <form onSubmit={onSubmit} className={kakao ? '' : 'mt-5'}>
