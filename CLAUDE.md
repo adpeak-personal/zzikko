@@ -315,6 +315,17 @@
   라우트마다 스트림 읽는 코드를 또 쓰지 말 것.
 - **AWS 키를 커밋하지 말 것.** `.env.local`(로컬) / 서버 `/opt/zzikko/.env.back`(운영)에만 둔다.
 
+## 손에 걸리는 것들
+
+- ⚠️ **`/compare/[slug]` 가 정적으로 안 구워진다.** 레이아웃의 `getBoardGroups` 가 `apiGet`(쿠키)을
+  쓰기 때문이다. `next build` 에 `Dynamic server usage` 경고가 23개 나오는데 **원래 있던 것이다** —
+  새로 생겼는지 볼 때 `grep -c` 로 개수를 견주면 된다. 고치려면 레이아웃이 `apiGetPublic` 을 쓰면 된다.
+- `next build` 를 돌리면 `frontend/next-env.d.ts` 가 빌드용으로 바뀐다. **커밋하지 말고 되돌린다**
+  (`next dev` 가 다시 개발용으로 쓴다).
+- **prettier 설정이 없다.** `npx prettier` 를 돌리면 기본 설정으로 파일 전체가 바뀐다 — 돌리지 말 것.
+- RSS 는 아직 없다. `/sitemap.xml` 과 구조화 데이터가 들어간 지금은 효용이 낮다고 보고 미뤘다.
+  할 때는 기사 게시판만 내보내면 된다.
+
 ## 환경변수
 
 - `.env` = 비밀이 아닌 공용 설정(포트·CORS·업로드 폴더). **git 에 올라간다.**
