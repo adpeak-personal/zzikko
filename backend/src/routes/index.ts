@@ -16,11 +16,12 @@ import uploadRoutes from './uploads.js';
 import nworkRoutes from './nwork.js';
 import sellerRoutes from './seller.js';
 import siseRoutes from './sise.js';
+import planRoutes from './plans.js';
 
 const boardPatchSchema = z.object({
   name: z.string().trim().min(1).max(40).optional(),
   description: z.string().trim().max(200).optional(),
-  type: z.enum(['list', 'deal', 'gallery', 'news', 'spec']).optional(),
+  type: z.enum(['list', 'deal', 'gallery', 'news', 'spec', 'plan']).optional(),
   writeMode: z.enum(['editor', 'photo']).optional(),
   categories: z.array(z.string().trim().min(1).max(40)).max(30).optional(),
   sellerOnly: z.boolean().optional(),
@@ -72,6 +73,7 @@ export default async function routes(app: FastifyInstance) {
   await app.register(uploadRoutes);
   await app.register(sellerRoutes);
   await app.register(siseRoutes);
+  await app.register(planRoutes);
   // 운영진 전용 훅을 플러그인 안에 거므로 다른 라우트에는 번지지 않는다
   await app.register(nworkRoutes);
 

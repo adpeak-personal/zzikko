@@ -25,6 +25,7 @@ SET NAMES utf8mb4;
 
 -- 의존성 역순으로 삭제
 DROP TABLE IF EXISTS
+  mvno_plans,
   news_feed,
   sise_reports,
   sise_sheets, seller_applications;
@@ -129,7 +130,7 @@ CREATE TABLE boards (
   name        VARCHAR(40)  NOT NULL,
   description VARCHAR(200) NOT NULL DEFAULT '',
   -- 목록을 그리는 방식
-  type        ENUM('list','deal','gallery','news','spec') NOT NULL DEFAULT 'list',
+  type        ENUM('list','deal','gallery','news','spec','plan') NOT NULL DEFAULT 'list',
   -- 글 작성 화면
   write_mode  ENUM('editor','photo') NOT NULL DEFAULT 'editor',
   -- 말머리 (JSON 문자열 배열)
@@ -454,6 +455,41 @@ CREATE TABLE sise_keywords (
 -- 출처(GSMArena)가 license.xml 로 "ai-summarize 허용 / 출처 표기(CC BY 4.0) 조건"
 -- 을 밝혀 두었다. 그래서 원문을 그대로 옮기지 않고 요약·재작성하며,
 -- 기사에는 반드시 출처 이름과 링크를 남긴다.
+-- ---------------------------------------------------------------------
+-- 유심 요금제 — 바깥 목록에서 받아 온다(lib/plans). 회원 글이 아니다.
+-- 목록에서 빠진 요금제는 지우지 않고 active = 0 (다시 나오면 같은 행으로 돌아온다)
+CREATE TABLE mvno_plans (
+  id              INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+  source          VARCHAR(20)   NOT NULL COMMENT '받아 온 곳 (dnbn)',
+  source_id       VARCHAR(80)   NOT NULL COMMENT '그쪽 요금제 id',
+  carrier         VARCHAR(40)   NOT NULL COMMENT '파는 곳',
+  network         VARCHAR(10)   NOT NULL DEFAULT '' COMMENT '망 (SKT/KT/LG U+)',
+  tech            VARCHAR(10)   NOT NULL DEFAULT '' COMMENT 'LTE/5G',
+  name            VARCHAR(120)  NOT NULL,
+  tags            JSON          NULL,
+  data_text       VARCHAR(40)   NOT NULL DEFAULT '' COMMENT '화면용 문장',
+  data_gb         DECIMAL(7,1)  NULL COMMENT '비교용 월 데이터',
+  daily_gb        DECIMAL(5,1)  NULL COMMENT '하루 추가 데이터',
+  unlimited       TINYINT(1)    NOT NULL DEFAULT 0,
+  after_speed     VARCHAR(60)   NOT NULL DEFAULT '',
+  voice           VARCHAR(20)   NOT NULL DEFAULT '',
+  sms             VARCHAR(20)   NOT NULL DEFAULT '',
+  monthly_fee     INT           NOT NULL COMMENT '지금 내는 월 요금(원)',
+  promo_months    INT           NULL COMMENT '할인 기간(개월)',
+  fee_after_promo INT           NULL COMMENT '할인 끝난 뒤 요금(원)',
+  regular_fee     INT           NULL COMMENT '정가(원)',
+  benefit         VARCHAR(300)  NOT NULL DEFAULT '',
+  perks           JSON          NULL,
+  conditions      JSON          NULL,
+  source_url      VARCHAR(300)  NOT NULL,
+  active          TINYINT(1)    NOT NULL DEFAULT 1,
+  first_seen_at   DATETIME      NOT NULL,
+  last_seen_at    DATETIME      NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_mvno_plans_source (source, source_id),
+  KEY idx_mvno_plans_active (active, monthly_fee)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
 -- ---------------------------------------------------------------------
 CREATE TABLE news_feed (
   id           INT UNSIGNED NOT NULL AUTO_INCREMENT,

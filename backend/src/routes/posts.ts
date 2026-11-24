@@ -95,7 +95,7 @@ export default async function postRoutes(app: FastifyInstance) {
 
     const board = await boards.getBoard(input.boardSlug);
     if (!board) throw badRequest('없는 게시판입니다.');
-    if (board.type === 'news' || board.type === 'spec') {
+    if (board.type === 'news' || board.type === 'spec' || board.type === 'plan') {
       throw forbidden('이 게시판은 어드민에서 관리합니다.');
     }
     if (board.sellerOnly && user.role !== '판매자' && user.role !== '운영진') {

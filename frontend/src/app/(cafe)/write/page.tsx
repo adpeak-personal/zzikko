@@ -14,7 +14,7 @@ export default async function WritePage({ searchParams }: { searchParams: Promis
   const { board: boardSlug = 'qna' } = await searchParams;
   const boardGroups = await getBoardGroups();
 
-  // 어드민이 관리하는 게시판(IT 소식·스펙 비교)은 글쓰기 대상이 아니고,
+  // 어드민이 관리하는 게시판(IT 소식·스펙 비교·유심 요금제)은 글쓰기 대상이 아니고,
   // 판매자 전용 게시판은 판매자·운영진에게만, 관리자 전용 게시판은 운영진에게만 보여준다
   const writableGroups = boardGroups
     .map((group) => ({
@@ -23,6 +23,7 @@ export default async function WritePage({ searchParams }: { searchParams: Promis
         (board) =>
           board.type !== 'news' &&
           board.type !== 'spec' &&
+          board.type !== 'plan' &&
           (!board.sellerOnly || me.role === '판매자' || me.role === '운영진') &&
           (!board.adminOnly || me.role === '운영진'),
       ),

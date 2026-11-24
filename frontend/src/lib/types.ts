@@ -12,7 +12,7 @@ export type MemberRole = '회원' | '판매자' | '운영진';
  * - list / deal / gallery : 회원이 쓴 글
  * - news / spec           : 어드민이 관리하는 콘텐츠
  */
-export type BoardType = 'list' | 'deal' | 'gallery' | 'news' | 'spec';
+export type BoardType = 'list' | 'deal' | 'gallery' | 'news' | 'spec' | 'plan';
 
 /** 글 작성 화면 — 어느 쪽으로 써도 저장 형식은 같다 */
 export type WriteMode = 'editor' | 'photo';
@@ -348,4 +348,45 @@ export interface SiseKeyword {
   done: boolean;
   doneAt: string | null;
   fetchedAt: string;
+}
+
+/** 유심 요금제 — 바깥 목록에서 받아 온다(`mvno_plans`). 요금은 원 단위 */
+export interface MvnoPlan {
+  id: number;
+  /** 파는 곳 (SKT · 더원모바일 …) */
+  carrier: string;
+  /** 망 (SKT · KT · LG U+) */
+  network: string;
+  /** LTE · 5G (모르면 빈 값) */
+  tech: string;
+  name: string;
+  tags: string[];
+  /** 화면용 문장 ("11GB+일2") — 비교는 아래 숫자로 한다 */
+  dataText: string;
+  dataGb: number | null;
+  dailyGb: number | null;
+  unlimited: boolean;
+  /** 다 쓴 뒤 속도 또는 테더링 등 데이터 보조 문장 */
+  afterSpeed: string;
+  voice: string;
+  sms: string;
+  /** 지금 내는 월 요금(할인 기간 중이면 할인가). 포인트는 빼지 않은 값이다 */
+  monthlyFee: number;
+  promoMonths: number | null;
+  feeAfterPromo: number | null;
+  regularFee: number | null;
+  /** 포인트·사은품 문장 */
+  benefit: string;
+  perks: string[];
+  conditions: string[];
+  /** 가입 안내 페이지(원문) */
+  sourceUrl: string;
+  /** 마지막으로 목록에서 확인한 시각 */
+  updatedAt: string;
+}
+
+export interface PlanList {
+  items: MvnoPlan[];
+  source: { name: string; home: string };
+  syncedAt: string | null;
 }

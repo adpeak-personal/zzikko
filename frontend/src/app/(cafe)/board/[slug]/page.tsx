@@ -2,15 +2,16 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { PenSquare, Search } from 'lucide-react';
-import { apiGet } from '@/lib/api.server';
+import { apiGet, apiGetPublic } from '@/lib/api.server';
 import { getBoard, getBoards, getCurrentUser, getPosts, getShops, type PostQuery } from '@/lib/data';
-import type { Board, Chipset, NewsArticle, PhoneSpec } from '@/lib/types';
+import type { Board, Chipset, NewsArticle, PhoneSpec, PlanList } from '@/lib/types';
 import { PostTable } from '@/components/board/PostTable';
 import { DealTable } from '@/components/board/DealTable';
 import { GalleryGrid } from '@/components/board/GalleryGrid';
 import { Pagination } from '@/components/board/Pagination';
 import { NewsBoard } from '@/components/news/NewsBoard';
 import { SpecBoard } from '@/components/specs/SpecBoard';
+import { PlanBoard } from '@/components/plans/PlanBoard';
 import { EmptyState, FilterChip, Tag } from '@/components/ui';
 
 /** 모든 게시판의 글을 모아 보는 가상 게시판 */
@@ -43,8 +44,8 @@ export default async function BoardPage({ params, searchParams }: Params) {
   const page = Number(pageParam) || 1;
   const size = board.type === 'gallery' ? 12 : 15;
 
-  // 기사·기종은 게시글이 아니라서 글쓰기·말머리 칩·페이지 번호·검색을 쓰지 않는다
-  const isContentBoard = board.type === 'news' || board.type === 'spec';
+  // 기사·기종·요금제는 게시글이 아니라서 글쓰기·말머리 칩·페이지 번호·검색을 쓰지 않는다
+  const isContentBoard = board.type === 'news' || board.type === 'spec' || board.type === 'plan';
   // 관리자 전용 게시판은 운영진에게만 글쓰기 버튼을 보인다(막는 건 백엔드가 한다)
   const canWrite = !isContentBoard && (!board.adminOnly || (await getCurrentUser())?.role === '운영진');
 
@@ -62,6 +63,8 @@ export default async function BoardPage({ params, searchParams }: Params) {
   const news = board.type === 'news' ? (await apiGet<{ items: NewsArticle[] }>('/news')).items : [];
   const specs =
     board.type === 'spec' ? await apiGet<{ items: PhoneSpec[]; chipsets: Chipset[] }>('/specs') : { items: [], chipsets: [] as Chipset[] };
+  // 요금제는 로그인과 무관하다 — 쿠키를 읽지 않는 쪽으로 부른다
+  const plans = board.type === 'plan' ? await apiGetPublic<PlanList>('/plans') : null;
 
   const result = isContentBoard
     ? { items: [], notices: [], total: 0 }
@@ -119,6 +122,8 @@ export default async function BoardPage({ params, searchParams }: Params) {
         <NewsBoard articles={news} />
       ) : board.type === 'spec' ? (
         <SpecBoard specs={specs.items} chipsets={specs.chipsets} />
+      ) : board.type === 'plan' ? (
+        plans ? <PlanBoard data={plans} /> : <EmptyState>요금제를 불러오지 못했습니다.</EmptyState>
       ) : board.type === 'deal' ? (
         <DealTable items={result.items} shops={shops} />
       ) : board.type === 'gallery' ? (

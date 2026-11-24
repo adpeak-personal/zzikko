@@ -17,10 +17,18 @@ const TYPE_LABEL: Record<BoardType, string> = {
   gallery: '갤러리형',
   news: '매거진형 (기사)',
   spec: '기종 사양 비교',
+  plan: '유심 요금제',
 };
 
+/** 콘텐츠 형식마다 내용을 고치는 어드민 화면 */
+const CONTENT_ADMIN = {
+  news: { href: '/admin/news', label: 'IT 소식 관리' },
+  spec: { href: '/admin/specs', label: '기종 사양 관리' },
+  plan: { href: '/admin/plans', label: '유심 요금제 관리' },
+} as const;
+
 /** 글이 아니라 어드민에서 관리하는 콘텐츠를 쓰는 형식 */
-const CONTENT_TYPES: BoardType[] = ['news', 'spec'];
+const CONTENT_TYPES: BoardType[] = ['news', 'spec', 'plan'];
 
 const WRITE_MODE_LABEL: Record<WriteMode, string> = {
   editor: '에디터 (서식·표·본문 이미지)',
@@ -197,8 +205,8 @@ function BoardCard({ board, move }: { board: AdminBoard; move: Move }) {
           {CONTENT_TYPES.includes(type) ? (
             <p className="rounded-lg bg-zz-50 px-3 py-2.5 text-xs leading-relaxed text-zz-700">
               이 형식은 회원 글이 아니라 어드민에서 관리하는 콘텐츠를 보여줍니다. 내용은{' '}
-              <Link href={type === 'news' ? '/admin/news' : '/admin/specs'} className="font-bold underline">
-                {type === 'news' ? 'IT 소식 관리' : '기종 사양 관리'}
+              <Link href={CONTENT_ADMIN[type as keyof typeof CONTENT_ADMIN].href} className="font-bold underline">
+                {CONTENT_ADMIN[type as keyof typeof CONTENT_ADMIN].label}
               </Link>{' '}
               에서 등록·수정하세요. 아래 글 작성 방식과 말머리는 적용되지 않습니다.
             </p>

@@ -315,6 +315,46 @@ const steps = [
        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`,
     ],
   },
+  {
+    // 유심 요금제 게시판 — 바깥 목록에서 받아 온 요금제를 보여준다
+    name: 'boards.type plan + mvno_plans — 유심 요금제',
+    check: (c) => hasTable(c, 'mvno_plans'),
+    sql: [
+      `ALTER TABLE boards
+         MODIFY COLUMN type ENUM('list','deal','gallery','news','spec','plan') NOT NULL DEFAULT 'list'`,
+      `CREATE TABLE mvno_plans (
+  id              INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+  source          VARCHAR(20)   NOT NULL COMMENT '받아 온 곳 (dnbn)',
+  source_id       VARCHAR(80)   NOT NULL COMMENT '그쪽 요금제 id',
+  carrier         VARCHAR(40)   NOT NULL COMMENT '파는 곳',
+  network         VARCHAR(10)   NOT NULL DEFAULT '' COMMENT '망 (SKT/KT/LG U+)',
+  tech            VARCHAR(10)   NOT NULL DEFAULT '' COMMENT 'LTE/5G',
+  name            VARCHAR(120)  NOT NULL,
+  tags            JSON          NULL,
+  data_text       VARCHAR(40)   NOT NULL DEFAULT '' COMMENT '화면용 문장',
+  data_gb         DECIMAL(7,1)  NULL COMMENT '비교용 월 데이터',
+  daily_gb        DECIMAL(5,1)  NULL COMMENT '하루 추가 데이터',
+  unlimited       TINYINT(1)    NOT NULL DEFAULT 0,
+  after_speed     VARCHAR(60)   NOT NULL DEFAULT '',
+  voice           VARCHAR(20)   NOT NULL DEFAULT '',
+  sms             VARCHAR(20)   NOT NULL DEFAULT '',
+  monthly_fee     INT           NOT NULL COMMENT '지금 내는 월 요금(원)',
+  promo_months    INT           NULL COMMENT '할인 기간(개월)',
+  fee_after_promo INT           NULL COMMENT '할인 끝난 뒤 요금(원)',
+  regular_fee     INT           NULL COMMENT '정가(원)',
+  benefit         VARCHAR(300)  NOT NULL DEFAULT '',
+  perks           JSON          NULL,
+  conditions      JSON          NULL,
+  source_url      VARCHAR(300)  NOT NULL,
+  active          TINYINT(1)    NOT NULL DEFAULT 1,
+  first_seen_at   DATETIME      NOT NULL,
+  last_seen_at    DATETIME      NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_mvno_plans_source (source, source_id),
+  KEY idx_mvno_plans_active (active, monthly_fee)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`,
+    ],
+  },
 ];
 
 /** 공개 주소 앞머리. 없으면 바꿀 것도 없다. */
