@@ -101,22 +101,6 @@ export default async function blogRoutes(app: FastifyInstance) {
     return { items: await profiles.runnerBundle(profile) };
   });
 
-  /** 이 프로필에서 지금 쓸 아이디 하나를 고른다 (`null` 이면 고름 해제) */
-  app.patch('/admin/blog/profiles/:id/account', async (request) => {
-    const { id } = parse(idParam, request.params);
-    const row = await profiles.findProfile(id);
-    if (!row) throw notFound('프로필');
-
-    const { accountId } = parse(
-      z.object({ accountId: z.number().int().positive().nullable() }),
-      request.body,
-    );
-    if (!(await profiles.setCurrentAccount(id, row.name, accountId))) {
-      throw badRequest('이 프로필에 붙어 있는 아이디만 고를 수 있습니다.');
-    }
-    return { ok: true };
-  });
-
   /**
    * 작업기가 브라우저에서 잰 IP 를 적어 둔다 (비어 있을 때만).
    * 손으로 적다 오타가 나면 그 프로필이 통째로 멈추기 때문이다.

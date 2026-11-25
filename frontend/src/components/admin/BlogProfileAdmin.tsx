@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, Trash2 } from 'lucide-react';
 import { ApiError, apiFetch } from '@/lib/api';
-import { cn, formatDate } from '@/lib/utils';
+import { formatDate } from '@/lib/utils';
 import type { BlogProfile } from '@/lib/types';
 
 const inputClass = 'w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-zz-400';
@@ -89,24 +89,6 @@ export function BlogProfileAdmin({ items }: { items: BlogProfile[] }) {
     }
   };
 
-  /** 지금 쓸 아이디 고르기. 고른 것을 다시 누르면 해제된다 */
-  const pick = async (item: BlogProfile, accountId: number) => {
-    const next = item.currentAccountId === accountId ? null : accountId;
-    setBusy(true);
-    setError(null);
-    try {
-      await apiFetch(`/admin/blog/profiles/${item.id}/account`, {
-        method: 'PATCH',
-        body: JSON.stringify({ accountId: next }),
-      });
-      router.refresh();
-    } catch (err) {
-      fail(err, '고르지 못했어요.');
-    } finally {
-      setBusy(false);
-    }
-  };
-
   return (
     <section className="rounded-xl border border-gray-200 bg-white">
       <header className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
@@ -129,83 +111,89 @@ export function BlogProfileAdmin({ items }: { items: BlogProfile[] }) {
           아직 프로필이 없습니다. <b>프로필 추가</b> 를 눌러 IP 하나씩 만들어 주세요.
         </p>
       ) : (
-        <ul className="divide-y divide-gray-100">
-          {items.map((item) => (
-            <li key={item.id} className="px-5 py-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <button type="button" onClick={() => open(item)} className="font-medium text-gray-900 hover:underline">
-                    {item.name}
-                  </button>
-                  {!item.active && <span className="ml-1.5 text-xs text-gray-400">쉬는 중</span>}
-                  <p className="mt-0.5 text-xs text-gray-500">
+        <div>
+          {items.map((item, index) => {
+            // IP 가 바뀌는 자리에만 머리글을 둔다 (목록이 IP 순으로 정렬돼 온다)
+            const newGroup = index === 0 || items[index - 1]!.expectedIp !== item.expectedIp;
+            const account = item.accounts[0];
+            return (
+              <div key={item.id}>
+                {newGroup && (
+                  <p className="border-b border-gray-100 bg-gray-50 px-5 py-1.5 text-xs font-semibold text-gray-500">
                     {item.expectedIp ? (
-                      <span className="font-mono text-gray-600">{item.expectedIp}</span>
+                      <span className="font-mono">{item.expectedIp}</span>
                     ) : (
-                      <span className="text-gray-400">IP 는 첫 작업 때 기록됩니다</span>
+                      <span className="font-normal text-gray-400">IP 미정 — 첫 작업 때 기록됩니다</span>
                     )}
-                    {item.vpnLocation && <span className="ml-1.5">· {item.vpnLocation}</span>}
-                    {item.note && <span className="ml-1.5">· {item.note}</span>}
                   </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-3">
-                  <span className="text-xs text-gray-400">
-                    {item.lastOkAt ? `마지막 성공 ${formatDate(item.lastOkAt)}` : '아직 작업 없음'}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => remove(item)}
-                    disabled={busy}
-                    aria-label={`${item.name} 지우기`}
-                    className="rounded p-1 text-gray-300 hover:bg-red-50 hover:text-red-500 disabled:opacity-40"
-                  >
-                    <Trash2 size={14} />
-                  </button>
+                )}
+
+                <div className="flex items-start justify-between gap-3 border-b border-gray-50 px-5 py-3">
+                  <div className="min-w-0">
+                    <button
+                      type="button"
+                      onClick={() => open(item)}
+                      className="font-medium text-gray-900 hover:underline"
+                    >
+                      {item.name}
+                    </button>
+                    {!item.active && <span className="ml-1.5 text-xs text-gray-400">쉬는 중</span>}
+
+                    {/* 프로필 하나에 아이디 하나가 원칙이다 */}
+                    {account ? (
+                      <p className="mt-0.5 text-sm text-gray-700">
+                        {account.loginId}
+                        {!account.usable && <span className="ml-1 text-xs text-amber-600">쓸 수 없음</span>}
+                        {account.lastLoginCheckAt && (
+                          <span className="ml-1.5 text-xs text-gray-400">
+                            로그인 확인 {formatDate(account.lastLoginCheckAt)}
+                          </span>
+                        )}
+                      </p>
+                    ) : (
+                      <p className="mt-0.5 text-xs text-gray-400">
+                        붙은 아이디가 없습니다.{' '}
+                        <a href="/admin/nwork" className="font-semibold text-zz-600 hover:underline">
+                          네이버 계정
+                        </a>{' '}
+                        에서 <b>블로그 프로필</b> 칸에 <code>{item.name}</code> 을 적어주세요.
+                      </p>
+                    )}
+
+                    {/* 원칙을 어긴 상태는 숨기지 않고 보여준다 — 옛 데이터일 수 있다 */}
+                    {item.accounts.length > 1 && (
+                      <p className="mt-0.5 text-xs text-red-600">
+                        아이디가 {item.accounts.length}개 붙어 있습니다 ({item.accounts.map((a) => a.loginId).join(', ')}).
+                        프로필 하나에 하나만 두세요.
+                      </p>
+                    )}
+
+                    {(item.vpnLocation || item.note) && (
+                      <p className="mt-0.5 text-xs text-gray-400">
+                        {[item.vpnLocation, item.note].filter(Boolean).join(' · ')}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex shrink-0 items-center gap-3">
+                    <span className="text-xs text-gray-400">
+                      {item.lastOkAt ? `마지막 성공 ${formatDate(item.lastOkAt)}` : '아직 작업 없음'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => remove(item)}
+                      disabled={busy}
+                      aria-label={`${item.name} 지우기`}
+                      className="rounded p-1 text-gray-300 hover:bg-red-50 hover:text-red-500 disabled:opacity-40"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 </div>
               </div>
-
-              {/* 붙은 아이디 — 지금 쓸 것 하나만 고른다 (주기적으로 돌려 가며 쓴다) */}
-              {item.accounts.length === 0 ? (
-                <p className="mt-2 text-xs text-gray-400">
-                  붙은 아이디가 없습니다.{' '}
-                  <a href="/admin/nwork" className="font-semibold text-zz-600 hover:underline">
-                    네이버 계정
-                  </a>{' '}
-                  에서 <b>블로그 프로필</b> 칸에 <code>{item.name}</code> 을 적어주세요.
-                </p>
-              ) : (
-                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5">
-                  {item.accounts.map((account) => {
-                    const picked = item.currentAccountId === account.id;
-                    return (
-                      <label
-                        key={account.id}
-                        title={account.usable ? '다시 누르면 고름이 풀립니다' : '쓸 수 없음으로 꺼져 있어 작업에서 빠집니다'}
-                        className={cn(
-                          'flex items-center gap-1.5 text-sm',
-                          account.usable ? 'cursor-pointer text-gray-700' : 'cursor-not-allowed text-gray-300',
-                        )}
-                      >
-                        <input
-                          type="radio"
-                          name={`current-${item.id}`}
-                          checked={picked}
-                          disabled={busy || !account.usable}
-                          onChange={() => pick(item, account.id)}
-                          // 라디오는 보통 해제가 안 되므로 같은 것을 다시 누르면 풀어 준다
-                          onClick={() => picked && pick(item, account.id)}
-                          className="accent-zz-600"
-                        />
-                        <span className={cn(picked && 'font-semibold text-zz-700')}>{account.loginId}</span>
-                        {!account.usable && <span className="text-xs">(꺼짐)</span>}
-                      </label>
-                    );
-                  })}
-                </div>
-              )}
-            </li>
-          ))}
-        </ul>
+            );
+          })}
+        </div>
       )}
 
       {editing !== null && (

@@ -392,9 +392,7 @@ export interface BlogProfile {
   active: boolean;
   /** 이 프로필로 마지막에 로그인이 통한 시각 */
   lastOkAt: string | null;
-  /** 지금 이 프로필에서 쓸 아이디. 안 고르면 붙은 것 전부를 돈다 */
-  currentAccountId: number | null;
-  /** 이 프로필에 붙은 계정들 */
+  /** 이 프로필에 붙은 계정. **하나만 붙이는 게 원칙**이다 */
   accounts: BlogProfileAccount[];
 }
 
@@ -426,7 +424,5 @@ export interface RunnerProfile {
   userAgent: string;
   expectedIp: string;
   vpnLocation: string;
-  /** 지금 쓸 아이디. 있으면 작업기가 그것만 돌린다 */
-  currentAccountId: number | null;
   accounts: RunnerAccount[];
 }

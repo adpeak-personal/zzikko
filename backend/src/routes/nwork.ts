@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { badRequest, notFound, parse } from '../lib/http.js';
 import { requireAdmin } from '../lib/auth.js';
 import * as nwork from '../repositories/nwork.js';
-import { profileExists } from '../repositories/blogProfiles.js';
+import { profileExists, profileTakenBy } from '../repositories/blogProfiles.js';
 
 /* 네이버 작업 계정 — 전부 운영진 전용 */
 
@@ -58,10 +58,22 @@ const importSchema = z.object({
   role: role.default('미사용'),
 });
 
-/** 적어 넣은 프로필이 실제로 있는지 — 오타면 계정이 어느 프로필에도 안 붙는다 */
-async function checkProfile(name: string | undefined) {
-  if (name && !(await profileExists(name))) {
+/**
+ * 적어 넣은 프로필을 쓸 수 있는지.
+ *
+ * - 없는 이름이면 막는다 — 오타면 계정이 어느 프로필에도 안 붙어 작업에서 빠진다.
+ * - ⚠️ **이미 다른 계정이 쓰는 프로필이어도 막는다.** 프로필 하나에 아이디 하나가 원칙이다.
+ *   둘을 붙이면 같은 크롬 폴더를 두 계정이 나눠 쓰게 되는데, 네이버는 브라우저 하나에
+ *   한 계정만 로그인시키므로 돌릴 때마다 로그아웃→로그인을 반복하게 된다.
+ */
+async function checkProfile(name: string | undefined, accountId?: number) {
+  if (!name) return;
+  if (!(await profileExists(name))) {
     throw badRequest(`'${name}' 프로필이 없습니다. 블로그 프로필 화면에서 먼저 만들어 주세요.`);
+  }
+  const owner = await profileTakenBy(name, accountId);
+  if (owner) {
+    throw badRequest(`'${name}' 프로필은 이미 ${owner} 가 쓰고 있습니다. 프로필 하나에 아이디 하나만 붙입니다.`);
   }
 }
 
@@ -95,7 +107,7 @@ export default async function nworkRoutes(app: FastifyInstance) {
     const input = parse(updateSchema, request.body);
     if (!(await nwork.getAccount(id))) throw notFound('계정');
     if (await nwork.loginIdTaken(input.loginId, id)) throw badRequest('이미 등록된 아이디입니다.');
-    await checkProfile(input.profile);
+    await checkProfile(input.profile, id);
     await nwork.updateAccount(id, input);
     return nwork.getAccount(id);
   });

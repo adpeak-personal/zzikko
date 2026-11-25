@@ -18,7 +18,8 @@ export default async function AdminBlogPage() {
       <div>
         <h1 className="text-xl font-bold text-gray-900">블로그 작업 프로필</h1>
         <p className="mt-1 text-sm text-gray-500">
-          <b>IP 하나에 크롬 프로필 하나</b>가 한 쌍입니다. 네이버 계정은{' '}
+          <b>프로필 하나에 아이디 하나</b>입니다. IP 는 여러 프로필이 나눠 써도 됩니다 — 목록은 IP 로 묶어
+          보여줍니다. 아이디를 붙이려면{' '}
           <a href="/admin/nwork" className="font-semibold text-zz-600 hover:underline">
             네이버 계정
           </a>{' '}

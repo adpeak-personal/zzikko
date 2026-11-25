@@ -22,7 +22,6 @@ interface ProfileRow extends RowDataPacket {
   note: string;
   expected_ip: string;
   vpn_location: string;
-  current_account_id: number | null;
   active: number;
   last_ok_at: string | null;
   created_at: string;
@@ -42,12 +41,20 @@ const toProfile = (row: ProfileRow, accounts: BlogProfileAccount[]): BlogProfile
   vpnLocation: row.vpn_location,
   active: Boolean(row.active),
   lastOkAt: row.last_ok_at,
-  currentAccountId: row.current_account_id,
   accounts,
 });
 
 export async function listProfiles(): Promise<BlogProfile[]> {
-  const rows = await query<ProfileRow>('SELECT * FROM blog_profiles ORDER BY active DESC, name');
+  // IP 끼리 모이게 정렬한다. 여러 프로필이 같은 IP 를 나눠 쓰므로 IP 가 묶는 단위다.
+  // INET_ATON 을 쓰는 이유: 문자열로 줄 세우면 10.x 가 9.x 앞에 온다.
+  const rows = await query<ProfileRow>(
+    `SELECT * FROM blog_profiles
+      ORDER BY (expected_ip = '') ASC,
+               INET_ATON(expected_ip) ASC,
+               expected_ip ASC,
+               active DESC,
+               name ASC`,
+  );
   if (rows.length === 0) return [];
 
   // 붙은 계정을 한 번에 받아 프로필별로 나눈다 (프로필마다 따로 묻지 않는다)
@@ -68,21 +75,6 @@ export async function listProfiles(): Promise<BlogProfile[]> {
   }
 
   return rows.map((row) => toProfile(row, byProfile.get(row.name) ?? []));
-}
-
-/**
- * 지금 쓸 아이디를 고른다. `null` 이면 고르지 않은 상태(붙은 것 전부를 돈다).
- *
- * ⚠️ **그 프로필에 붙어 있는 계정만** 고를 수 있다. 다른 프로필의 아이디를 넣으면
- * 작업기가 엉뚱한 IP 로 그 계정에 들어가게 된다.
- */
-export async function setCurrentAccount(id: number, name: string, accountId: number | null): Promise<boolean> {
-  if (accountId !== null) {
-    const owned = await queryOne('SELECT 1 FROM nwork WHERE n_idx = ? AND work_profile = ?', [accountId, name]);
-    if (!owned) return false;
-  }
-  await execute('UPDATE blog_profiles SET current_account_id = ? WHERE id = ?', [accountId, id]);
-  return true;
 }
 
 export async function findProfile(id: number): Promise<ProfileRow | null> {
@@ -181,7 +173,11 @@ interface RunnerRow extends RowDataPacket {
  */
 export async function runnerBundle(onlyProfile?: string): Promise<RunnerProfile[]> {
   const profiles = await query<ProfileRow>(
-    `SELECT * FROM blog_profiles WHERE active = 1 ${onlyProfile ? 'AND name = ?' : ''} ORDER BY name`,
+    // 목록과 같은 순서(IP 끼리 모이게). 작업기가 차례로 도는데, 같은 IP 가 붙어 있으면
+    // 그 사이에는 VPN 을 바꿀 필요가 없다.
+    `SELECT * FROM blog_profiles
+       WHERE active = 1 ${onlyProfile ? 'AND name = ?' : ''}
+       ORDER BY (expected_ip = '') ASC, INET_ATON(expected_ip) ASC, expected_ip ASC, name ASC`,
     onlyProfile ? [onlyProfile] : [],
   );
   if (profiles.length === 0) return [];
@@ -212,8 +208,7 @@ export async function runnerBundle(onlyProfile?: string): Promise<RunnerProfile[
     userAgent: p.user_agent,
     expectedIp: p.expected_ip,
     vpnLocation: p.vpn_location,
-    currentAccountId: p.current_account_id,
-    accounts: byProfile.get(p.name) ?? [],
+      accounts: byProfile.get(p.name) ?? [],
   }));
 }
 
@@ -244,4 +239,19 @@ export async function recordIpIfEmpty(name: string, ip: string): Promise<boolean
     [ip, name],
   );
   return affectedRows > 0;
+}
+
+/**
+ * 그 프로필을 **이미 다른 계정이 쓰고 있는지.**
+ *
+ * ⚠️ 프로필 하나에는 아이디 하나만 붙인다. 둘을 붙이면 같은 크롬 폴더를 두 계정이
+ * 나눠 쓰게 되는데, 네이버는 브라우저 하나에 한 계정만 로그인시키므로 돌릴 때마다
+ * 로그아웃→로그인을 반복하게 된다. 그게 세션을 유지하는 것보다 훨씬 눈에 띈다.
+ */
+export async function profileTakenBy(name: string, exceptAccountId?: number): Promise<string | null> {
+  const row = await queryOne<RowDataPacket & { n_id: string }>(
+    `SELECT n_id FROM nwork WHERE work_profile = ?${exceptAccountId ? ' AND n_idx <> ?' : ''} LIMIT 1`,
+    exceptAccountId ? [name, exceptAccountId] : [name],
+  );
+  return row ? row.n_id : null;
 }
