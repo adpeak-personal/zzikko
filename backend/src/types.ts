@@ -371,3 +371,44 @@ export interface PlanList {
   source: { name: string; home: string };
   syncedAt: string | null;
 }
+
+/* ── 블로그 작업 프로필 (IP ↔ 크롬 프로필 한 쌍) ── */
+
+/** 어드민 화면용. **프록시 비밀번호는 담지 않는다** */
+export interface BlogProfile {
+  id: number;
+  /** 크롬 프로필 폴더 이름이자 `nwork.work_profile` 과 묶는 키 */
+  name: string;
+  proxyHost: string;
+  proxyPort: number | null;
+  proxyUser: string;
+  hasProxyPass: boolean;
+  userAgent: string;
+  note: string;
+  active: boolean;
+  /** 이 프로필로 마지막에 로그인이 통한 시각 */
+  lastOkAt: string | null;
+  /** 이 프로필에 묶인 계정 수 */
+  accounts: number;
+  /** 그중 쓸 수 있다고 표시된 수 — 돌아가는 건 이 수만큼이다 */
+  usable: number;
+}
+
+/** 작업기(py)에게만 주는 계정 — 비밀번호가 들어 있다 */
+export interface RunnerAccount {
+  id: number;
+  loginId: string;
+  password: string;
+  lastLoginCheckAt: string | null;
+}
+
+/** 작업기(py)에게만 주는 프로필 — 프록시 비밀번호가 들어 있다 */
+export interface RunnerProfile {
+  name: string;
+  proxyHost: string;
+  proxyPort: number | null;
+  proxyUser: string;
+  proxyPass: string;
+  userAgent: string;
+  accounts: RunnerAccount[];
+}

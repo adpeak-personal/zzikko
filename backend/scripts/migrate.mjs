@@ -355,6 +355,29 @@ const steps = [
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`,
     ],
   },
+  {
+    name: 'blog_profiles — 블로그 작업 프로필 (IP ↔ 크롬 프로필)',
+    check: (c) => hasTable(c, 'blog_profiles'),
+    sql: [
+      `CREATE TABLE blog_profiles (
+  id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  -- 크롬 프로필 폴더 이름이자 nwork.work_profile 과 묶는 키
+  name        VARCHAR(100) NOT NULL,
+  -- 산 IP 하나. 프로필 하나에 IP 하나다
+  proxy_host  VARCHAR(120) NOT NULL DEFAULT '',
+  proxy_port  INT UNSIGNED NULL,
+  proxy_user  VARCHAR(100) NOT NULL DEFAULT '',
+  proxy_pass  VARCHAR(100) NOT NULL DEFAULT '',
+  user_agent  VARCHAR(255) NOT NULL DEFAULT '',
+  note        VARCHAR(255) NOT NULL DEFAULT '',
+  active      TINYINT(1)   NOT NULL DEFAULT 1,
+  last_ok_at  DATETIME     NULL COMMENT '이 프로필로 마지막에 로그인이 통한 시각',
+  created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_blog_profiles_name (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`,
+    ],
+  },
 ];
 
 /** 공개 주소 앞머리. 없으면 바꿀 것도 없다. */

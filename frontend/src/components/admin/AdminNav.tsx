@@ -11,6 +11,7 @@ import {
   ListTree,
   MessageSquare,
   Newspaper,
+  NotebookPen,
   Scale,
   Settings,
   CardSim,
@@ -49,7 +50,10 @@ const SECTIONS = [
   {
     // 블로그 · 밴드 등 외부 자동화 프로그램의 작업 근거지
     title: '작업',
-    items: [{ href: '/admin/nwork', label: '네이버 계정', icon: KeyRound }],
+    items: [
+      { href: '/admin/nwork', label: '네이버 계정', icon: KeyRound },
+      { href: '/admin/blog', label: '블로그 프로필', icon: NotebookPen },
+    ],
   },
   {
     title: '기타',

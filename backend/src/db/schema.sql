@@ -30,6 +30,7 @@ DROP TABLE IF EXISTS
   sise_reports,
   sise_sheets, seller_applications;
 DROP TABLE IF EXISTS phone_verifications;
+DROP TABLE IF EXISTS blog_profiles;
 DROP TABLE IF EXISTS uploads;
 DROP TABLE IF EXISTS post_scraps;
 DROP TABLE IF EXISTS comment_likes;
@@ -526,4 +527,24 @@ CREATE TABLE IF NOT EXISTS nwork (
   work_profile    VARCHAR(100) DEFAULT NULL,
   PRIMARY KEY (n_idx),
   UNIQUE KEY n_id (n_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- 블로그 작업 프로필 — IP(프록시) 하나와 크롬 프로필 하나가 한 쌍.
+-- 계정(nwork)이 work_profile 이름으로 여기에 붙는다 (보통 셋).
+CREATE TABLE blog_profiles (
+  id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  -- 크롬 프로필 폴더 이름이자 nwork.work_profile 과 묶는 키
+  name        VARCHAR(100) NOT NULL,
+  -- 산 IP 하나. 프로필 하나에 IP 하나다
+  proxy_host  VARCHAR(120) NOT NULL DEFAULT '',
+  proxy_port  INT UNSIGNED NULL,
+  proxy_user  VARCHAR(100) NOT NULL DEFAULT '',
+  proxy_pass  VARCHAR(100) NOT NULL DEFAULT '',
+  user_agent  VARCHAR(255) NOT NULL DEFAULT '',
+  note        VARCHAR(255) NOT NULL DEFAULT '',
+  active      TINYINT(1)   NOT NULL DEFAULT 1,
+  last_ok_at  DATETIME     NULL COMMENT '이 프로필로 마지막에 로그인이 통한 시각',
+  created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_blog_profiles_name (name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

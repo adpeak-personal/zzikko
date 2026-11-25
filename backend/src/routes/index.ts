@@ -14,6 +14,7 @@ import postRoutes from './posts.js';
 import contentRoutes from './content.js';
 import uploadRoutes from './uploads.js';
 import nworkRoutes from './nwork.js';
+import blogRoutes from './blog.js';
 import sellerRoutes from './seller.js';
 import siseRoutes from './sise.js';
 import planRoutes from './plans.js';
@@ -76,6 +77,7 @@ export default async function routes(app: FastifyInstance) {
   await app.register(planRoutes);
   // 운영진 전용 훅을 플러그인 안에 거므로 다른 라우트에는 번지지 않는다
   await app.register(nworkRoutes);
+  await app.register(blogRoutes);
 
   /* ── 게시판 ── */
 

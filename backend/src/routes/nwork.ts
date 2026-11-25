@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { badRequest, notFound, parse } from '../lib/http.js';
 import { requireAdmin } from '../lib/auth.js';
 import * as nwork from '../repositories/nwork.js';
+import { profileExists } from '../repositories/blogProfiles.js';
 
 /* 네이버 작업 계정 — 전부 운영진 전용 */
 
@@ -29,6 +30,13 @@ const accountBase = {
   usable: z.boolean().default(true),
   role: role.default('미사용'),
   working: z.boolean().default(false),
+  /**
+   * 붙일 블로그 작업 프로필 이름 (`blog_profiles.name`). 빈 문자열이면 떼어 낸다.
+   *
+   * ⚠️ `.default('')` 를 주면 안 된다 — 프로필을 모르는 화면이 저장할 때마다
+   * 조용히 떨어져 나간다. **보낸 경우에만** 바꾼다.
+   */
+  profile: z.string().trim().max(100).optional(),
 };
 
 const createSchema = z.object({ ...accountBase, password: z.string().min(1, '비밀번호를 입력해주세요.').max(100) });
@@ -50,6 +58,13 @@ const importSchema = z.object({
   role: role.default('미사용'),
 });
 
+/** 적어 넣은 프로필이 실제로 있는지 — 오타면 계정이 어느 프로필에도 안 붙는다 */
+async function checkProfile(name: string | undefined) {
+  if (name && !(await profileExists(name))) {
+    throw badRequest(`'${name}' 프로필이 없습니다. 블로그 프로필 화면에서 먼저 만들어 주세요.`);
+  }
+}
+
 export default async function nworkRoutes(app: FastifyInstance) {
   app.addHook('preHandler', requireAdmin);
 
@@ -70,6 +85,7 @@ export default async function nworkRoutes(app: FastifyInstance) {
   app.post('/admin/nwork', async (request, reply) => {
     const input = parse(createSchema, request.body);
     if (await nwork.loginIdTaken(input.loginId)) throw badRequest('이미 등록된 아이디입니다.');
+    await checkProfile(input.profile);
     const id = await nwork.createAccount(input);
     return reply.code(201).send(await nwork.getAccount(id));
   });
@@ -79,6 +95,7 @@ export default async function nworkRoutes(app: FastifyInstance) {
     const input = parse(updateSchema, request.body);
     if (!(await nwork.getAccount(id))) throw notFound('계정');
     if (await nwork.loginIdTaken(input.loginId, id)) throw badRequest('이미 등록된 아이디입니다.');
+    await checkProfile(input.profile);
     await nwork.updateAccount(id, input);
     return nwork.getAccount(id);
   });

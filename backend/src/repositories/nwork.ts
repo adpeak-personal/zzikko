@@ -127,6 +127,8 @@ export interface NworkInput {
   usable: boolean;
   role: string;
   working: boolean;
+  /** 붙일 블로그 작업 프로필 이름 (blog_profiles.name). 빈 문자열이면 떼어 낸다 */
+  profile?: string;
 }
 
 const emptyToNull = (value: string) => (value.trim() ? value.trim() : null);
@@ -144,6 +146,7 @@ export async function createAccount(input: NworkInput & { password: string }): P
       input.usable ? 1 : 0,
       input.role,
       input.working ? 1 : 0,
+      emptyToNull(input.profile ?? ''),
     ],
   );
   return result.insertId;
@@ -166,6 +169,10 @@ export async function updateAccount(id: number, input: NworkInput & { password?:
       id,
     ],
   );
+  // 프로필은 보낸 경우에만 바꾼다 — 안 보낸 화면이 저장해도 떨어지지 않게
+  if (input.profile !== undefined) {
+    await execute('UPDATE nwork SET work_profile = ? WHERE n_idx = ?', [emptyToNull(input.profile), id]);
+  }
   if (input.password) await execute('UPDATE nwork SET n_pwd = ? WHERE n_idx = ?', [input.password, id]);
 }
 

@@ -110,7 +110,11 @@ function RoleInput({ value, onChange, roles }: { value: string; onChange: (role:
 
 /* ── 한 계정 추가 · 수정 ─────────────────────────── */
 
-type Draft = Pick<NworkAccount, 'id' | 'loginId' | 'memo1' | 'memo2' | 'memo3' | 'usable' | 'role' | 'working'> & { password: string };
+type Draft = Pick<NworkAccount, 'id' | 'loginId' | 'memo1' | 'memo2' | 'memo3' | 'usable' | 'role' | 'working'> & {
+  password: string;
+  /** 붙일 블로그 작업 프로필 이름. 빈 값이면 어디에도 안 붙는다 */
+  profile: string;
+};
 
 const emptyDraft = (): Draft => ({
   id: 0,
@@ -122,6 +126,7 @@ const emptyDraft = (): Draft => ({
   usable: true,
   role: '미사용',
   working: false,
+  profile: '',
 });
 
 function AccountForm({ draft, roles, onDone }: { draft: Draft; roles: string[]; onDone: () => void }) {
@@ -183,6 +188,20 @@ function AccountForm({ draft, roles, onDone }: { draft: Draft; roles: string[]; 
             <input value={form[key]} onChange={(e) => set(key, e.target.value)} maxLength={255} className={cn(inputClass, 'mt-1')} />
           </label>
         ))}
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <label className="block text-xs font-medium text-gray-600">
+          블로그 프로필
+          <span className="font-normal text-gray-400"> — 이 계정이 쓸 IP</span>
+          <input
+            value={form.profile}
+            onChange={(e) => set('profile', e.target.value)}
+            maxLength={100}
+            placeholder="prof-01 (없으면 비움)"
+            className={cn(inputClass, 'mt-1')}
+          />
+        </label>
       </div>
 
       <div className="flex flex-wrap gap-4">
@@ -569,6 +588,7 @@ function AccountRow({
                 memo1: account.memo1,
                 memo2: account.memo2,
                 memo3: account.memo3,
+                profile: account.profile ?? '',
                 usable: account.usable,
                 role: account.role,
                 working: account.working,
