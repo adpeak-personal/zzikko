@@ -101,6 +101,21 @@ export default async function blogRoutes(app: FastifyInstance) {
     return { items: await profiles.runnerBundle(profile) };
   });
 
+  /** 고른 프로필들을 한 번에 쓰기/쉬기 — 같은 IP 에서 어느 아이디를 돌릴지 고를 때 */
+  app.post('/admin/blog/profiles/bulk', async (request) => {
+    const { ids, active } = parse(
+      z.object({ ids: z.array(z.number().int().positive()).min(1).max(500), active: z.boolean() }),
+      request.body,
+    );
+    return { updated: await profiles.setActiveMany(ids, active) };
+  });
+
+  /** 고른 프로필들을 한 번에 지운다. 붙어 있던 계정은 남는다 */
+  app.post('/admin/blog/profiles/bulk-delete', async (request) => {
+    const { ids } = parse(z.object({ ids: z.array(z.number().int().positive()).min(1).max(500) }), request.body);
+    return { deleted: await profiles.deleteMany(ids) };
+  });
+
   /**
    * 작업기가 브라우저에서 잰 IP 를 적어 둔다 (비어 있을 때만).
    * 손으로 적다 오타가 나면 그 프로필이 통째로 멈추기 때문이다.

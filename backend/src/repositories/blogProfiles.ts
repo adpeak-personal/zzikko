@@ -255,3 +255,28 @@ export async function profileTakenBy(name: string, exceptAccountId?: number): Pr
   );
   return row ? row.n_id : null;
 }
+
+/** 여러 프로필을 한 번에 쓰기/쉬기 — 같은 IP 에서 어느 아이디를 돌릴지 고를 때 쓴다 */
+export async function setActiveMany(ids: number[], active: boolean): Promise<number> {
+  const { affectedRows } = await execute(
+    `UPDATE blog_profiles SET active = ? WHERE id IN (${ids.map(() => '?').join(',')})`,
+    [active ? 1 : 0, ...ids],
+  );
+  return affectedRows;
+}
+
+/** 여러 프로필을 한 번에 지운다. **계정은 남기고** 프로필만 뗀다 */
+export async function deleteMany(ids: number[]): Promise<number> {
+  const rows = await query<ProfileRow>(
+    `SELECT name FROM blog_profiles WHERE id IN (${ids.map(() => '?').join(',')})`,
+    ids,
+  );
+  if (rows.length === 0) return 0;
+  const names = rows.map((row) => row.name);
+  await execute(`UPDATE nwork SET work_profile = NULL WHERE work_profile IN (${names.map(() => '?').join(',')})`, names);
+  const { affectedRows } = await execute(
+    `DELETE FROM blog_profiles WHERE id IN (${ids.map(() => '?').join(',')})`,
+    ids,
+  );
+  return affectedRows;
+}
