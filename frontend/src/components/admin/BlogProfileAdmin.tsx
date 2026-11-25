@@ -209,12 +209,16 @@ export function BlogProfileAdmin({ items }: { items: BlogProfile[] }) {
                 className={`mt-1 ${inputClass}`}
               />
             </label>
-            <label className="block text-xs font-semibold text-gray-500">
+            <label className="block text-xs font-semibold text-gray-500 sm:col-span-2">
               프록시 주소
+              <span className="font-normal text-gray-400">
+                {' '}
+                — VPN 업체가 준 주소입니다. <b>내 IP 를 적는 칸이 아닙니다</b>
+              </span>
               <input
                 value={draft.proxyHost}
                 onChange={(event) => setDraft({ ...draft, proxyHost: event.target.value })}
-                placeholder="1.2.3.4"
+                placeholder="지금 쓰는 회선 그대로 나가려면 비워 두세요"
                 className={`mt-1 ${inputClass}`}
               />
             </label>

@@ -29,9 +29,21 @@ const profileBase = {
   active: z.boolean().default(true),
 };
 
-const createSchema = z.object({ ...profileBase, proxyPass: z.string().max(100).default('') });
+/**
+ * 프록시는 주소와 포트가 같이 있어야 한다.
+ *
+ * ⚠️ 주소만 적고 포트를 비우면 브라우저가 그 주소를 프록시로 알고 접속하다 실패해
+ * **아무 데도 못 간다.** 화면에서는 "IP 칸" 처럼 보여서, 자기 IP 를 적어 넣기 쉽다.
+ */
+const needsPort = <T extends { proxyHost: string; proxyPort: number | null }>(schema: z.ZodType<T>) =>
+  schema.refine((v) => !v.proxyHost || v.proxyPort !== null, {
+    path: ['proxyPort'],
+    message: '프록시 주소를 적었으면 포트도 넣어주세요. (내 IP 로 그냥 나가려면 주소를 비웁니다)',
+  });
+
+const createSchema = needsPort(z.object({ ...profileBase, proxyPass: z.string().max(100).default('') }));
 // 수정할 땐 비밀번호를 보낼 때만 바꾼다
-const updateSchema = z.object({ ...profileBase, proxyPass: z.string().max(100).optional() });
+const updateSchema = needsPort(z.object({ ...profileBase, proxyPass: z.string().max(100).optional() }));
 
 export default async function blogRoutes(app: FastifyInstance) {
   app.addHook('preHandler', requireAdmin);
