@@ -72,15 +72,19 @@ export function BlogProfileAdmin({ items }: { items: BlogProfile[] }) {
     }
   };
 
-  const bulkDelete = async () => {
-    if (!confirm(`프로필 ${selected.length}개를 지웁니다.\n붙어 있던 아이디는 남고 프로필만 떨어집니다.`)) return;
+  /** 지우기 **표시만** 한다. 실제로 지우는 건 작업기다 (PC 의 폴더까지 치워야 하므로) */
+  const bulkPending = async () => {
+    const warn =
+      `프로필 ${selected.length}개를 지우기로 표시합니다.\n` +
+      `작업기를 한 번 돌리면 PC 의 크롬 폴더까지 지워지고 목록에서 사라집니다.`;
+    if (!confirm(warn)) return;
     setBusy(true);
     setError(null);
     try {
-      await apiFetch(`${BASE}/bulk-delete`, { method: 'POST', body: JSON.stringify({ ids: selected }) });
+      await apiFetch(`${BASE}/bulk`, { method: 'POST', body: JSON.stringify({ ids: selected, pendingDelete: true }) });
       done();
     } catch (err) {
-      fail(err, '지우지 못했어요.');
+      fail(err, '바꾸지 못했어요.');
     } finally {
       setBusy(false);
     }
@@ -100,12 +104,25 @@ export function BlogProfileAdmin({ items }: { items: BlogProfile[] }) {
     }
   };
 
-  /** 표에서 바로 쓰기/쉬기 — 여러 개 바꾸는 길을 하나짜리로 쓴다 */
-  const setActive = async (item: BlogProfile, active: boolean) => {
+  /**
+   * 표에서 바로 상태를 바꾼다 — 여러 개 바꾸는 길을 하나짜리로 쓴다.
+   *
+   * '삭제'는 **표시만** 한다. 크롬 프로필 폴더가 작업 PC 에 있어서 서버가 못 지우므로,
+   * 작업기를 한 번 돌려야 폴더가 지워지고 목록에서도 사라진다.
+   */
+  const setStatus = async (item: BlogProfile, value: '쓰기' | '쉬기' | '삭제') => {
+    if (value === '삭제') {
+      const warn =
+        `프로필 ${item.name} 을 지우기로 표시합니다.\n` +
+        `작업기를 한 번 돌리면 PC 의 크롬 폴더까지 지워지고 목록에서 사라집니다.`;
+      if (!confirm(warn)) return;
+    }
     setBusy(true);
     setError(null);
+    const body =
+      value === '삭제' ? { ids: [item.id], pendingDelete: true } : { ids: [item.id], active: value === '쓰기' };
     try {
-      await apiFetch(`${BASE}/bulk`, { method: 'POST', body: JSON.stringify({ ids: [item.id], active }) });
+      await apiFetch(`${BASE}/bulk`, { method: 'POST', body: JSON.stringify(body) });
       router.refresh();
     } catch (err) {
       fail(err, '바꾸지 못했어요.');
@@ -154,10 +171,10 @@ export function BlogProfileAdmin({ items }: { items: BlogProfile[] }) {
           <button
             type="button"
             disabled={busy}
-            onClick={bulkDelete}
+            onClick={bulkPending}
             className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs text-red-600 hover:bg-red-50 disabled:opacity-50"
           >
-            지우기
+            삭제 표시
           </button>
           <button type="button" onClick={() => setSelected([])} className="ml-auto text-xs text-gray-500 hover:underline">
             선택 해제
@@ -213,7 +230,14 @@ export function BlogProfileAdmin({ items }: { items: BlogProfile[] }) {
                       </tr>
                     )}
 
-                    <tr className={cn('border-b border-gray-50 align-middle', checked && 'bg-zz-50/40', !item.active && 'text-gray-400')}>
+                    <tr
+                      className={cn(
+                        'border-b border-gray-50 align-middle',
+                        checked && 'bg-zz-50/40',
+                        item.pendingDelete && 'bg-red-50/50',
+                        !item.active && 'text-gray-400',
+                      )}
+                    >
                       <td className="px-4 py-2">
                         <input
                           type="checkbox"
@@ -223,7 +247,12 @@ export function BlogProfileAdmin({ items }: { items: BlogProfile[] }) {
                           className="accent-zz-600"
                         />
                       </td>
-                      <td className="px-2 py-2 font-medium text-gray-900">{item.name}</td>
+                      <td className="px-2 py-2 font-medium text-gray-900">
+                        {item.name}
+                        {item.pendingDelete && (
+                          <span className="ml-1.5 text-xs font-normal text-red-600">작업기를 돌리면 지워집니다</span>
+                        )}
+                      </td>
                       <td className="px-2 py-2">
                         {account ? (
                           <>
@@ -245,17 +274,22 @@ export function BlogProfileAdmin({ items }: { items: BlogProfile[] }) {
                       <td className="px-2 py-2">
                         {/* 같은 IP 에서 이번에 돌릴 것만 켜 두면 된다 — 쉬는 프로필은 작업기가 건너뛴다 */}
                         <select
-                          value={item.active ? '1' : '0'}
+                          value={item.pendingDelete ? '삭제' : item.active ? '쓰기' : '쉬기'}
                           disabled={busy}
-                          onChange={(event) => void setActive(item, event.target.value === '1')}
+                          onChange={(event) => void setStatus(item, event.target.value as '쓰기' | '쉬기' | '삭제')}
                           aria-label={`${item.name} 상태`}
                           className={cn(
                             'rounded border border-transparent bg-transparent py-0.5 pl-1 pr-5 text-xs outline-none hover:border-gray-200 focus:border-zz-400 disabled:opacity-50',
-                            item.active ? 'text-emerald-700' : 'text-gray-400',
+                            item.pendingDelete
+                              ? 'font-semibold text-red-600'
+                              : item.active
+                                ? 'text-emerald-700'
+                                : 'text-gray-400',
                           )}
                         >
-                          <option value="1">쓰는 중</option>
-                          <option value="0">쉬는 중</option>
+                          <option value="쓰기">쓰는 중</option>
+                          <option value="쉬기">쉬는 중</option>
+                          <option value="삭제">삭제 대기</option>
                         </select>
                       </td>
                       <td className="whitespace-nowrap px-2 py-2 text-right text-xs text-gray-400">

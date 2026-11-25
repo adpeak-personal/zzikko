@@ -23,6 +23,7 @@ interface ProfileRow extends RowDataPacket {
   expected_ip: string;
   vpn_location: string;
   active: number;
+  pending_delete: number;
   last_ok_at: string | null;
   created_at: string;
 }
@@ -40,6 +41,7 @@ const toProfile = (row: ProfileRow, accounts: BlogProfileAccount[]): BlogProfile
   expectedIp: row.expected_ip,
   vpnLocation: row.vpn_location,
   active: Boolean(row.active),
+  pendingDelete: Boolean(row.pending_delete),
   lastOkAt: row.last_ok_at,
   accounts,
 });
@@ -259,10 +261,30 @@ export async function profileTakenBy(name: string, exceptAccountId?: number): Pr
 /** 여러 프로필을 한 번에 쓰기/쉬기 — 같은 IP 에서 어느 아이디를 돌릴지 고를 때 쓴다 */
 export async function setActiveMany(ids: number[], active: boolean): Promise<number> {
   const { affectedRows } = await execute(
-    `UPDATE blog_profiles SET active = ? WHERE id IN (${ids.map(() => '?').join(',')})`,
+    // 다시 쓰기로 돌리면 지우기 표시도 같이 푼다 — 표시해 둔 채로 돌면 작업기가 지워 버린다
+    `UPDATE blog_profiles SET active = ?, pending_delete = 0 WHERE id IN (${ids.map(() => '?').join(',')})`,
     [active ? 1 : 0, ...ids],
   );
   return affectedRows;
+}
+
+/**
+ * 지우기로 표시해 둔다. **여기서 행을 지우지 않는다** —
+ * 크롬 프로필 폴더는 작업 PC 에 있어서 서버가 못 지운다.
+ * 작업기가 폴더를 지운 뒤 `DELETE /admin/blog/profiles/:id` 로 마무리한다.
+ */
+export async function markPendingDelete(ids: number[]): Promise<number> {
+  const { affectedRows } = await execute(
+    `UPDATE blog_profiles SET pending_delete = 1, active = 0 WHERE id IN (${ids.map(() => '?').join(',')})`,
+    ids,
+  );
+  return affectedRows;
+}
+
+/** 작업기가 치울 것들 */
+export async function listPendingDelete(): Promise<{ id: number; name: string }[]> {
+  const rows = await query<ProfileRow>('SELECT id, name FROM blog_profiles WHERE pending_delete = 1 ORDER BY name');
+  return rows.map((row) => ({ id: row.id, name: row.name }));
 }
 
 /** 여러 프로필을 한 번에 지운다. **계정은 남기고** 프로필만 뗀다 */

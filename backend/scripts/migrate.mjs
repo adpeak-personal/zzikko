@@ -395,6 +395,15 @@ const steps = [
          ADD COLUMN current_account_id INT UNSIGNED NULL COMMENT '지금 이 프로필에서 쓸 아이디 (nwork.n_idx)'`,
     ],
   },
+  {
+    name: 'blog_profiles.pending_delete — 지우기 예약',
+    check: (c) => hasColumn(c, 'blog_profiles', 'pending_delete'),
+    sql: [
+      `ALTER TABLE blog_profiles
+         ADD COLUMN pending_delete TINYINT(1) NOT NULL DEFAULT 0
+         COMMENT '지우기로 표시해 둔 것. 작업기가 PC 의 크롬 폴더를 지운 뒤 행을 없앤다'`,
+    ],
+  },
 ];
 
 /** 공개 주소 앞머리. 없으면 바꿀 것도 없다. */

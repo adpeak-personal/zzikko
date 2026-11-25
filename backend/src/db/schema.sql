@@ -549,6 +549,9 @@ CREATE TABLE blog_profiles (
   -- 지금 이 프로필에서 쓸 아이디 하나 (nwork.n_idx). 주기적으로 돌려 가며 쓴다
   current_account_id INT UNSIGNED NULL,
   active      TINYINT(1)   NOT NULL DEFAULT 1,
+  -- 지우기로 표시해 둔 것. 서버는 PC 의 크롬 폴더를 못 지우므로,
+  -- 작업기가 폴더를 지운 뒤에 이 행을 없앤다
+  pending_delete TINYINT(1) NOT NULL DEFAULT 0,
   last_ok_at  DATETIME     NULL COMMENT '이 프로필로 마지막에 로그인이 통한 시각',
   created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),

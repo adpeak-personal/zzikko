@@ -392,6 +392,8 @@ export interface BlogProfile {
   /** VPN 에서 고를 위치 이름 (자동 전환에 쓴다) */
   vpnLocation: string;
   active: boolean;
+  /** 지우기로 표시해 둔 것. 작업기가 PC 의 폴더를 지운 뒤 행을 없앤다 */
+  pendingDelete: boolean;
   /** 이 프로필로 마지막에 로그인이 통한 시각 */
   lastOkAt: string | null;
   /** 이 프로필에 붙은 계정. **하나만 붙이는 게 원칙**이다 */

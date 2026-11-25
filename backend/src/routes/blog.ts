@@ -101,14 +101,27 @@ export default async function blogRoutes(app: FastifyInstance) {
     return { items: await profiles.runnerBundle(profile) };
   });
 
-  /** 고른 프로필들을 한 번에 쓰기/쉬기 — 같은 IP 에서 어느 아이디를 돌릴지 고를 때 */
+  /**
+   * 고른 프로필들의 상태를 한 번에 바꾼다.
+   * `active` 면 쓰기/쉬기, `pendingDelete` 면 **지우기 표시만** 한다(행은 작업기가 없앤다).
+   */
   app.post('/admin/blog/profiles/bulk', async (request) => {
-    const { ids, active } = parse(
-      z.object({ ids: z.array(z.number().int().positive()).min(1).max(500), active: z.boolean() }),
+    const { ids, active, pendingDelete } = parse(
+      z
+        .object({
+          ids: z.array(z.number().int().positive()).min(1).max(500),
+          active: z.boolean().optional(),
+          pendingDelete: z.literal(true).optional(),
+        })
+        .refine((v) => v.active !== undefined || v.pendingDelete, '바꿀 값을 보내주세요.'),
       request.body,
     );
-    return { updated: await profiles.setActiveMany(ids, active) };
+    if (pendingDelete) return { updated: await profiles.markPendingDelete(ids) };
+    return { updated: await profiles.setActiveMany(ids, active!) };
   });
+
+  /** 작업기가 치울 목록. 폴더를 지운 뒤 `DELETE /admin/blog/profiles/:id` 로 마무리한다 */
+  app.get('/admin/blog/pending-delete', async () => ({ items: await profiles.listPendingDelete() }));
 
   /** 고른 프로필들을 한 번에 지운다. 붙어 있던 계정은 남는다 */
   app.post('/admin/blog/profiles/bulk-delete', async (request) => {
