@@ -14,6 +14,8 @@ const boolParam = z.enum(['1', '0']).transform((value) => value === '1');
 const listQuery = z.object({
   q: z.string().trim().max(100).optional(),
   role: z.string().trim().max(20).optional(),
+  /** 용도가 비어 있는 것만 보기 */
+  noRole: boolParam.optional(),
   usable: boolParam.optional(),
   working: boolParam.optional(),
   page: z.coerce.number().int().min(1).default(1),
@@ -82,7 +84,8 @@ export default async function nworkRoutes(app: FastifyInstance) {
 
   app.get('/admin/nwork', async (request) => {
     const filter = parse(listQuery, request.query);
-    const [list, summary] = await Promise.all([nwork.listAccounts(filter), nwork.summary()]);
+    // 집계도 같은 조건을 받는다 — 화면의 숫자가 지금 보이는 범위와 맞아야 한다
+    const [list, summary] = await Promise.all([nwork.listAccounts(filter), nwork.summary(filter)]);
     return { ...list, summary };
   });
 

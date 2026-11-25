@@ -47,13 +47,20 @@ const toAccount = (row: NworkRow): NworkAccount => ({
 export interface NworkFilter {
   q?: string;
   role?: string;
+  /** 용도가 비어 있는 것만 — `role` 보다 먼저 본다 */
+  noRole?: boolean;
   usable?: boolean;
   working?: boolean;
   page: number;
   size: number;
 }
 
-export async function listAccounts(filter: NworkFilter): Promise<Paged<NworkAccount>> {
+/**
+ * 거르는 조건을 만든다. 목록과 집계가 **같은 규칙**을 써야 화면의 숫자와 줄 수가 맞는다.
+ *
+ * `skipRole` 은 용도 집계에서 쓴다 — 용도별 개수를 셀 때 용도로 거르면 고른 것 하나만 남는다.
+ */
+function buildWhere(filter: NworkFilter, skipRole = false) {
   const where: string[] = [];
   const params: unknown[] = [];
   if (filter.q) {
@@ -62,9 +69,14 @@ export async function listAccounts(filter: NworkFilter): Promise<Paged<NworkAcco
     const like = `%${filter.q}%`;
     params.push(like, like, like, like);
   }
-  if (filter.role) {
-    where.push('task_role = ?');
-    params.push(filter.role);
+  if (!skipRole) {
+    if (filter.noRole) {
+      // 용도가 비어 있는 것들. 옛 자료에 섞여 있어서 따로 고를 수 있게 둔다
+      where.push("(task_role IS NULL OR task_role = '')");
+    } else if (filter.role) {
+      where.push('task_role = ?');
+      params.push(filter.role);
+    }
   }
   if (filter.usable !== undefined) {
     where.push('use_status = ?');
@@ -74,7 +86,11 @@ export async function listAccounts(filter: NworkFilter): Promise<Paged<NworkAcco
     where.push('work_used = ?');
     params.push(filter.working ? 1 : 0);
   }
-  const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+  return { sql: where.length ? `WHERE ${where.join(' AND ')}` : '', params };
+}
+
+export async function listAccounts(filter: NworkFilter): Promise<Paged<NworkAccount>> {
+  const { sql: whereSql, params } = buildWhere(filter);
 
   const [countRow] = await query<RowDataPacket & { n: number }>(`SELECT COUNT(*) AS n FROM nwork ${whereSql}`, params);
   const rows = await query<NworkRow>(
@@ -88,19 +104,38 @@ export async function listAccounts(filter: NworkFilter): Promise<Paged<NworkAcco
   return { items: rows.map(toAccount), total: Number(countRow?.n ?? 0), page: filter.page, size: filter.size };
 }
 
-/** 목록 위에 띄울 건수 — 필터와 상관없이 전체 기준 */
-export async function summary(): Promise<NworkSummary> {
+/**
+ * 목록 위에 띄울 건수.
+ *
+ * - 상태(전체·사용 가능·사용 불가)는 **검색어 안에서** 센다. 검색을 걸어 두고
+ *   상태를 고를 때 숫자가 맞아야 한다.
+ * - 용도별 개수는 거기에 **상태까지 반영**해서 센다 — "사용 불가인 블로그 계정이 몇 개" 가
+ *   바로 보여야 고를 수 있다. 용도 자체는 빼고 센다(고른 것만 남으면 셀 이유가 없다).
+ */
+export async function summary(filter: NworkFilter): Promise<NworkSummary> {
+  // 상태 칸은 상태를 빼고 센다 — '사용 가능'을 고른 채로도 '사용 불가'가 몇 개인지 보여야 한다
+  const base = buildWhere({ ...filter, usable: undefined, working: undefined, role: '', noRole: false });
   const [totals] = await query<RowDataPacket & { total: number; usable: number; working: number }>(
-    'SELECT COUNT(*) AS total, SUM(use_status = 1) AS usable, SUM(work_used = 1) AS working FROM nwork',
+    `SELECT COUNT(*) AS total, SUM(use_status = 1) AS usable, SUM(work_used = 1) AS working FROM nwork ${base.sql}`,
+    base.params,
   );
-  const roles = await query<RowDataPacket & { task_role: string; n: number }>(
-    'SELECT task_role, COUNT(*) AS n FROM nwork GROUP BY task_role ORDER BY n DESC',
+
+  const scoped = buildWhere(filter, true);
+  const roles = await query<RowDataPacket & { task_role: string | null; n: number }>(
+    `SELECT task_role, COUNT(*) AS n FROM nwork ${scoped.sql} GROUP BY task_role ORDER BY n DESC`,
+    scoped.params,
   );
+
+  // 비어 있는 용도는 한 줄로 모은다 (NULL 과 '' 가 섞여 있을 수 있다)
+  const named = roles.filter((row) => (row.task_role ?? '').trim() !== '');
+  const blank = roles.reduce((sum, row) => sum + ((row.task_role ?? '').trim() === '' ? Number(row.n) : 0), 0);
+
   return {
     total: Number(totals?.total ?? 0),
     usable: Number(totals?.usable ?? 0),
     working: Number(totals?.working ?? 0),
-    roles: roles.map((row) => ({ role: row.task_role, count: Number(row.n) })),
+    roles: named.map((row) => ({ role: row.task_role as string, count: Number(row.n) })),
+    noRole: blank,
   };
 }
 

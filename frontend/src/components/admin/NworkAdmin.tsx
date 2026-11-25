@@ -12,6 +12,8 @@ import type { BlogProfile, NworkAccount, NworkSummary, Paged } from '@/lib/types
 export interface NworkFilters {
   q: string;
   role: string;
+  /** 용도가 비어 있는 것만 ('1' 이면 켠 것) */
+  noRole: string;
   usable: '' | '1' | '0';
   working: '' | '1' | '0';
 }
@@ -354,7 +356,7 @@ function BulkBar({ ids, roles, onDone, onClear }: { ids: number[]; roles: string
         사용 가능
       </button>
       <button type="button" disabled={saving} onClick={() => apply({ usable: false })} className={chip}>
-        정지
+        사용 불가
       </button>
       <button type="button" disabled={saving} onClick={() => apply({ working: false })} className={chip}>
         작업 중 해제
@@ -431,14 +433,14 @@ export function NworkAdmin({
     </button>
   );
 
-  const noFilter = !filters.q && !filters.role && !filters.usable && !filters.working;
+  const noFilter = !filters.q && !filters.role && !filters.noRole && !filters.usable && !filters.working;
 
   return (
     <div className="space-y-4">
       {/* 요약 — 누르면 그 조건으로 거른다 */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-[repeat(auto-fill,minmax(120px,1fr))]">
         {/* 상태만 칩으로 둔다. 용도·작업중은 검색칸 옆 select 에서 고르고, 둘은 교집합으로 걸린다 */}
-        {statChip('전체', summary.total, noFilter, { q: '', role: '', usable: '', working: '' })}
+        {statChip('전체', summary.total, noFilter, { q: '', role: '', noRole: '', usable: '', working: '' })}
         {statChip('사용 가능', summary.usable, filters.usable === '1', { usable: filters.usable === '1' ? '' : '1' })}
         {statChip('사용 불가', summary.total - summary.usable, filters.usable === '0', { usable: filters.usable === '0' ? '' : '0' })}
       </div>
@@ -478,12 +480,14 @@ export function NworkAdmin({
 
             {/* 용도와 '작업 중' 을 한 칸에 모았다. 위의 사용 가능/불가 와 **교집합**으로 걸린다.
                 값 앞에 무엇으로 거를지를 붙여 둔다 (role: / working) — 둘은 다른 칸이라서 */}
+            {/* 개수는 **지금 고른 상태(사용 가능/불가)와 검색어 안에서** 센 것이다.
+                그래야 고르기 전에 몇 개가 나올지 알 수 있다 */}
             <select
-              value={filters.working === '1' ? 'working' : filters.role ? `role:${filters.role}` : ''}
+              value={filters.noRole === '1' ? 'none' : filters.role ? `role:${filters.role}` : ''}
               onChange={(event) => {
                 const picked = event.target.value;
                 go({
-                  working: picked === 'working' ? '1' : '',
+                  noRole: picked === 'none' ? '1' : '',
                   role: picked.startsWith('role:') ? picked.slice(5) : '',
                 });
               }}
@@ -491,16 +495,15 @@ export function NworkAdmin({
               className="shrink-0 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-zz-400"
             >
               <option value="">용도 전체</option>
-              <option value="working">작업 중 ({formatNumber(summary.working)})</option>
               {roles.map((role) => {
                 const found = summary.roles.find((r) => r.role === role);
                 return (
                   <option key={role} value={`role:${role}`}>
-                    {role}
-                    {found ? ` (${formatNumber(found.count)})` : ''}
+                    {role} ({formatNumber(found?.count ?? 0)})
                   </option>
                 );
               })}
+              <option value="none">용도 없음 ({formatNumber(summary.noRole)})</option>
             </select>
           </form>
           <span className="text-sm text-gray-500">{formatNumber(total)}개</span>

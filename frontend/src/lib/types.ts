@@ -217,6 +217,8 @@ export interface NworkSummary {
   usable: number;
   working: number;
   roles: { role: string; count: number }[];
+  /** 용도가 비어 있는 계정 수 */
+  noRole: number;
 }
 
 /* ── 판매자 입점 신청 ── */

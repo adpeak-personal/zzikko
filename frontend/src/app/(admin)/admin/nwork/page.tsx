@@ -8,7 +8,7 @@ import { NworkAdmin, type NworkFilters } from '@/components/admin/NworkAdmin';
 export const metadata = { title: '네이버 작업 계정' };
 
 type Params = {
-  searchParams: Promise<{ q?: string; role?: string; usable?: string; working?: string; page?: string }>;
+  searchParams: Promise<{ q?: string; role?: string; noRole?: string; usable?: string; working?: string; page?: string }>;
 };
 
 const PAGE_SIZE = 50;
@@ -22,6 +22,7 @@ export default async function AdminNworkPage({ searchParams }: Params) {
   const filters: NworkFilters = {
     q: sp.q?.trim() ?? '',
     role: sp.role ?? '',
+    noRole: sp.noRole === '1' ? '1' : '',
     usable: sp.usable === '1' || sp.usable === '0' ? sp.usable : '',
     working: sp.working === '1' || sp.working === '0' ? sp.working : '',
   };
