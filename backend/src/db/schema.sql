@@ -542,6 +542,10 @@ CREATE TABLE blog_profiles (
   proxy_pass  VARCHAR(100) NOT NULL DEFAULT '',
   user_agent  VARCHAR(255) NOT NULL DEFAULT '',
   note        VARCHAR(255) NOT NULL DEFAULT '',
+  -- 이 프로필일 때 밖에서 보여야 할 IP. 다르면 작업기가 로그인하지 않고 멈춘다
+  expected_ip  VARCHAR(45)  NOT NULL DEFAULT '',
+  -- VPN 에서 고를 위치 이름 (자동 전환에 쓴다)
+  vpn_location VARCHAR(100) NOT NULL DEFAULT '',
   active      TINYINT(1)   NOT NULL DEFAULT 1,
   last_ok_at  DATETIME     NULL COMMENT '이 프로필로 마지막에 로그인이 통한 시각',
   created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,

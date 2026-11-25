@@ -17,6 +17,8 @@ interface Draft {
   proxyPass: string;
   userAgent: string;
   note: string;
+  expectedIp: string;
+  vpnLocation: string;
   active: boolean;
 }
 
@@ -28,6 +30,8 @@ const EMPTY: Draft = {
   proxyPass: '',
   userAgent: '',
   note: '',
+  expectedIp: '',
+  vpnLocation: '',
   active: true,
 };
 
@@ -40,6 +44,8 @@ const toDraft = (item: BlogProfile): Draft => ({
   proxyPass: '',
   userAgent: item.userAgent,
   note: item.note,
+  expectedIp: item.expectedIp,
+  vpnLocation: item.vpnLocation,
   active: item.active,
 });
 
@@ -72,6 +78,8 @@ export function BlogProfileAdmin({ items }: { items: BlogProfile[] }) {
       proxyUser: draft.proxyUser.trim(),
       userAgent: draft.userAgent.trim(),
       note: draft.note.trim(),
+      expectedIp: draft.expectedIp.trim(),
+      vpnLocation: draft.vpnLocation.trim(),
       active: draft.active,
       // 새로 만들 땐 빈 값이라도 보내고, 고칠 땐 적었을 때만 보낸다
       ...(editing === 'new' || draft.proxyPass ? { proxyPass: draft.proxyPass } : {}),
@@ -130,7 +138,8 @@ export function BlogProfileAdmin({ items }: { items: BlogProfile[] }) {
           <thead>
             <tr className="border-b border-gray-100 text-left text-xs text-gray-400">
               <th className="px-5 py-2 font-medium">이름</th>
-              <th className="px-2 py-2 font-medium">IP (프록시)</th>
+              <th className="px-2 py-2 font-medium">보여야 할 IP</th>
+              <th className="px-2 py-2 font-medium">프록시</th>
               <th className="w-20 px-2 py-2 text-center font-medium">쓸 수 있는 계정</th>
               <th className="w-28 px-2 py-2 text-right font-medium">마지막 성공</th>
               <th className="w-12 px-2 py-2" />
@@ -145,6 +154,15 @@ export function BlogProfileAdmin({ items }: { items: BlogProfile[] }) {
                   </button>
                   {!item.active && <span className="ml-1.5 text-xs text-gray-400">쉬는 중</span>}
                   {item.note && <p className="text-xs text-gray-400">{item.note}</p>}
+                </td>
+                <td className="px-2 py-2">
+                  {item.expectedIp ? (
+                    <span className="font-mono text-gray-700">{item.expectedIp}</span>
+                  ) : (
+                    // 비어 있으면 작업기가 처음 성공했을 때 적어 넣는다
+                    <span className="text-xs text-gray-400">첫 작업 때 기록됨</span>
+                  )}
+                  {item.vpnLocation && <p className="text-xs text-gray-400">{item.vpnLocation}</p>}
                 </td>
                 <td className="px-2 py-2 text-gray-600">
                   {item.proxyHost ? (
@@ -206,6 +224,26 @@ export function BlogProfileAdmin({ items }: { items: BlogProfile[] }) {
                 value={draft.note}
                 onChange={(event) => setDraft({ ...draft, note: event.target.value })}
                 placeholder="VPN 업체 / 지역 등"
+                className={`mt-1 ${inputClass}`}
+              />
+            </label>
+            <label className="block text-xs font-semibold text-gray-500">
+              보여야 할 IP
+              <span className="font-normal text-gray-400"> — 다르면 작업기가 멈춥니다</span>
+              <input
+                value={draft.expectedIp}
+                onChange={(event) => setDraft({ ...draft, expectedIp: event.target.value })}
+                placeholder="비워 두면 첫 작업 때 기록됩니다"
+                className={`mt-1 font-mono ${inputClass}`}
+              />
+            </label>
+            <label className="block text-xs font-semibold text-gray-500">
+              VPN 위치 이름
+              <span className="font-normal text-gray-400"> — 자동 전환에 씁니다</span>
+              <input
+                value={draft.vpnLocation}
+                onChange={(event) => setDraft({ ...draft, vpnLocation: event.target.value })}
+                placeholder="Korea #5"
                 className={`mt-1 ${inputClass}`}
               />
             </label>

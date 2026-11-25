@@ -26,6 +26,14 @@ const profileBase = {
   proxyUser: z.string().trim().max(100).default(''),
   userAgent: z.string().trim().max(255).default(''),
   note: z.string().trim().max(255).default(''),
+  /** 이 프로필일 때 밖에서 보여야 할 IP. 비우면 작업기가 처음 성공했을 때 적어 넣는다 */
+  expectedIp: z
+    .string()
+    .trim()
+    .max(45)
+    .regex(/^$|^[0-9a-fA-F.:]+$/, 'IP 주소만 넣어주세요.')
+    .default(''),
+  vpnLocation: z.string().trim().max(100).default(''),
   active: z.boolean().default(true),
 };
 
@@ -91,6 +99,18 @@ export default async function blogRoutes(app: FastifyInstance) {
   app.get('/admin/blog/runner', async (request) => {
     const { profile } = parse(z.object({ profile: z.string().trim().max(100).optional() }), request.query);
     return { items: await profiles.runnerBundle(profile) };
+  });
+
+  /**
+   * 작업기가 브라우저에서 잰 IP 를 적어 둔다 (비어 있을 때만).
+   * 손으로 적다 오타가 나면 그 프로필이 통째로 멈추기 때문이다.
+   */
+  app.post('/admin/blog/profiles/:id/ip', async (request) => {
+    const { id } = parse(idParam, request.params);
+    const row = await profiles.findProfile(id);
+    if (!row) throw notFound('프로필');
+    const { ip } = parse(z.object({ ip: z.string().trim().min(1).max(45) }), request.body);
+    return { recorded: await profiles.recordIpIfEmpty(row.name, ip) };
   });
 
   /** 로그인 결과 보고. 실패하면 그 계정이 '쓸 수 없음'으로 내려간다 */

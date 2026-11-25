@@ -378,6 +378,15 @@ const steps = [
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`,
     ],
   },
+  {
+    name: 'blog_profiles.expected_ip + vpn_location — IP 확인 뒤 작업',
+    check: (c) => hasColumn(c, 'blog_profiles', 'expected_ip'),
+    sql: [
+      `ALTER TABLE blog_profiles
+         ADD COLUMN expected_ip  VARCHAR(45)  NOT NULL DEFAULT '' COMMENT '이 프로필일 때 밖에서 보여야 할 IP',
+         ADD COLUMN vpn_location VARCHAR(100) NOT NULL DEFAULT '' COMMENT 'VPN 에서 고를 위치 이름 (자동 전환용)'`,
+    ],
+  },
 ];
 
 /** 공개 주소 앞머리. 없으면 바꿀 것도 없다. */

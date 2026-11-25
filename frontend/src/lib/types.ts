@@ -404,6 +404,10 @@ export interface BlogProfile {
   hasProxyPass: boolean;
   userAgent: string;
   note: string;
+  /** 이 프로필일 때 밖에서 보여야 할 IP. 다르면 작업기가 로그인하지 않고 멈춘다 */
+  expectedIp: string;
+  /** VPN 에서 고를 위치 이름 (자동 전환에 쓴다) */
+  vpnLocation: string;
   active: boolean;
   /** 이 프로필로 마지막에 로그인이 통한 시각 */
   lastOkAt: string | null;

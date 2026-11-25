@@ -20,6 +20,8 @@ interface ProfileRow extends RowDataPacket {
   proxy_pass: string;
   user_agent: string;
   note: string;
+  expected_ip: string;
+  vpn_location: string;
   active: number;
   last_ok_at: string | null;
   created_at: string;
@@ -37,6 +39,8 @@ const toProfile = (row: ProfileRow): BlogProfile => ({
   hasProxyPass: Boolean(row.proxy_pass),
   userAgent: row.user_agent,
   note: row.note,
+  expectedIp: row.expected_ip,
+  vpnLocation: row.vpn_location,
   active: Boolean(row.active),
   lastOkAt: row.last_ok_at,
   accounts: Number(row.accounts ?? 0),
@@ -69,13 +73,16 @@ export interface ProfileInput {
   proxyPass?: string;
   userAgent: string;
   note: string;
+  expectedIp: string;
+  vpnLocation: string;
   active: boolean;
 }
 
 export async function createProfile(input: ProfileInput): Promise<number> {
   const { insertId } = await execute(
-    `INSERT INTO blog_profiles (name, proxy_host, proxy_port, proxy_user, proxy_pass, user_agent, note, active)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO blog_profiles
+       (name, proxy_host, proxy_port, proxy_user, proxy_pass, user_agent, note, expected_ip, vpn_location, active)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       input.name,
       input.proxyHost,
@@ -84,6 +91,8 @@ export async function createProfile(input: ProfileInput): Promise<number> {
       input.proxyPass ?? '',
       input.userAgent,
       input.note,
+      input.expectedIp,
+      input.vpnLocation,
       input.active ? 1 : 0,
     ],
   );
@@ -97,9 +106,21 @@ export async function createProfile(input: ProfileInput): Promise<number> {
 export async function updateProfile(id: number, oldName: string, input: ProfileInput): Promise<void> {
   await execute(
     `UPDATE blog_profiles
-        SET name = ?, proxy_host = ?, proxy_port = ?, proxy_user = ?, user_agent = ?, note = ?, active = ?
+        SET name = ?, proxy_host = ?, proxy_port = ?, proxy_user = ?, user_agent = ?, note = ?,
+            expected_ip = ?, vpn_location = ?, active = ?
       WHERE id = ?`,
-    [input.name, input.proxyHost, input.proxyPort, input.proxyUser, input.userAgent, input.note, input.active ? 1 : 0, id],
+    [
+      input.name,
+      input.proxyHost,
+      input.proxyPort,
+      input.proxyUser,
+      input.userAgent,
+      input.note,
+      input.expectedIp,
+      input.vpnLocation,
+      input.active ? 1 : 0,
+      id,
+    ],
   );
   if (input.proxyPass !== undefined) {
     await execute('UPDATE blog_profiles SET proxy_pass = ? WHERE id = ?', [input.proxyPass, id]);
@@ -157,12 +178,15 @@ export async function runnerBundle(onlyProfile?: string): Promise<RunnerProfile[
   }
 
   return profiles.map((p) => ({
+    id: p.id,
     name: p.name,
     proxyHost: p.proxy_host,
     proxyPort: p.proxy_port,
     proxyUser: p.proxy_user,
     proxyPass: p.proxy_pass,
     userAgent: p.user_agent,
+    expectedIp: p.expected_ip,
+    vpnLocation: p.vpn_location,
     accounts: byProfile.get(p.name) ?? [],
   }));
 }
@@ -180,4 +204,18 @@ export async function reportLogin(id: number, ok: boolean): Promise<boolean> {
 /** 그 이름의 프로필이 있는지 — 계정에 프로필을 적을 때 오타를 막는다 */
 export async function profileExists(name: string): Promise<boolean> {
   return Boolean(await queryOne('SELECT 1 FROM blog_profiles WHERE name = ?', [name]));
+}
+
+/**
+ * 작업기가 브라우저에서 잰 IP 를 기록한다.
+ *
+ * **손으로 적게 두지 않으려고 만들었다** — 오타가 나면 영영 안 맞아서 그 프로필이 통째로 멈춘다.
+ * 이미 적혀 있으면 덮지 않는다. 바꾸는 건 사람이 어드민에서 한다.
+ */
+export async function recordIpIfEmpty(name: string, ip: string): Promise<boolean> {
+  const { affectedRows } = await execute(
+    "UPDATE blog_profiles SET expected_ip = ? WHERE name = ? AND expected_ip = ''",
+    [ip, name],
+  );
+  return affectedRows > 0;
 }
