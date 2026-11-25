@@ -89,6 +89,90 @@ export function BlogProfileAdmin({ items }: { items: BlogProfile[] }) {
     }
   };
 
+  // 고치는 칸. **고칠 줄 바로 아래**에 끼워 넣으려고 따로 빼 두었다 —
+  // 목록 맨 아래에 뜨면 어느 줄을 고치는 중인지 헷갈린다.
+  const editPanel = (
+        <div className="border-t border-gray-100 bg-gray-50 px-5 py-4">
+          <h3 className="text-sm font-bold text-gray-900">{editing === 'new' ? '새 프로필' : '프로필 고치기'}</h3>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <label className="block text-xs font-semibold text-gray-500">
+              이름 (크롬 프로필 폴더가 됩니다)
+              <input
+                value={draft.name}
+                onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+                placeholder="prof-01"
+                className={`mt-1 ${inputClass}`}
+              />
+            </label>
+            <label className="block text-xs font-semibold text-gray-500">
+              메모
+              <input
+                value={draft.note}
+                onChange={(event) => setDraft({ ...draft, note: event.target.value })}
+                placeholder="VPN 업체 / 지역 등"
+                className={`mt-1 ${inputClass}`}
+              />
+            </label>
+            <label className="block text-xs font-semibold text-gray-500">
+              보여야 할 IP
+              <span className="font-normal text-gray-400"> — 다르면 작업기가 멈춥니다</span>
+              <input
+                value={draft.expectedIp}
+                onChange={(event) => setDraft({ ...draft, expectedIp: event.target.value })}
+                placeholder="비워 두면 첫 작업 때 기록됩니다"
+                className={`mt-1 font-mono ${inputClass}`}
+              />
+            </label>
+            <label className="block text-xs font-semibold text-gray-500">
+              VPN 위치 이름
+              <span className="font-normal text-gray-400"> — 자동 전환에 씁니다</span>
+              <input
+                value={draft.vpnLocation}
+                onChange={(event) => setDraft({ ...draft, vpnLocation: event.target.value })}
+                placeholder="Korea #5"
+                className={`mt-1 ${inputClass}`}
+              />
+            </label>
+            <label className="block text-xs font-semibold text-gray-500 sm:col-span-2">
+              User-Agent (비우면 작업기 기본값)
+              <input
+                value={draft.userAgent}
+                onChange={(event) => setDraft({ ...draft, userAgent: event.target.value })}
+                className={`mt-1 ${inputClass}`}
+              />
+            </label>
+          </div>
+
+          <label className="mt-3 flex items-center gap-2 text-sm text-gray-600">
+            <input
+              type="checkbox"
+              checked={draft.active}
+              onChange={(event) => setDraft({ ...draft, active: event.target.checked })}
+              className="accent-zz-600"
+            />
+            쓰는 프로필 (끄면 작업기가 건너뜁니다)
+          </label>
+
+          <div className="mt-4 flex gap-2">
+            <button
+              type="button"
+              onClick={save}
+              disabled={busy || !draft.name.trim()}
+              className="rounded-lg bg-zz-600 px-4 py-2 text-sm font-semibold text-white hover:bg-zz-700 disabled:opacity-50"
+            >
+              {busy ? '저장 중…' : '저장'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditing(null)}
+              className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-white"
+            >
+              취소
+            </button>
+          </div>
+        </div>
+  );
+
   return (
     <section className="rounded-xl border border-gray-200 bg-white">
       <header className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
@@ -105,6 +189,9 @@ export function BlogProfileAdmin({ items }: { items: BlogProfile[] }) {
       </header>
 
       {error && <p className="border-b border-gray-100 bg-red-50 px-5 py-2 text-xs text-red-600">{error}</p>}
+
+      {/* 새 프로필은 '프로필 추가' 버튼 바로 밑에 */}
+      {editing === 'new' && editPanel}
 
       {items.length === 0 && editing === null ? (
         <p className="py-12 text-center text-sm text-gray-400">
@@ -190,93 +277,15 @@ export function BlogProfileAdmin({ items }: { items: BlogProfile[] }) {
                     </button>
                   </div>
                 </div>
+
+                {/* 고치는 칸은 그 줄 바로 아래에 */}
+                {editing === item.id && editPanel}
               </div>
             );
           })}
         </div>
       )}
 
-      {editing !== null && (
-        <div className="border-t border-gray-100 bg-gray-50 px-5 py-4">
-          <h3 className="text-sm font-bold text-gray-900">{editing === 'new' ? '새 프로필' : '프로필 고치기'}</h3>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <label className="block text-xs font-semibold text-gray-500">
-              이름 (크롬 프로필 폴더가 됩니다)
-              <input
-                value={draft.name}
-                onChange={(event) => setDraft({ ...draft, name: event.target.value })}
-                placeholder="prof-01"
-                className={`mt-1 ${inputClass}`}
-              />
-            </label>
-            <label className="block text-xs font-semibold text-gray-500">
-              메모
-              <input
-                value={draft.note}
-                onChange={(event) => setDraft({ ...draft, note: event.target.value })}
-                placeholder="VPN 업체 / 지역 등"
-                className={`mt-1 ${inputClass}`}
-              />
-            </label>
-            <label className="block text-xs font-semibold text-gray-500">
-              보여야 할 IP
-              <span className="font-normal text-gray-400"> — 다르면 작업기가 멈춥니다</span>
-              <input
-                value={draft.expectedIp}
-                onChange={(event) => setDraft({ ...draft, expectedIp: event.target.value })}
-                placeholder="비워 두면 첫 작업 때 기록됩니다"
-                className={`mt-1 font-mono ${inputClass}`}
-              />
-            </label>
-            <label className="block text-xs font-semibold text-gray-500">
-              VPN 위치 이름
-              <span className="font-normal text-gray-400"> — 자동 전환에 씁니다</span>
-              <input
-                value={draft.vpnLocation}
-                onChange={(event) => setDraft({ ...draft, vpnLocation: event.target.value })}
-                placeholder="Korea #5"
-                className={`mt-1 ${inputClass}`}
-              />
-            </label>
-            <label className="block text-xs font-semibold text-gray-500 sm:col-span-2">
-              User-Agent (비우면 작업기 기본값)
-              <input
-                value={draft.userAgent}
-                onChange={(event) => setDraft({ ...draft, userAgent: event.target.value })}
-                className={`mt-1 ${inputClass}`}
-              />
-            </label>
-          </div>
-
-          <label className="mt-3 flex items-center gap-2 text-sm text-gray-600">
-            <input
-              type="checkbox"
-              checked={draft.active}
-              onChange={(event) => setDraft({ ...draft, active: event.target.checked })}
-              className="accent-zz-600"
-            />
-            쓰는 프로필 (끄면 작업기가 건너뜁니다)
-          </label>
-
-          <div className="mt-4 flex gap-2">
-            <button
-              type="button"
-              onClick={save}
-              disabled={busy || !draft.name.trim()}
-              className="rounded-lg bg-zz-600 px-4 py-2 text-sm font-semibold text-white hover:bg-zz-700 disabled:opacity-50"
-            >
-              {busy ? '저장 중…' : '저장'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setEditing(null)}
-              className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-white"
-            >
-              취소
-            </button>
-          </div>
-        </div>
-      )}
     </section>
   );
 }
