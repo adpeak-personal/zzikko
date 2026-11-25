@@ -6,7 +6,7 @@ import { Check, Copy, Eye, EyeOff, ListPlus, Pencil, Plus, Search, Trash2, X } f
 import { ApiError, apiFetch, query } from '@/lib/api';
 import { Pagination } from '@/components/board/Pagination';
 import { cn, formatNumber } from '@/lib/utils';
-import type { NworkAccount, NworkSummary, Paged } from '@/lib/types';
+import type { BlogProfile, NworkAccount, NworkSummary, Paged } from '@/lib/types';
 
 /** 화면 필터 — URL 쿼리와 같은 모양 ('' 이면 전체) */
 export interface NworkFilters {
@@ -129,7 +129,17 @@ const emptyDraft = (): Draft => ({
   profile: '',
 });
 
-function AccountForm({ draft, roles, onDone }: { draft: Draft; roles: string[]; onDone: () => void }) {
+function AccountForm({
+  draft,
+  roles,
+  profiles,
+  onDone,
+}: {
+  draft: Draft;
+  roles: string[];
+  profiles: BlogProfile[];
+  onDone: () => void;
+}) {
   const [form, setForm] = useState(draft);
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setForm((prev) => ({ ...prev, [key]: value }));
   const [error, setError] = useState<string | null>(null);
@@ -193,14 +203,25 @@ function AccountForm({ draft, roles, onDone }: { draft: Draft; roles: string[]; 
       <div className="grid gap-3 sm:grid-cols-3">
         <label className="block text-xs font-medium text-gray-600">
           블로그 프로필
-          <span className="font-normal text-gray-400"> — 이 계정이 쓸 IP</span>
-          <input
-            value={form.profile}
-            onChange={(e) => set('profile', e.target.value)}
-            maxLength={100}
-            placeholder="prof-01 (없으면 비움)"
-            className={cn(inputClass, 'mt-1')}
-          />
+          <span className="font-normal text-gray-400"> — 이 계정이 쓸 크롬 프로필</span>
+          <select value={form.profile} onChange={(e) => set('profile', e.target.value)} className={cn(inputClass, 'mt-1')}>
+            <option value="">(안 씀)</option>
+            {/* 비어 있는 프로필과, 지금 이 계정이 쓰고 있는 것만 고를 수 있다.
+                남이 쓰는 프로필을 고르면 저장이 막히므로 애초에 안 보여준다 */}
+            {profiles
+              .filter((item) => item.accounts.length === 0 || item.accounts.some((a) => a.id === form.id))
+              .map((item) => (
+                <option key={item.id} value={item.name}>
+                  {item.name}
+                  {item.expectedIp ? ` · ${item.expectedIp}` : ' · IP 미정'}
+                  {item.vpnLocation ? ` · ${item.vpnLocation}` : ''}
+                </option>
+              ))}
+            {/* 이미 적혀 있는데 목록에 없으면(지워진 프로필 등) 값이 조용히 사라지지 않게 남겨 둔다 */}
+            {form.profile && !profiles.some((item) => item.name === form.profile) && (
+              <option value={form.profile}>{form.profile} (목록에 없음)</option>
+            )}
+          </select>
         </label>
       </div>
 
@@ -348,7 +369,15 @@ function BulkBar({ ids, roles, onDone, onClear }: { ids: number[]; roles: string
 
 /* ── 목록 ─────────────────────────────────────────── */
 
-export function NworkAdmin({ data, filters }: { data: Paged<NworkAccount> & { summary: NworkSummary }; filters: NworkFilters }) {
+export function NworkAdmin({
+  data,
+  filters,
+  profiles,
+}: {
+  data: Paged<NworkAccount> & { summary: NworkSummary };
+  filters: NworkFilters;
+  profiles: BlogProfile[];
+}) {
   const router = useRouter();
   const { items, total, page, size, summary } = data;
   const [search, setSearch] = useState(filters.q);
@@ -465,7 +494,7 @@ export function NworkAdmin({ data, filters }: { data: Paged<NworkAccount> & { su
           </button>
         </header>
 
-        {panel === 'new' && <AccountForm draft={emptyDraft()} roles={roles} onDone={refresh} />}
+        {panel === 'new' && <AccountForm draft={emptyDraft()} roles={roles} profiles={profiles} onDone={refresh} />}
         {panel === 'import' && <ImportForm roles={roles} onDone={() => router.refresh()} />}
         {selected.length > 0 && <BulkBar ids={selected} roles={roles} onDone={refresh} onClear={() => setSelected([])} />}
         {error && <p className="border-b border-gray-100 bg-red-50 px-5 py-2 text-xs text-red-600">{error}</p>}
@@ -498,6 +527,7 @@ export function NworkAdmin({ data, filters }: { data: Paged<NworkAccount> & { su
                     key={account.id}
                     account={account}
                     roles={roles}
+                    profiles={profiles}
                     selected={selected.includes(account.id)}
                     editing={editingId === account.id}
                     onSelect={() => toggleOne(account.id)}
@@ -520,6 +550,7 @@ export function NworkAdmin({ data, filters }: { data: Paged<NworkAccount> & { su
 function AccountRow({
   account,
   roles,
+  profiles,
   selected,
   editing,
   onSelect,
@@ -529,6 +560,7 @@ function AccountRow({
 }: {
   account: NworkAccount;
   roles: string[];
+  profiles: BlogProfile[];
   selected: boolean;
   editing: boolean;
   onSelect: () => void;
@@ -594,6 +626,7 @@ function AccountRow({
                 working: account.working,
               }}
               roles={roles}
+              profiles={profiles}
               onDone={onSaved}
             />
           </td>

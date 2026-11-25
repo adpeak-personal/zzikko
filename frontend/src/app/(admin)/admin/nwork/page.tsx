@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { apiGet } from '@/lib/api.server';
 import { query } from '@/lib/api';
 import { getCurrentUser } from '@/lib/data';
-import type { NworkAccount, NworkSummary, Paged } from '@/lib/types';
+import type { BlogProfile, NworkAccount, NworkSummary, Paged } from '@/lib/types';
 import { NworkAdmin, type NworkFilters } from '@/components/admin/NworkAdmin';
 
 export const metadata = { title: '네이버 작업 계정' };
@@ -27,9 +27,14 @@ export default async function AdminNworkPage({ searchParams }: Params) {
   };
   const page = Math.max(1, Number(sp.page) || 1);
 
-  const data = await apiGet<Paged<NworkAccount> & { summary: NworkSummary }>(
-    '/admin/nwork' + query({ ...filters, page, size: PAGE_SIZE }),
-  );
+  // 프로필 목록도 같이 받는다 — 계정 수정 화면에서 **골라** 넣게 하려고.
+  // 손으로 적으면 오타가 나고, 이미 다른 아이디가 쓰는 프로필을 적으면 저장이 막힌다.
+  const [data, profiles] = await Promise.all([
+    apiGet<Paged<NworkAccount> & { summary: NworkSummary }>(
+      '/admin/nwork' + query({ ...filters, page, size: PAGE_SIZE }),
+    ),
+    apiGet<{ items: BlogProfile[] }>('/admin/blog/profiles'),
+  ]);
 
   return (
     <div className="space-y-5">
@@ -40,7 +45,7 @@ export default async function AdminNworkPage({ searchParams }: Params) {
         </p>
       </div>
 
-      <NworkAdmin data={data} filters={filters} />
+      <NworkAdmin data={data} filters={filters} profiles={profiles.items} />
     </div>
   );
 }
