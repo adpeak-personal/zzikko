@@ -437,11 +437,10 @@ export function NworkAdmin({
     <div className="space-y-4">
       {/* 요약 — 누르면 그 조건으로 거른다 */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-[repeat(auto-fill,minmax(120px,1fr))]">
+        {/* 상태만 칩으로 둔다. 용도·작업중은 검색칸 옆 select 에서 고르고, 둘은 교집합으로 걸린다 */}
         {statChip('전체', summary.total, noFilter, { q: '', role: '', usable: '', working: '' })}
         {statChip('사용 가능', summary.usable, filters.usable === '1', { usable: filters.usable === '1' ? '' : '1' })}
-        {statChip('정지', summary.total - summary.usable, filters.usable === '0', { usable: filters.usable === '0' ? '' : '0' })}
-        {statChip('작업 중', summary.working, filters.working === '1', { working: filters.working === '1' ? '' : '1' })}
-        {summary.roles.map((r) => statChip(r.role, r.count, filters.role === r.role, { role: filters.role === r.role ? '' : r.role }))}
+        {statChip('사용 불가', summary.total - summary.usable, filters.usable === '0', { usable: filters.usable === '0' ? '' : '0' })}
       </div>
 
       <section className="overflow-hidden rounded-xl border border-gray-200 bg-white">
@@ -476,6 +475,33 @@ export function NworkAdmin({
                 <X size={14} />
               </button>
             )}
+
+            {/* 용도와 '작업 중' 을 한 칸에 모았다. 위의 사용 가능/불가 와 **교집합**으로 걸린다.
+                값 앞에 무엇으로 거를지를 붙여 둔다 (role: / working) — 둘은 다른 칸이라서 */}
+            <select
+              value={filters.working === '1' ? 'working' : filters.role ? `role:${filters.role}` : ''}
+              onChange={(event) => {
+                const picked = event.target.value;
+                go({
+                  working: picked === 'working' ? '1' : '',
+                  role: picked.startsWith('role:') ? picked.slice(5) : '',
+                });
+              }}
+              aria-label="용도로 거르기"
+              className="shrink-0 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-zz-400"
+            >
+              <option value="">용도 전체</option>
+              <option value="working">작업 중 ({formatNumber(summary.working)})</option>
+              {roles.map((role) => {
+                const found = summary.roles.find((r) => r.role === role);
+                return (
+                  <option key={role} value={`role:${role}`}>
+                    {role}
+                    {found ? ` (${formatNumber(found.count)})` : ''}
+                  </option>
+                );
+              })}
+            </select>
           </form>
           <span className="text-sm text-gray-500">{formatNumber(total)}개</span>
           <button
@@ -568,6 +594,40 @@ function AccountRow({
   onDelete: () => void;
   onSaved: () => void;
 }) {
+  const [saving, setSaving] = useState(false);
+  // 메모2 는 이 칸에서 바로 고친다. 밖에서 목록이 새로 오면 그 값을 따라간다
+  const [memo2, setMemo2] = useState(account.memo2);
+  const [lastMemo2, setLastMemo2] = useState(account.memo2);
+  if (lastMemo2 !== account.memo2) {
+    setLastMemo2(account.memo2);
+    setMemo2(account.memo2);
+  }
+
+  const saveMemo2 = async () => {
+    if (memo2 === account.memo2) return;
+    setSaving(true);
+    try {
+      await apiFetch(`${BASE}/${account.id}/memo2`, { method: 'PATCH', body: JSON.stringify({ value: memo2 }) });
+      onSaved();
+    } catch {
+      // 저장이 안 됐으면 적던 것을 되돌린다 — 저장된 줄 알면 안 된다
+      setMemo2(account.memo2);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /** 상태를 바로 바꾼다. 여러 개 바꾸는 길(bulk)을 하나짜리로 쓴다 */
+  const onUsable = async (usable: boolean) => {
+    setSaving(true);
+    try {
+      await apiFetch(`${BASE}/bulk`, { method: 'POST', body: JSON.stringify({ ids: [account.id], usable }) });
+      onSaved();
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <>
       <tr className={cn('border-b border-gray-100 align-middle', selected && 'bg-zz-50/40', !account.usable && 'text-gray-400')}>
@@ -587,14 +647,42 @@ function AccountRow({
         <td className="max-w-[200px] truncate px-2 py-2 text-xs" title={account.memo1}>
           {account.memo1 || '-'}
         </td>
-        <td className="max-w-[180px] truncate px-2 py-2 text-xs" title={account.memo2}>
-          {account.memo2 || '-'}
+        {/* 메모2 는 '최근 작업 기록' 자리라 자주 바뀐다. 눌러서 바로 적게 둔다 */}
+        <td className="px-2 py-2 text-xs">
+          <input
+            value={memo2}
+            onChange={(event) => setMemo2(event.target.value)}
+            onBlur={() => void saveMemo2()}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') event.currentTarget.blur();
+              if (event.key === 'Escape') setMemo2(account.memo2);
+            }}
+            disabled={saving}
+            maxLength={255}
+            placeholder="-"
+            aria-label={`${account.loginId} 메모2`}
+            title={memo2}
+            className="w-[180px] rounded border border-transparent bg-transparent px-1 py-0.5 text-xs outline-none hover:border-gray-200 focus:border-zz-400 disabled:opacity-50"
+          />
         </td>
         <td className="px-2 py-2">
           <RoleBadge role={account.role} />
         </td>
         <td className="whitespace-nowrap px-2 py-2 text-xs">
-          {account.usable ? <span className="text-emerald-700">사용 가능</span> : <span className="text-red-500">정지</span>}
+          {/* 수정 화면을 열지 않고 여기서 바로 바꾼다. 가장 자주 건드리는 값이다 */}
+          <select
+            value={account.usable ? '1' : '0'}
+            disabled={saving}
+            onChange={(event) => void onUsable(event.target.value === '1')}
+            aria-label={`${account.loginId} 상태`}
+            className={cn(
+              'rounded border border-transparent bg-transparent py-0.5 pl-1 pr-5 text-xs outline-none hover:border-gray-200 focus:border-zz-400 disabled:opacity-50',
+              account.usable ? 'text-emerald-700' : 'text-red-500',
+            )}
+          >
+            <option value="1">사용 가능</option>
+            <option value="0">사용 불가</option>
+          </select>
           {account.working && <span className="ml-1 rounded bg-violet-50 px-1 text-[10px] text-violet-700">작업 중</span>}
         </td>
         <td className="whitespace-nowrap px-2 py-2 text-xs text-gray-500" title={`로그인 확인 ${shortDate(account.lastLoginCheckAt)}`}>

@@ -227,3 +227,14 @@ export async function importAccounts(
 export async function deleteAccount(id: number) {
   await execute('DELETE FROM nwork WHERE n_idx = ?', [id]);
 }
+
+/**
+ * 메모2 한 칸만 고친다 — 표에서 바로 적게 하려고.
+ *
+ * 메모2 는 '최근 작업 기록' 자리라 자주 바뀐다. 그때마다 수정 화면을 열면
+ * 아이디·비밀번호까지 같이 보내야 해서, 다른 칸을 건드릴 위험이 생긴다.
+ */
+export async function updateMemo2(id: number, value: string): Promise<boolean> {
+  const { affectedRows } = await execute('UPDATE nwork SET n_memo2 = ? WHERE n_idx = ?', [emptyToNull(value), id]);
+  return affectedRows > 0;
+}

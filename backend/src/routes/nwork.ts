@@ -112,6 +112,14 @@ export default async function nworkRoutes(app: FastifyInstance) {
     return nwork.getAccount(id);
   });
 
+  /** 표에서 메모2 한 칸만 고친다 */
+  app.patch('/admin/nwork/:id/memo2', async (request) => {
+    const { id } = parse(idParam, request.params);
+    const { value } = parse(z.object({ value: z.string().max(255) }), request.body);
+    if (!(await nwork.updateMemo2(id, value))) throw notFound('계정');
+    return { ok: true };
+  });
+
   app.post('/admin/nwork/bulk', async (request) => {
     const { ids, ...patch } = parse(bulkSchema, request.body);
     return { updated: await nwork.bulkUpdate(ids, patch) };
