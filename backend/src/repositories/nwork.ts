@@ -46,6 +46,8 @@ const toAccount = (row: NworkRow): NworkAccount => ({
 
 export interface NworkFilter {
   q?: string;
+  /** 켜면 `q` 에 걸리는 것을 **빼고** 본다 */
+  exclude?: boolean;
   role?: string;
   /** 용도가 비어 있는 것만 — `role` 보다 먼저 본다 */
   noRole?: boolean;
@@ -65,7 +67,13 @@ function buildWhere(filter: NworkFilter, skipRole = false) {
   const params: unknown[] = [];
   if (filter.q) {
     // 아이디·메모 어디에 있든 찾는다 — 메모에 이름·생년·작업 기록이 섞여 있다
-    where.push('(n_id LIKE ? OR n_memo1 LIKE ? OR n_memo2 LIKE ? OR n_memo3 LIKE ?)');
+    //
+    // ⚠️ 메모는 비어 있으면 NULL 이라 `COALESCE` 로 빈 문자열로 바꿔 놓는다.
+    //    안 그러면 '제외'를 켰을 때 `NOT (… NULL …)` 이 NULL 이 돼서,
+    //    **메모가 빈 계정이 통째로 사라진다.** 찾을 때는 티가 안 나고 뺄 때만 터진다.
+    const match = `(n_id LIKE ? OR COALESCE(n_memo1, '') LIKE ? OR COALESCE(n_memo2, '') LIKE ?
+                    OR COALESCE(n_memo3, '') LIKE ?)`;
+    where.push(filter.exclude ? `NOT ${match}` : match);
     const like = `%${filter.q}%`;
     params.push(like, like, like, like);
   }

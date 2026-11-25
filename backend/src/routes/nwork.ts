@@ -13,6 +13,8 @@ const boolParam = z.enum(['1', '0']).transform((value) => value === '1');
 
 const listQuery = z.object({
   q: z.string().trim().max(100).optional(),
+  /** 검색어에 걸리는 것을 빼고 본다 */
+  exclude: boolParam.optional(),
   role: z.string().trim().max(20).optional(),
   /** 용도가 비어 있는 것만 보기 */
   noRole: boolParam.optional(),

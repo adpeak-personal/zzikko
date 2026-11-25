@@ -11,6 +11,8 @@ import type { BlogProfile, NworkAccount, NworkSummary, Paged } from '@/lib/types
 /** 화면 필터 — URL 쿼리와 같은 모양 ('' 이면 전체) */
 export interface NworkFilters {
   q: string;
+  /** 검색어에 걸리는 것을 빼고 볼 때 '1' */
+  exclude: string;
   role: string;
   /** 용도가 비어 있는 것만 ('1' 이면 켠 것) */
   noRole: string;
@@ -433,14 +435,14 @@ export function NworkAdmin({
     </button>
   );
 
-  const noFilter = !filters.q && !filters.role && !filters.noRole && !filters.usable && !filters.working;
+  const noFilter = !filters.q && !filters.exclude && !filters.role && !filters.noRole && !filters.usable && !filters.working;
 
   return (
     <div className="space-y-4">
       {/* 요약 — 누르면 그 조건으로 거른다 */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-[repeat(auto-fill,minmax(120px,1fr))]">
         {/* 상태만 칩으로 둔다. 용도·작업중은 검색칸 옆 select 에서 고르고, 둘은 교집합으로 걸린다 */}
-        {statChip('전체', summary.total, noFilter, { q: '', role: '', noRole: '', usable: '', working: '' })}
+        {statChip('전체', summary.total, noFilter, { q: '', exclude: '', role: '', noRole: '', usable: '', working: '' })}
         {statChip('사용 가능', summary.usable, filters.usable === '1', { usable: filters.usable === '1' ? '' : '1' })}
         {statChip('사용 불가', summary.total - summary.usable, filters.usable === '0', { usable: filters.usable === '0' ? '' : '0' })}
       </div>
@@ -464,12 +466,31 @@ export function NworkAdmin({
                 className="w-full rounded-lg border border-gray-200 bg-white py-1.5 pl-8 pr-3 text-sm outline-none focus:border-zz-400"
               />
             </div>
+            {/* 찾기 ↔ 빼기. 같은 검색어로 '작업 이 들어간 것'과 '안 들어간 것'을 오간다 */}
+            <button
+              type="button"
+              onClick={() => go({ q: search.trim(), exclude: filters.exclude === '1' ? '' : '1' })}
+              title={
+                filters.exclude === '1'
+                  ? '지금은 검색어가 든 것을 빼고 있습니다. 누르면 찾기로 돌아갑니다'
+                  : '누르면 검색어가 든 것을 빼고 봅니다'
+              }
+              aria-pressed={filters.exclude === '1'}
+              className={cn(
+                'shrink-0 rounded-lg border px-2.5 py-1.5 text-sm transition',
+                filters.exclude === '1'
+                  ? 'border-red-300 bg-red-50 font-semibold text-red-600'
+                  : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50',
+              )}
+            >
+              제외
+            </button>
             {filters.q && (
               <button
                 type="button"
                 onClick={() => {
                   setSearch('');
-                  go({ q: '' });
+                  go({ q: '', exclude: '' });
                 }}
                 aria-label="검색 지우기"
                 className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100"
@@ -506,7 +527,12 @@ export function NworkAdmin({
               <option value="none">용도 없음 ({formatNumber(summary.noRole)})</option>
             </select>
           </form>
-          <span className="text-sm text-gray-500">{formatNumber(total)}개</span>
+          <span className="text-sm text-gray-500">
+            {formatNumber(total)}개
+            {filters.q && filters.exclude === '1' && (
+              <span className="ml-1 text-xs text-red-600">‘{filters.q}’ 뺀 것</span>
+            )}
+          </span>
           <button
             type="button"
             onClick={() => setPanel(panel === 'import' ? null : 'import')}
