@@ -546,6 +546,8 @@ CREATE TABLE blog_profiles (
   expected_ip  VARCHAR(45)  NOT NULL DEFAULT '',
   -- VPN 에서 고를 위치 이름 (자동 전환에 쓴다)
   vpn_location VARCHAR(100) NOT NULL DEFAULT '',
+  -- 지금 이 프로필에서 쓸 아이디 하나 (nwork.n_idx). 주기적으로 돌려 가며 쓴다
+  current_account_id INT UNSIGNED NULL,
   active      TINYINT(1)   NOT NULL DEFAULT 1,
   last_ok_at  DATETIME     NULL COMMENT '이 프로필로 마지막에 로그인이 통한 시각',
   created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,

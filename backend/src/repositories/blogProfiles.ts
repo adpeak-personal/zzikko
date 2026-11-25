@@ -1,6 +1,6 @@
 import type { RowDataPacket } from 'mysql2';
 import { execute, query, queryOne } from '../db/pool.js';
-import type { BlogProfile, RunnerAccount, RunnerProfile } from '../types.js';
+import type { BlogProfile, BlogProfileAccount, RunnerAccount, RunnerProfile } from '../types.js';
 
 /**
  * 블로그 작업 프로필 — **IP(프록시) 하나와 크롬 프로필 하나가 한 쌍**이다.
@@ -22,14 +22,13 @@ interface ProfileRow extends RowDataPacket {
   note: string;
   expected_ip: string;
   vpn_location: string;
+  current_account_id: number | null;
   active: number;
   last_ok_at: string | null;
   created_at: string;
-  accounts?: number;
-  usable?: number;
 }
 
-const toProfile = (row: ProfileRow): BlogProfile => ({
+const toProfile = (row: ProfileRow, accounts: BlogProfileAccount[]): BlogProfile => ({
   id: row.id,
   name: row.name,
   proxyHost: row.proxy_host,
@@ -43,21 +42,47 @@ const toProfile = (row: ProfileRow): BlogProfile => ({
   vpnLocation: row.vpn_location,
   active: Boolean(row.active),
   lastOkAt: row.last_ok_at,
-  accounts: Number(row.accounts ?? 0),
-  usable: Number(row.usable ?? 0),
+  currentAccountId: row.current_account_id,
+  accounts,
 });
 
 export async function listProfiles(): Promise<BlogProfile[]> {
-  const rows = await query<ProfileRow>(
-    // 붙은 계정 수와, 그중 실제로 돌릴 수 있는 수를 따로 센다 —
-    // 막혀서 내려간 계정이 있으면 "3개인데 왜 2개만 도나" 가 된다
-    `SELECT p.*,
-            (SELECT COUNT(*) FROM nwork n WHERE n.work_profile = p.name) AS accounts,
-            (SELECT COUNT(*) FROM nwork n WHERE n.work_profile = p.name AND n.use_status = 1) AS usable
-       FROM blog_profiles p
-      ORDER BY p.active DESC, p.name`,
+  const rows = await query<ProfileRow>('SELECT * FROM blog_profiles ORDER BY active DESC, name');
+  if (rows.length === 0) return [];
+
+  // 붙은 계정을 한 번에 받아 프로필별로 나눈다 (프로필마다 따로 묻지 않는다)
+  const names = rows.map((row) => row.name);
+  const members = await query<RowDataPacket & { n_idx: number; n_id: string; use_status: number; work_profile: string; last_login_chk: string | null }>(
+    `SELECT n_idx, n_id, use_status, work_profile, last_login_chk
+       FROM nwork
+      WHERE work_profile IN (${names.map(() => '?').join(',')})
+      ORDER BY n_id`,
+    names,
   );
-  return rows.map(toProfile);
+
+  const byProfile = new Map<string, BlogProfileAccount[]>();
+  for (const m of members) {
+    const list = byProfile.get(m.work_profile) ?? [];
+    list.push({ id: m.n_idx, loginId: m.n_id, usable: Boolean(m.use_status), lastLoginCheckAt: m.last_login_chk });
+    byProfile.set(m.work_profile, list);
+  }
+
+  return rows.map((row) => toProfile(row, byProfile.get(row.name) ?? []));
+}
+
+/**
+ * 지금 쓸 아이디를 고른다. `null` 이면 고르지 않은 상태(붙은 것 전부를 돈다).
+ *
+ * ⚠️ **그 프로필에 붙어 있는 계정만** 고를 수 있다. 다른 프로필의 아이디를 넣으면
+ * 작업기가 엉뚱한 IP 로 그 계정에 들어가게 된다.
+ */
+export async function setCurrentAccount(id: number, name: string, accountId: number | null): Promise<boolean> {
+  if (accountId !== null) {
+    const owned = await queryOne('SELECT 1 FROM nwork WHERE n_idx = ? AND work_profile = ?', [accountId, name]);
+    if (!owned) return false;
+  }
+  await execute('UPDATE blog_profiles SET current_account_id = ? WHERE id = ?', [accountId, id]);
+  return true;
 }
 
 export async function findProfile(id: number): Promise<ProfileRow | null> {
@@ -187,6 +212,7 @@ export async function runnerBundle(onlyProfile?: string): Promise<RunnerProfile[
     userAgent: p.user_agent,
     expectedIp: p.expected_ip,
     vpnLocation: p.vpn_location,
+    currentAccountId: p.current_account_id,
     accounts: byProfile.get(p.name) ?? [],
   }));
 }

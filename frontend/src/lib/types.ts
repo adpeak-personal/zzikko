@@ -411,8 +411,17 @@ export interface BlogProfile {
   active: boolean;
   /** 이 프로필로 마지막에 로그인이 통한 시각 */
   lastOkAt: string | null;
-  /** 이 프로필에 묶인 계정 수 */
-  accounts: number;
-  /** 그중 쓸 수 있다고 표시된 수 — 돌아가는 건 이 수만큼이다 */
-  usable: number;
+  /** 지금 이 프로필에서 쓸 아이디. 안 고르면 붙은 것 전부를 돈다 */
+  currentAccountId: number | null;
+  /** 이 프로필에 붙은 계정들 */
+  accounts: BlogProfileAccount[];
+}
+
+/** 프로필에 붙은 계정 한 줄 (목록 화면용 — 비밀번호 없음) */
+export interface BlogProfileAccount {
+  id: number;
+  loginId: string;
+  /** 쓸 수 있다고 표시돼 있는지. 꺼져 있으면 작업에서 빠진다 */
+  usable: boolean;
+  lastLoginCheckAt: string | null;
 }

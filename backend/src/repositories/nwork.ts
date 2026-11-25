@@ -135,8 +135,10 @@ const emptyToNull = (value: string) => (value.trim() ? value.trim() : null);
 
 export async function createAccount(input: NworkInput & { password: string }): Promise<number> {
   const result = await execute(
-    `INSERT INTO nwork (n_id, n_pwd, n_memo1, n_memo2, n_memo3, use_status, task_role, work_used)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    // ⚠️ 칸 수와 ? 수를 반드시 맞출 것 — mysql2 는 값이 남아도 조용히 버린다.
+    //    실제로 work_profile 을 값에만 넣고 칸에서 빠뜨려, 프로필이 안 들어간 적이 있다.
+    `INSERT INTO nwork (n_id, n_pwd, n_memo1, n_memo2, n_memo3, use_status, task_role, work_used, work_profile)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       input.loginId,
       input.password,

@@ -11,10 +11,6 @@ const inputClass = 'w-full rounded-lg border border-gray-200 px-3 py-2 text-sm o
 
 interface Draft {
   name: string;
-  proxyHost: string;
-  proxyPort: string;
-  proxyUser: string;
-  proxyPass: string;
   userAgent: string;
   note: string;
   expectedIp: string;
@@ -22,26 +18,10 @@ interface Draft {
   active: boolean;
 }
 
-const EMPTY: Draft = {
-  name: '',
-  proxyHost: '',
-  proxyPort: '',
-  proxyUser: '',
-  proxyPass: '',
-  userAgent: '',
-  note: '',
-  expectedIp: '',
-  vpnLocation: '',
-  active: true,
-};
+const EMPTY: Draft = { name: '', userAgent: '', note: '', expectedIp: '', vpnLocation: '', active: true };
 
 const toDraft = (item: BlogProfile): Draft => ({
   name: item.name,
-  proxyHost: item.proxyHost,
-  proxyPort: item.proxyPort === null ? '' : String(item.proxyPort),
-  proxyUser: item.proxyUser,
-  // 비밀번호는 내려받지 않는다 — 비워 두면 그대로 두고, 적으면 바꾼다
-  proxyPass: '',
   userAgent: item.userAgent,
   note: item.note,
   expectedIp: item.expectedIp,
@@ -52,8 +32,9 @@ const toDraft = (item: BlogProfile): Draft => ({
 /**
  * 프로필 목록과 편집.
  *
- * 프록시 비밀번호는 **화면에 보여주지 않는다.** 목록 API 가 아예 안 내려주고(`hasProxyPass` 만 온다),
- * 작업기(py)만 `/admin/blog/runner` 로 받아 간다.
+ * ⚠️ **프록시 칸은 화면에 없다.** DB·API 에는 그대로 있지만, VPN 프로그램을 쓰는 지금
+ * 구조에서는 쓸 일이 없고 "내 IP 적는 칸" 으로 오해하기 쉬워서 뺐다. 프록시를 사게 되면
+ * 이 파일에 칸을 다시 넣으면 된다 — 뒤쪽은 건드릴 것이 없다.
  */
 export function BlogProfileAdmin({ items }: { items: BlogProfile[] }) {
   const router = useRouter();
@@ -61,57 +42,66 @@ export function BlogProfileAdmin({ items }: { items: BlogProfile[] }) {
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // 프록시는 평소엔 접어 둔다 — VPN 프로그램을 쓰면 쓸 일이 없고, 실수로 자기 IP 를 적기 쉽다
-  const [useProxy, setUseProxy] = useState(false);
 
   const open = (item: BlogProfile | null) => {
     setError(null);
     setEditing(item ? item.id : 'new');
     setDraft(item ? toDraft(item) : EMPTY);
-    // 이미 프록시를 쓰고 있던 프로필이면 펼쳐서 보여준다
-    setUseProxy(Boolean(item?.proxyHost));
   };
+
+  const fail = (err: unknown, fallback: string) => setError(err instanceof ApiError ? err.message : fallback);
 
   const save = async () => {
     setBusy(true);
     setError(null);
-    const body = {
-      name: draft.name.trim(),
-      // 접어 둔 상태로 저장하면 프록시를 안 쓰겠다는 뜻이다
-      proxyHost: useProxy ? draft.proxyHost.trim() : '',
-      proxyPort: useProxy && draft.proxyPort.trim() !== '' ? Number(draft.proxyPort) : null,
-      proxyUser: useProxy ? draft.proxyUser.trim() : '',
-      userAgent: draft.userAgent.trim(),
-      note: draft.note.trim(),
-      expectedIp: draft.expectedIp.trim(),
-      vpnLocation: draft.vpnLocation.trim(),
-      active: draft.active,
-      // 새로 만들 땐 빈 값이라도 보내고, 고칠 땐 적었을 때만 보낸다
-      ...(editing === 'new' || draft.proxyPass ? { proxyPass: useProxy ? draft.proxyPass : '' } : {}),
-    };
     try {
       await apiFetch(editing === 'new' ? '/admin/blog/profiles' : `/admin/blog/profiles/${editing}`, {
         method: editing === 'new' ? 'POST' : 'PATCH',
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          name: draft.name.trim(),
+          userAgent: draft.userAgent.trim(),
+          note: draft.note.trim(),
+          expectedIp: draft.expectedIp.trim(),
+          vpnLocation: draft.vpnLocation.trim(),
+          active: draft.active,
+        }),
       });
       setEditing(null);
       router.refresh();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : '저장하지 못했어요.');
+      fail(err, '저장하지 못했어요.');
     } finally {
       setBusy(false);
     }
   };
 
   const remove = async (item: BlogProfile) => {
-    const warn = `프로필 ${item.name} 을 지웁니다.\n붙어 있던 계정 ${item.accounts}개는 남고 프로필만 떨어집니다.`;
+    const warn = `프로필 ${item.name} 을 지웁니다.\n붙어 있던 계정 ${item.accounts.length}개는 남고 프로필만 떨어집니다.`;
     if (!confirm(warn)) return;
     setBusy(true);
     try {
       await apiFetch(`/admin/blog/profiles/${item.id}`, { method: 'DELETE' });
       router.refresh();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : '지우지 못했어요.');
+      fail(err, '지우지 못했어요.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** 지금 쓸 아이디 고르기. 고른 것을 다시 누르면 해제된다 */
+  const pick = async (item: BlogProfile, accountId: number) => {
+    const next = item.currentAccountId === accountId ? null : accountId;
+    setBusy(true);
+    setError(null);
+    try {
+      await apiFetch(`/admin/blog/profiles/${item.id}/account`, {
+        method: 'PATCH',
+        body: JSON.stringify({ accountId: next }),
+      });
+      router.refresh();
+    } catch (err) {
+      fail(err, '고르지 못했어요.');
     } finally {
       setBusy(false);
     }
@@ -136,56 +126,32 @@ export function BlogProfileAdmin({ items }: { items: BlogProfile[] }) {
 
       {items.length === 0 && editing === null ? (
         <p className="py-12 text-center text-sm text-gray-400">
-          아직 프로필이 없습니다. <b>프로필 추가</b> 를 눌러 산 IP 를 하나씩 넣어주세요.
+          아직 프로필이 없습니다. <b>프로필 추가</b> 를 눌러 IP 하나씩 만들어 주세요.
         </p>
       ) : (
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-100 text-left text-xs text-gray-400">
-              <th className="px-5 py-2 font-medium">이름</th>
-              <th className="px-2 py-2 font-medium">보여야 할 IP</th>
-              <th className="w-20 px-2 py-2 text-center font-medium">쓸 수 있는 계정</th>
-              <th className="w-28 px-2 py-2 text-right font-medium">마지막 성공</th>
-              <th className="w-12 px-2 py-2" />
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((item) => (
-              <tr key={item.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50">
-                <td className="px-5 py-2">
+        <ul className="divide-y divide-gray-100">
+          {items.map((item) => (
+            <li key={item.id} className="px-5 py-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
                   <button type="button" onClick={() => open(item)} className="font-medium text-gray-900 hover:underline">
                     {item.name}
                   </button>
                   {!item.active && <span className="ml-1.5 text-xs text-gray-400">쉬는 중</span>}
-                  {item.note && <p className="text-xs text-gray-400">{item.note}</p>}
-                </td>
-                <td className="px-2 py-2">
-                  {item.expectedIp ? (
-                    <span className="font-mono text-gray-700">{item.expectedIp}</span>
-                  ) : (
-                    // 비어 있으면 작업기가 처음 성공했을 때 적어 넣는다
-                    <span className="text-xs text-gray-400">첫 작업 때 기록됨</span>
-                  )}
-                  {item.vpnLocation && <p className="text-xs text-gray-400">{item.vpnLocation}</p>}
-                  {item.proxyHost && (
-                    <p className="text-xs text-gray-400">
-                      프록시 {item.proxyHost}
-                      {item.proxyPort ? `:${item.proxyPort}` : ''}
-                      {item.proxyUser && !item.hasProxyPass && <span className="text-amber-600"> 비밀번호 없음</span>}
-                    </p>
-                  )}
-                </td>
-                <td className={cn('px-2 py-2 text-center tabular-nums', item.accounts === 0 && 'text-gray-300')}>
-                  {item.usable}
-                  {/* 막혀서 내려간 계정이 있으면 "쓸 수 있는 수 / 붙은 수" 로 보여준다 */}
-                  {item.usable !== item.accounts && (
-                    <span className="text-xs text-gray-400"> / {item.accounts}</span>
-                  )}
-                </td>
-                <td className="px-2 py-2 text-right text-xs text-gray-400">
-                  {item.lastOkAt ? formatDate(item.lastOkAt) : '—'}
-                </td>
-                <td className="px-2 py-2 text-right">
+                  <p className="mt-0.5 text-xs text-gray-500">
+                    {item.expectedIp ? (
+                      <span className="font-mono text-gray-600">{item.expectedIp}</span>
+                    ) : (
+                      <span className="text-gray-400">IP 는 첫 작업 때 기록됩니다</span>
+                    )}
+                    {item.vpnLocation && <span className="ml-1.5">· {item.vpnLocation}</span>}
+                    {item.note && <span className="ml-1.5">· {item.note}</span>}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-3">
+                  <span className="text-xs text-gray-400">
+                    {item.lastOkAt ? `마지막 성공 ${formatDate(item.lastOkAt)}` : '아직 작업 없음'}
+                  </span>
                   <button
                     type="button"
                     onClick={() => remove(item)}
@@ -195,11 +161,51 @@ export function BlogProfileAdmin({ items }: { items: BlogProfile[] }) {
                   >
                     <Trash2 size={14} />
                   </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                </div>
+              </div>
+
+              {/* 붙은 아이디 — 지금 쓸 것 하나만 고른다 (주기적으로 돌려 가며 쓴다) */}
+              {item.accounts.length === 0 ? (
+                <p className="mt-2 text-xs text-gray-400">
+                  붙은 아이디가 없습니다.{' '}
+                  <a href="/admin/nwork" className="font-semibold text-zz-600 hover:underline">
+                    네이버 계정
+                  </a>{' '}
+                  에서 <b>블로그 프로필</b> 칸에 <code>{item.name}</code> 을 적어주세요.
+                </p>
+              ) : (
+                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5">
+                  {item.accounts.map((account) => {
+                    const picked = item.currentAccountId === account.id;
+                    return (
+                      <label
+                        key={account.id}
+                        title={account.usable ? '다시 누르면 고름이 풀립니다' : '쓸 수 없음으로 꺼져 있어 작업에서 빠집니다'}
+                        className={cn(
+                          'flex items-center gap-1.5 text-sm',
+                          account.usable ? 'cursor-pointer text-gray-700' : 'cursor-not-allowed text-gray-300',
+                        )}
+                      >
+                        <input
+                          type="radio"
+                          name={`current-${item.id}`}
+                          checked={picked}
+                          disabled={busy || !account.usable}
+                          onChange={() => pick(item, account.id)}
+                          // 라디오는 보통 해제가 안 되므로 같은 것을 다시 누르면 풀어 준다
+                          onClick={() => picked && pick(item, account.id)}
+                          className="accent-zz-600"
+                        />
+                        <span className={cn(picked && 'font-semibold text-zz-700')}>{account.loginId}</span>
+                        {!account.usable && <span className="text-xs">(꺼짐)</span>}
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
       )}
 
       {editing !== null && (
@@ -253,65 +259,6 @@ export function BlogProfileAdmin({ items }: { items: BlogProfile[] }) {
               />
             </label>
           </div>
-
-          {/* 프록시는 평소엔 접어 둔다. VPN 프로그램을 쓰면 쓸 일이 없는 칸이다 */}
-          <label className="mt-3 flex items-center gap-2 text-sm text-gray-600">
-            <input
-              type="checkbox"
-              checked={useProxy}
-              onChange={(event) => setUseProxy(event.target.checked)}
-              className="accent-zz-600"
-            />
-            프록시 서버를 거쳐서 내보내기
-            <span className="text-xs text-gray-400">VPN 프로그램을 쓰면 끈 채로 둡니다</span>
-          </label>
-
-          {useProxy && (
-            <div className="mt-3 grid gap-3 rounded-lg border border-gray-200 bg-white p-3 sm:grid-cols-2">
-            <label className="block text-xs font-semibold text-gray-500 sm:col-span-2">
-              프록시 주소
-              <span className="font-normal text-gray-400">
-                {' '}
-                — VPN 업체가 준 주소입니다. <b>내 IP 를 적는 칸이 아닙니다</b>
-              </span>
-              <input
-                value={draft.proxyHost}
-                onChange={(event) => setDraft({ ...draft, proxyHost: event.target.value })}
-                placeholder="지금 쓰는 회선 그대로 나가려면 비워 두세요"
-                className={`mt-1 ${inputClass}`}
-              />
-            </label>
-            <label className="block text-xs font-semibold text-gray-500">
-              포트
-              <input
-                value={draft.proxyPort}
-                onChange={(event) => setDraft({ ...draft, proxyPort: event.target.value.replace(/[^0-9]/g, '') })}
-                inputMode="numeric"
-                placeholder="8080"
-                className={`mt-1 ${inputClass}`}
-              />
-            </label>
-            <label className="block text-xs font-semibold text-gray-500">
-              프록시 아이디
-              <input
-                value={draft.proxyUser}
-                onChange={(event) => setDraft({ ...draft, proxyUser: event.target.value })}
-                className={`mt-1 ${inputClass}`}
-              />
-            </label>
-            <label className="block text-xs font-semibold text-gray-500">
-              프록시 비밀번호
-              <input
-                type="password"
-                value={draft.proxyPass}
-                onChange={(event) => setDraft({ ...draft, proxyPass: event.target.value })}
-                placeholder={editing === 'new' ? '' : '바꿀 때만 입력'}
-                autoComplete="new-password"
-                className={`mt-1 ${inputClass}`}
-              />
-            </label>
-            </div>
-          )}
 
           <label className="mt-3 flex items-center gap-2 text-sm text-gray-600">
             <input
