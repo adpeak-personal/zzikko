@@ -494,6 +494,13 @@
 ## 배포
 
 - main 에 푸시하면 워크플로가 이미지를 올리고 `deploy/deploy.sh` 를 서버에서 돌린다. 헬스체크까지 한다.
+- ⚠️ **서버 디스크가 차면 배포가 레이어를 푸는 중에 터진다.** 오류 글은 엉뚱하게 보인다 —
+  `failed to Lchown ... no such file or directory`. 디스크가 아니라 파일 권한 문제처럼 읽힌다.
+  - 배포마다 `sha-<커밋>` 태그가 새로 붙어 옛 이미지에 **전부 이름이 있다.** `docker image prune -f` 는
+    이름 없는 것만 지우므로 그것들이 계속 쌓인다. 그래서 `deploy.sh` 가 받기 전에
+    **우리 이미지만** 손봐 최근 3개와 `latest`, 지금 태그만 남긴다(`trim_old_images`).
+  - **이 서버에는 다른 프로젝트도 있다.** `docker system prune -af` 처럼 전부 쓸어 가는 명령은 쓰지 말 것.
+  - `/opt/zzikko/uploads` 는 바인드 마운트, DB 는 다른 서버(158.247.244.167)라 이미지 정리와 무관하다.
 - ⚠️ **서버에서 손으로 다시 띄울 땐 반드시 `deploy.sh` 를 쓴다.**
   - `docker compose restart` 는 `.env.back` 을 다시 읽지 않는다 (env_file 은 컨테이너를 만들 때만 읽힌다).
   - `docker compose up -d --force-recreate` 는 **이미지를 받아오지 않는다.** 태그를 안 주면 `latest` 가

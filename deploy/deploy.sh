@@ -19,6 +19,33 @@ echo "== zzikko 배포: $ZZIKKO_TAG"
 mkdir -p uploads
 chown 1000:1000 uploads   # 컨테이너의 node 사용자가 써야 한다
 
+# ⚠️ 받기 전에 자리를 비운다.
+#    배포마다 sha-<커밋> 태그가 새로 붙어서 옛 이미지에 **전부 이름이 있다.**
+#    `docker image prune -f` 는 이름 없는 것만 지우므로 그것들이 계속 쌓이고,
+#    디스크가 차면 레이어를 푸는 중에 터진다 (lchown ... no such file or directory).
+#    이 서버에는 다른 프로젝트도 있으므로 **우리 이미지만** 손댄다.
+trim_old_images() {
+  local repo keep
+  for repo in ghcr.io/adpeak-personal/zzikko-back ghcr.io/adpeak-personal/zzikko-front; do
+    # 지금 쓰는 태그와 latest 는 남기고, 최근 3개까지만 둔다 (롤백할 자리)
+    keep=$(docker image ls "$repo" --format '{{.Tag}}' | grep -v '^latest$' | head -3)
+    docker image ls "$repo" --format '{{.Repository}}:{{.Tag}}' | while read -r ref; do
+      case "${ref##*:}" in
+        latest | "$ZZIKKO_TAG") continue ;;
+      esac
+      grep -qx "${ref##*:}" <<< "$keep" && continue
+      docker image rm "$ref" > /dev/null 2>&1 || true
+    done
+  done
+  docker builder prune -f --filter 'until=168h' > /dev/null 2>&1 || true
+}
+trim_old_images
+
+# 남은 자리가 너무 적으면 받기 전에 알려 준다 — 받다가 터지면 원인이 안 보인다
+free_mb=$(df -Pm . | awk 'NR==2 {print $4}')
+echo "== 남은 디스크: ${free_mb}MB"
+[ "$free_mb" -gt 3000 ] || echo "::warning::디스크가 ${free_mb}MB 밖에 없습니다. 이미지를 푸는 중에 실패할 수 있습니다."
+
 docker compose pull
 docker compose up -d --remove-orphans
 docker image prune -f > /dev/null
