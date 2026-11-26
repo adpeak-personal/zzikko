@@ -1,6 +1,7 @@
 import type { RowDataPacket } from 'mysql2';
 import { execute, query, queryOne } from '../db/pool.js';
 import type { BlogProfile, BlogProfileAccount, RunnerAccount, RunnerProfile } from '../types.js';
+import { pickUserAgent } from '../lib/blog/userAgents.js';
 
 /**
  * 블로그 작업 프로필 — **IP(프록시) 하나와 크롬 프로필 하나가 한 쌍**이다.
@@ -98,6 +99,8 @@ export interface ProfileInput {
 }
 
 export async function createProfile(input: ProfileInput): Promise<number> {
+  // 안 적었으면 돌려 쓰는 목록에서 하나 골라 넣는다
+  const userAgent = input.userAgent || (await nextUserAgent());
   const { insertId } = await execute(
     `INSERT INTO blog_profiles
        (name, proxy_host, proxy_port, proxy_user, proxy_pass, user_agent, note, expected_ip, vpn_location, active)
@@ -108,7 +111,7 @@ export async function createProfile(input: ProfileInput): Promise<number> {
       input.proxyPort,
       input.proxyUser,
       input.proxyPass ?? '',
-      input.userAgent,
+      userAgent,
       input.note,
       input.expectedIp,
       input.vpnLocation,
@@ -123,6 +126,8 @@ export async function createProfile(input: ProfileInput): Promise<number> {
  * 안 그러면 계정이 어느 프로필에도 속하지 않게 된다.
  */
 export async function updateProfile(id: number, oldName: string, input: ProfileInput): Promise<void> {
+  // 비워 둔 채 저장하면 여기서도 하나 골라 넣는다 — 전부 빈 채로 두면 다 같은 기기가 된다
+  const userAgent = input.userAgent || (await nextUserAgent());
   await execute(
     `UPDATE blog_profiles
         SET name = ?, proxy_host = ?, proxy_port = ?, proxy_user = ?, user_agent = ?, note = ?,
@@ -133,7 +138,7 @@ export async function updateProfile(id: number, oldName: string, input: ProfileI
       input.proxyHost,
       input.proxyPort,
       input.proxyUser,
-      input.userAgent,
+      userAgent,
       input.note,
       input.expectedIp,
       input.vpnLocation,
@@ -301,4 +306,17 @@ export async function deleteMany(ids: number[]): Promise<number> {
     ids,
   );
   return affectedRows;
+}
+
+/**
+ * 새 프로필에 넣을 User-Agent 를 고른다 — **이미 쓰는 것 중 가장 적게 쓰인 것.**
+ *
+ * 전부 같은 UA 로 두면 같은 IP 에 여러 계정이 "똑같은 기기" 로 들어가는 모양이 된다.
+ * 손으로 적어 넣으면 그 값을 그대로 쓴다.
+ */
+export async function nextUserAgent(): Promise<string> {
+  const rows = await query<RowDataPacket & { user_agent: string }>(
+    "SELECT user_agent FROM blog_profiles WHERE user_agent <> ''",
+  );
+  return pickUserAgent(rows.map((row) => row.user_agent));
 }
