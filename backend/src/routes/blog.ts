@@ -5,6 +5,7 @@ import { requireAdmin } from '../lib/auth.js';
 import * as profiles from '../repositories/blogProfiles.js';
 import * as drafts from '../repositories/blogDrafts.js';
 import { getSheet } from '../repositories/sise.js';
+import { listSpecs } from '../repositories/content.js';
 
 /**
  * 블로그 작업 프로필 — 전부 운영진 전용.
@@ -62,23 +63,40 @@ export default async function blogRoutes(app: FastifyInstance) {
     const sheet = await getSheet(id);
     if (!sheet) throw notFound('시세표');
     if (!sheet.rows.length) throw badRequest('가격이 등록된 시세표를 선택해주세요.');
-    return drafts.buildDraft(sheet);
+    return drafts.buildDraft(sheet, await listSpecs());
   };
 
   app.get('/admin/blog/draft-sources', async () => ({ items: await drafts.listSources() }));
   app.get('/admin/blog/draft-sources/:id', async (request) => draftSource(parse(idParam, request.params).id));
   app.get('/admin/blog/drafts', async () => ({ items: await drafts.listDrafts() }));
   app.post('/admin/blog/drafts', async (request, reply) => {
-    const { profileId, sheetId, title, intro, middle, outro } = parse(z.object({
+    const paragraph = z.string().trim().min(1).max(2000);
+    const { profileId, sheetId, title, intro, middle, outro, morePriceTexts, detailTexts, links } = parse(z.object({
       profileId: z.number().int().positive(),
       sheetId: z.number().int().positive(),
       title: z.string().trim().min(1).max(200),
       intro: z.string().trim().min(1).max(6000),
       middle: z.string().trim().min(1).max(6000).optional(),
       outro: z.string().trim().min(1).max(6000),
+      morePriceTexts: z.array(paragraph).max(3).optional(),
+      detailTexts: z.tuple([paragraph, paragraph]).optional(),
+      links: z.array(z.object({
+        title: z.string().trim().min(1).max(100),
+        url: z.string().trim().max(2048).pipe(z.url({ protocol: /^https?$/ })).refine((value) => {
+          const url = new URL(value);
+          return !url.username && !url.password;
+        }, '아이디나 비밀번호가 포함된 링크는 사용할 수 없습니다.'),
+      })).max(10).default([]),
     }), request.body);
     const source = await draftSource(sheetId);
-    const id = await drafts.enqueue(profileId, sheetId, { ...source, title, intro, middle: middle ?? source.middle, outro });
+    if (morePriceTexts && morePriceTexts.length !== source.morePrices.length) {
+      throw badRequest('시세표가 변경됐습니다. 초안을 다시 만들어주세요.');
+    }
+    const id = await drafts.enqueue(profileId, sheetId, {
+      ...source, title, intro, middle: middle ?? source.middle, outro, links,
+      morePrices: source.morePrices.map((item, i) => ({ ...item, text: morePriceTexts?.[i] ?? item.text })),
+      details: source.details.map((item, i) => ({ ...item, text: detailTexts?.[i] ?? item.text })),
+    });
     if (!id) throw badRequest('사용 중인 블로그 프로필을 선택해주세요.');
     return reply.code(201).send({ id });
   });
