@@ -404,6 +404,22 @@ const steps = [
          COMMENT '지우기로 표시해 둔 것. 작업기가 PC 의 크롬 폴더를 지운 뒤 행을 없앤다'`,
     ],
   },
+  {
+    name: 'blog_drafts — 블로그 원고 작업 대기열',
+    check: (c) => hasTable(c, 'blog_drafts'),
+    sql: [`CREATE TABLE blog_drafts (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  profile_id INT UNSIGNED NOT NULL,
+  sheet_id INT UNSIGNED NOT NULL,
+  title VARCHAR(200) NOT NULL,
+  payload JSON NOT NULL,
+  status ENUM('queued', 'writing', 'entered') NOT NULL DEFAULT 'queued',
+  claim_token CHAR(36) NULL,
+  claimed_at DATETIME NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY ix_blog_drafts_queue (profile_id, status, id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`],
+  },
 ];
 
 /** 공개 주소 앞머리. 없으면 바꿀 것도 없다. */

@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { badRequest, notFound, parse } from '../lib/http.js';
 import { requireAdmin } from '../lib/auth.js';
 import * as profiles from '../repositories/blogProfiles.js';
+import * as drafts from '../repositories/blogDrafts.js';
+import { getSheet } from '../repositories/sise.js';
 
 /**
  * 블로그 작업 프로필 — 전부 운영진 전용.
@@ -55,6 +57,40 @@ const updateSchema = needsPort(z.object({ ...profileBase, proxyPass: z.string().
 
 export default async function blogRoutes(app: FastifyInstance) {
   app.addHook('preHandler', requireAdmin);
+
+  const draftSource = async (id: number) => {
+    const sheet = await getSheet(id);
+    if (!sheet) throw notFound('시세표');
+    if (!sheet.rows.length) throw badRequest('가격이 등록된 시세표를 선택해주세요.');
+    return drafts.buildDraft(sheet);
+  };
+
+  app.get('/admin/blog/draft-sources', async () => ({ items: await drafts.listSources() }));
+  app.get('/admin/blog/draft-sources/:id', async (request) => draftSource(parse(idParam, request.params).id));
+  app.get('/admin/blog/drafts', async () => ({ items: await drafts.listDrafts() }));
+  app.post('/admin/blog/drafts', async (request, reply) => {
+    const { profileId, sheetId, title, intro, outro } = parse(z.object({
+      profileId: z.number().int().positive(),
+      sheetId: z.number().int().positive(),
+      title: z.string().trim().min(1).max(200),
+      intro: z.string().trim().min(1).max(6000),
+      outro: z.string().trim().min(1).max(6000),
+    }), request.body);
+    const source = await draftSource(sheetId);
+    const id = await drafts.enqueue(profileId, sheetId, { ...source, title, intro, outro });
+    if (!id) throw badRequest('사용 중인 블로그 프로필을 선택해주세요.');
+    return reply.code(201).send({ id });
+  });
+  app.post('/admin/blog/runner/drafts/claim', async (request) => {
+    const { profileId } = parse(z.object({ profileId: z.number().int().positive() }), request.body);
+    return { item: await drafts.claim(profileId) };
+  });
+  app.post('/admin/blog/runner/drafts/:id/result', async (request) => {
+    const { id } = parse(idParam, request.params);
+    const { token, ok } = parse(z.object({ token: z.uuid(), ok: z.boolean() }), request.body);
+    if (!(await drafts.finish(id, token, ok))) throw badRequest('원고 작업 권한이 만료됐습니다.');
+    return { ok: true };
+  });
 
   app.get('/admin/blog/profiles', async () => ({ items: await profiles.listProfiles() }));
 

@@ -30,6 +30,7 @@ DROP TABLE IF EXISTS
   sise_reports,
   sise_sheets, seller_applications;
 DROP TABLE IF EXISTS phone_verifications;
+DROP TABLE IF EXISTS blog_drafts;
 DROP TABLE IF EXISTS blog_profiles;
 DROP TABLE IF EXISTS uploads;
 DROP TABLE IF EXISTS post_scraps;
@@ -528,6 +529,19 @@ CREATE TABLE IF NOT EXISTS nwork (
   PRIMARY KEY (n_idx),
   UNIQUE KEY n_id (n_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE blog_drafts (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  profile_id INT UNSIGNED NOT NULL,
+  sheet_id INT UNSIGNED NOT NULL,
+  title VARCHAR(200) NOT NULL,
+  payload JSON NOT NULL,
+  status ENUM('queued', 'writing', 'entered') NOT NULL DEFAULT 'queued',
+  claim_token CHAR(36) NULL,
+  claimed_at DATETIME NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY ix_blog_drafts_queue (profile_id, status, id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 블로그 작업 프로필 — IP(프록시) 하나와 크롬 프로필 하나가 한 쌍.
 -- 계정(nwork)이 work_profile 이름으로 여기에 붙는다 (보통 셋).
