@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { execute, query, withTransaction } from '../db/pool.js';
+import { execute, query, queryOne, withTransaction } from '../db/pool.js';
 import { lowestByModel } from '../lib/sise/compare.js';
 import type { PhoneSpec, SiseRow, SiseSheet } from '../types.js';
 
@@ -108,12 +108,23 @@ export async function enqueue(profileId: number, sheetId: number, draft: Payload
   return result.affectedRows ? result.insertId : null;
 }
 
-export function listDrafts() {
-  return query(
+export async function listDrafts(requestedPage: number) {
+  const size = 20;
+  const count = await queryOne<{ total: number }>('SELECT COUNT(*) AS total FROM blog_drafts');
+  const total = Number(count?.total ?? 0);
+  const page = Math.min(requestedPage, Math.max(1, Math.ceil(total / size)));
+  const items = await query(
     `SELECT d.id, p.name AS profile, d.title, d.status, d.created_at AS createdAt
        FROM blog_drafts d LEFT JOIN blog_profiles p ON p.id = d.profile_id
-      ORDER BY d.id DESC LIMIT 100`,
+      ORDER BY d.id DESC LIMIT ? OFFSET ?`,
+    [size, (page - 1) * size],
   );
+  return { items, total, size, page };
+}
+
+export async function deleteDraft(id: number) {
+  const result = await execute("DELETE FROM blog_drafts WHERE id = ? AND status <> 'writing'", [id]);
+  return result.affectedRows > 0 || !(await queryOne('SELECT id FROM blog_drafts WHERE id = ?', [id]));
 }
 
 export function claim(profileId: number) {

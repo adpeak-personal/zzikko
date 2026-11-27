@@ -19,7 +19,8 @@ interface Draft {
   details: Section[];
   links: SourceLink[];
 }
-interface QueueItem { id: number; profile: string | null; title: string; status: keyof typeof STATUS }
+interface QueueItem { id: number; profile: string | null; title: string; status: keyof typeof STATUS; createdAt: string }
+interface QueuePage { items: QueueItem[]; total: number; size: number; page: number }
 
 const BASE = '/admin/blog';
 const STATUS = { queued: '작성 대기', writing: '입력 중', entered: '편집기 입력 완료' };
@@ -45,9 +46,9 @@ function CardPreview({ card }: { card: Card }) {
 export function BlogDraftAdmin({ profiles, sources, queue }: {
   profiles: BlogProfile[];
   sources: Source[];
-  queue: QueueItem[];
+  queue: QueuePage;
 }) {
-  const [items, setItems] = useState(queue);
+  const [history, setHistory] = useState(queue);
   const [sheetId, setSheetId] = useState('');
   const [profileId, setProfileId] = useState('');
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -66,9 +67,14 @@ export function BlogDraftAdmin({ profiles, sources, queue }: {
     }
   }
 
-  async function refresh() {
-    const { items } = await apiFetch<{ items: QueueItem[] }>(`${BASE}/drafts`);
-    setItems(items);
+  async function loadPage(page: number) {
+    setHistory(await apiFetch<QueuePage>(`${BASE}/drafts?page=${page}`));
+  }
+
+  async function removeDraft(item: QueueItem) {
+    await apiFetch(`${BASE}/drafts/${item.id}`, { method: 'DELETE' });
+    await loadPage(history.page);
+    setMessage('원고를 삭제했어요.');
   }
 
   async function enqueue(current: Draft) {
@@ -84,7 +90,7 @@ export function BlogDraftAdmin({ profiles, sources, queue }: {
     });
     setDraft(null);
     setMessage('작성 대기열에 추가했어요.');
-    await refresh();
+    await loadPage(1);
   }
 
   function extraSections(current: Draft, key: 'morePrices' | 'details') {
@@ -106,6 +112,7 @@ export function BlogDraftAdmin({ profiles, sources, queue }: {
     ? [draft.intro, draft.middle, draft.outro, ...draft.morePrices.map((item) => item.text), ...draft.details.map((item) => item.text)]
         .reduce((total, paragraph) => total + [...paragraph.trim()].length, 0)
     : 0;
+  const lastPage = Math.max(1, Math.ceil(history.total / history.size));
 
   return (
     <section className="space-y-5 rounded-xl border border-gray-200 bg-white p-4">
@@ -191,15 +198,52 @@ export function BlogDraftAdmin({ profiles, sources, queue }: {
       {message && <p role="status" className="text-sm">{message}</p>}
       <div>
         <div className="flex items-center justify-between">
-          <h3 className="font-semibold">원고 현황</h3>
+          <h3 className="font-semibold">원고 현황 <span className="text-sm font-normal text-gray-600">{history.total.toLocaleString()}건</span></h3>
           <button type="button" className="text-sm text-zz-600 underline" disabled={busy}
-            onClick={() => void request(refresh)}>새로고침</button>
+            onClick={() => void request(() => loadPage(history.page))}>새로고침</button>
         </div>
-        {items.length ? <ul className="mt-2 divide-y divide-gray-100 text-sm">
-          {items.map((item) => <li className="flex flex-wrap justify-between gap-2 py-2" key={item.id}>
-            <span>{item.title} · {item.profile ?? '삭제된 프로필'}</span><span>{STATUS[item.status]}</span>
-          </li>)}
-        </ul> : <p className="mt-2 text-sm text-gray-600">등록된 원고가 없어요.</p>}
+        <div className="mt-3 overflow-x-auto rounded-lg border border-gray-200">
+          <table className="w-full min-w-[40rem] text-left text-sm">
+            <thead className="bg-gray-50 text-gray-700">
+              <tr>
+                {['제목', '프로필', '상태', '작성일', '삭제'].map((heading) => (
+                  <th key={heading} scope="col" className="whitespace-nowrap px-3 py-2 font-semibold">{heading}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {history.items.map((item) => (
+                <tr key={item.id}>
+                  <td className="px-3 py-2 font-medium">{item.title}</td>
+                  <td className="whitespace-nowrap px-3 py-2">{item.profile ?? '삭제된 프로필'}</td>
+                  <td className="whitespace-nowrap px-3 py-2">{STATUS[item.status]}</td>
+                  <td className="whitespace-nowrap px-3 py-2 tabular-nums">{item.createdAt.slice(0, 10)}</td>
+                  <td className="px-3 py-2">
+                    <button type="button" disabled={busy || item.status === 'writing'}
+                      className="whitespace-nowrap rounded-md border border-red-200 px-2 py-1 text-red-700 hover:bg-red-50 disabled:opacity-40"
+                      aria-label={`${item.title} 삭제`}
+                      title={item.status === 'writing' ? '입력 중인 원고는 삭제할 수 없어요.' : undefined}
+                      onClick={() => {
+                        if (confirm(`“${item.title}” 원고를 삭제할까요?`)) void request(() => removeDraft(item));
+                      }}>삭제</button>
+                  </td>
+                </tr>
+              ))}
+              {history.items.length === 0 && (
+                <tr><td colSpan={5} className="px-3 py-6 text-center text-gray-600">등록된 원고가 없어요.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        {lastPage > 1 && (
+          <nav aria-label="원고 페이지" className="mt-3 flex items-center justify-center gap-3 text-sm">
+            <button type="button" className="rounded-md border px-3 py-1.5 disabled:opacity-40"
+              disabled={busy || history.page <= 1} onClick={() => void request(() => loadPage(history.page - 1))}>이전</button>
+            <span aria-live="polite" className="tabular-nums">{history.page} / {lastPage} 페이지</span>
+            <button type="button" className="rounded-md border px-3 py-1.5 disabled:opacity-40"
+              disabled={busy || history.page >= lastPage} onClick={() => void request(() => loadPage(history.page + 1))}>다음</button>
+          </nav>
+        )}
       </div>
     </section>
   );

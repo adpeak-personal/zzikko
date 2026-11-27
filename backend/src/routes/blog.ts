@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { badRequest, notFound, parse } from '../lib/http.js';
+import { badRequest, HttpError, notFound, parse } from '../lib/http.js';
 import { requireAdmin } from '../lib/auth.js';
 import * as profiles from '../repositories/blogProfiles.js';
 import * as drafts from '../repositories/blogDrafts.js';
@@ -68,7 +68,15 @@ export default async function blogRoutes(app: FastifyInstance) {
 
   app.get('/admin/blog/draft-sources', async () => ({ items: await drafts.listSources() }));
   app.get('/admin/blog/draft-sources/:id', async (request) => draftSource(parse(idParam, request.params).id));
-  app.get('/admin/blog/drafts', async () => ({ items: await drafts.listDrafts() }));
+  app.get('/admin/blog/drafts', async (request) => {
+    const { page } = parse(z.object({ page: z.coerce.number().int().positive().default(1) }), request.query);
+    return drafts.listDrafts(page);
+  });
+  app.delete('/admin/blog/drafts/:id', async (request) => {
+    const { id } = parse(idParam, request.params);
+    if (!(await drafts.deleteDraft(id))) throw new HttpError(409, '입력 중인 원고는 삭제할 수 없습니다.');
+    return { ok: true };
+  });
   app.post('/admin/blog/drafts', async (request, reply) => {
     const paragraph = z.string().trim().min(1).max(2000);
     const { profileId, sheetId, title, intro, middle, outro, morePriceTexts, detailTexts, links } = parse(z.object({

@@ -28,9 +28,9 @@ export default async function AdminBlogPage({ searchParams }: {
     type DraftProps = ComponentProps<typeof BlogDraftAdmin>;
     const [sources, queue] = await Promise.all([
       apiGet<{ items: DraftProps['sources'] }>('/admin/blog/draft-sources'),
-      apiGet<{ items: DraftProps['queue'] }>('/admin/blog/drafts'),
+      apiGet<DraftProps['queue']>('/admin/blog/drafts'),
     ]);
-    return <div className="space-y-5">{tabs}<BlogDraftAdmin profiles={items} sources={sources.items} queue={queue.items} /></div>;
+    return <div className="space-y-5">{tabs}<BlogDraftAdmin profiles={items} sources={sources.items} queue={queue} /></div>;
   }
 
   return (
