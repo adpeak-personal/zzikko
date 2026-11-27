@@ -69,15 +69,16 @@ export default async function blogRoutes(app: FastifyInstance) {
   app.get('/admin/blog/draft-sources/:id', async (request) => draftSource(parse(idParam, request.params).id));
   app.get('/admin/blog/drafts', async () => ({ items: await drafts.listDrafts() }));
   app.post('/admin/blog/drafts', async (request, reply) => {
-    const { profileId, sheetId, title, intro, outro } = parse(z.object({
+    const { profileId, sheetId, title, intro, middle, outro } = parse(z.object({
       profileId: z.number().int().positive(),
       sheetId: z.number().int().positive(),
       title: z.string().trim().min(1).max(200),
       intro: z.string().trim().min(1).max(6000),
+      middle: z.string().trim().min(1).max(6000).optional(),
       outro: z.string().trim().min(1).max(6000),
     }), request.body);
     const source = await draftSource(sheetId);
-    const id = await drafts.enqueue(profileId, sheetId, { ...source, title, intro, outro });
+    const id = await drafts.enqueue(profileId, sheetId, { ...source, title, intro, middle: middle ?? source.middle, outro });
     if (!id) throw badRequest('사용 중인 블로그 프로필을 선택해주세요.');
     return reply.code(201).send({ id });
   });

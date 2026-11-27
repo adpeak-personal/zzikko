@@ -5,11 +5,14 @@ import { ApiError, apiFetch } from '@/lib/api';
 import type { BlogProfile } from '@/lib/types';
 
 interface Source { id: number; region: string; datedOn: string }
+interface Card { title: string; source: string; columns: string[]; rows: string[][] }
 interface Draft {
   title: string;
   intro: string;
+  middle: string;
   outro: string;
-  card: { title: string; source: string; columns: string[]; rows: string[][] };
+  card: Card;
+  comparison: Card;
 }
 interface QueueItem { id: number; profile: string | null; title: string; status: keyof typeof STATUS }
 
@@ -17,6 +20,22 @@ const BASE = '/admin/blog';
 const STATUS = { queued: '작성 대기', writing: '입력 중', entered: '편집기 입력 완료' };
 const field = 'block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm';
 const button = 'rounded-lg bg-zz-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50';
+
+function CardPreview({ card }: { card: Card }) {
+  return (
+    <div className="overflow-x-auto rounded-lg border border-gray-200 p-3">
+      <table className="w-full text-left text-sm">
+        <caption className="pb-2 text-left font-semibold">{card.title} · {card.source}</caption>
+        <thead><tr>{card.columns.map((column) => <th className="bg-gray-50 p-2" key={column}>{column}</th>)}</tr></thead>
+        <tbody>{card.rows.map((row, index) => (
+          <tr className="border-b border-gray-100" key={index}>
+            {row.map((value, column) => <td className="p-2" key={column}>{value}</td>)}
+          </tr>
+        ))}</tbody>
+      </table>
+    </div>
+  );
+}
 
 export function BlogDraftAdmin({ profiles, sources, queue }: {
   profiles: BlogProfile[];
@@ -52,7 +71,7 @@ export function BlogDraftAdmin({ profiles, sources, queue }: {
       method: 'POST',
       body: JSON.stringify({
         profileId: Number(profileId), sheetId: Number(sheetId),
-        title: current.title, intro: current.intro, outro: current.outro,
+        title: current.title, intro: current.intro, middle: current.middle, outro: current.outro,
       }),
     });
     setDraft(null);
@@ -93,18 +112,13 @@ export function BlogDraftAdmin({ profiles, sources, queue }: {
               <textarea className={field} required maxLength={6000} rows={3} value={draft.intro}
                 onChange={(e) => setDraft({ ...draft, intro: e.target.value })} />
             </label>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <caption className="pb-2 text-left font-semibold">{draft.card.title} · {draft.card.source}</caption>
-                <thead><tr>{draft.card.columns.map((column) => <th className="bg-gray-50 p-2" key={column}>{column}</th>)}</tr></thead>
-                <tbody>{draft.card.rows.map((row, index) => (
-                  <tr className="border-b border-gray-100" key={index}>
-                    {row.map((value, column) => <td className="p-2" key={column}>{value}</td>)}
-                  </tr>
-                ))}</tbody>
-              </table>
-            </div>
-            <label className="block text-sm">시세표 뒤 본문
+            <CardPreview card={draft.card} />
+            <label className="block text-sm">가입 조건 해설
+              <textarea className={field} required maxLength={6000} rows={4} value={draft.middle}
+                onChange={(e) => setDraft({ ...draft, middle: e.target.value })} />
+            </label>
+            <CardPreview card={draft.comparison} />
+            <label className="block text-sm">마무리
               <textarea className={field} required maxLength={6000} rows={3} value={draft.outro}
                 onChange={(e) => setDraft({ ...draft, outro: e.target.value })} />
             </label>
